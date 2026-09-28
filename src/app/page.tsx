@@ -87,6 +87,241 @@ function nearestSnap(
   const candidates: SnapPoint[] = [];
 
   if (piece.type === "wall") {
+    for (const target of others.filter((candidate) => candidate.type === "wall")) {
+      candidates.push(
+        {
+          x: target.x - target.width / 2 - piece.width / 2,
+          y: target.y,
+          rotation: target.rotation,
+          key: `room-${target.id}-left`,
+          label: "Room edge",
+        },
+        {
+          x: target.x + target.width / 2 + piece.width / 2,
+          y: target.y,
+          rotation: target.rotation,
+          key: `room-${target.id}-right`,
+          label: "Room edge",
+        },
+        {
+          x: target.x,
+          y: target.y - target.height / 2 - piece.height / 2,
+          rotation: target.rotation,
+          key: `room-${target.id}-top`,
+          label: "Room edge",
+        },
+        {
+          x: target.x,
+          y: target.y + target.height / 2 + piece.height / 2,
+          rotation: target.rotation,
+          key: `room-${target.id}-bottom`,
+          label: "Room edge",
+        }
+      );
+    }
+
+    for (const floor of others.filter((candidate) => candidate.type === "floor")) {
+      candidates.push({
+        x: floor.x,
+        y: floor.y,
+        key: `room-floor-${floor.id}`,
+        label: "Floor center",
+      });
+    }
+  }
+
+  if (piece.type === "door" || piece.type === "window") {
+    for (const wall of others.filter((candidate) => candidate.type === "wall")) {
+      const angle = (wall.rotation * Math.PI) / 180;
+      const dirX = Math.cos(angle);
+      const dirY = Math.sin(angle);
+      const relX = proposedX - wall.x;
+      const relY = proposedY - wall.y;
+      const projected = relX * dirX + relY * dirY;
+      const maxTravel = Math.max(0, wall.width / 2 - piece.width / 2);
+      const travel = clamp(projected, -maxTravel, maxTravel);
+
+      candidates.push({
+        x: wall.x + dirX * travel,
+        y: wall.y + dirY * travel,
+        rotation: wall.rotation,
+        key: `${piece.type}-wall-${wall.id}`,
+        label: piece.type === "door" ? "Door in wall" : "Window in wall",
+      });
+    }
+  }
+
+  if (piece.type === "floor") {
+    for (const floor of others.filter((candidate) => candidate.type === "floor")) {
+      candidates.push(
+        {
+          x: floor.x - floor.width / 2 - piece.width / 2,
+          y: floor.y,
+          key: `floor-${floor.id}-left`,
+          label: "Floor edge",
+        },
+        {
+          x: floor.x + floor.width / 2 + piece.width / 2,
+          y: floor.y,
+          key: `floor-${floor.id}-right`,
+          label: "Floor edge",
+        }
+      );
+    }
+  }
+
+  if (piece.type === "tower") {
+    for (const floor of others.filter((candidate) => candidate.type === "floor")) {
+      const y = floor.y - floor.height / 2 - piece.height / 2;
+      candidates.push(
+        {
+          x: floor.x - floor.width / 2 + piece.width / 2,
+          y,
+          key: `tower-floor-${floor.id}-left`,
+          label: "Floor corner",
+        },
+        {
+          x: floor.x + floor.width / 2 - piece.width / 2,
+          y,
+          key: `tower-floor-${floor.id}-right`,
+          label: "Floor corner",
+        }
+      );
+    }
+
+    for (const wall of others.filter((candidate) => candidate.type === "wall")) {
+      wallEndpoints(wall).forEach((end, index) => {
+        candidates.push({
+          x: end.x,
+          y: end.y - piece.height / 2,
+          key: `tower-wall-${wall.id}-${index}`,
+          label: "Wall end",
+        });
+      });
+    }
+  }
+
+  if (piece.type === "column") {
+    for (const floor of others.filter((candidate) => candidate.type === "floor")) {
+      const left = floor.x - floor.width / 2 + piece.width / 2;
+      const right = floor.x + floor.width / 2 - piece.width / 2;
+      const y = floor.y - floor.height / 2 - piece.height / 2;
+
+      for (let index = 0; index < 5; index += 1) {
+        const x = left + ((right - left) * index) / 4;
+        candidates.push({
+          x,
+          y,
+          key: `column-grid-${floor.id}-${index}`,
+          label: "Column spacing",
+        });
+      }
+    }
+
+    for (const column of others.filter((candidate) => candidate.type === "column")) {
+      candidates.push({
+        x: 100 - column.x,
+        y: column.y,
+        key: `column-mirror-${column.id}`,
+        label: "Mirror alignment",
+      });
+    }
+  }
+
+  if (piece.type === "arch") {
+    const supports = others.filter(
+      (candidate) => candidate.type === "column" || candidate.type === "wall"
+    );
+
+    for (let first = 0; first < supports.length; first += 1) {
+      for (let second = first + 1; second < supports.length; second += 1) {
+        const a = supports[first];
+        const b = supports[second];
+        const gap = distance(a.x, a.y, b.x, b.y);
+
+        if (gap <= 45 && Math.abs(a.y - b.y) <= 10) {
+          candidates.push({
+            x: (a.x + b.x) / 2,
+            y: (a.y + b.y) / 2,
+            key: `arch-between-${a.id}-${b.id}`,
+            label: "Between supports",
+          });
+        }
+      }
+    }
+  }
+
+  if (piece.type === "roof") {
+    for (const target of others.filter(
+      (candidate) => candidate.type === "wall" || candidate.type === "tower"
+    )) {
+      candidates.push({
+        x: target.x,
+        y: target.y - target.height / 2 - piece.height / 2,
+        key: `roof-${target.id}`,
+        label: target.type === "tower" ? "Tower top" : "Wall top",
+        rotation: target.rotation,
+      });
+    }
+  }
+
+  for (const target of others.filter((candidate) => candidate.type === piece.type)) {
+    candidates.push(
+      {
+        x: target.x,
+        y: proposedY,
+        key: `align-x-${target.id}`,
+        label: "Vertical alignment",
+      },
+      {
+        x: proposedX,
+        y: target.y,
+        key: `align-y-${target.id}`,
+        label: "Horizontal alignment",
+      }
+    );
+  }
+
+  let best: { point: SnapPoint; score: number } | null = null;
+
+  for (const point of candidates) {
+    const score = distance(proposedX, proposedY, point.x, point.y);
+    if (score <= SNAP_DISTANCE && (!best || score < best.score)) {
+      best = { point, score };
+    }
+  }
+
+  return best?.point ?? null;
+}
+
+function PieceShape({
+  piece,
+  selected,
+  onPointerDown,
+}: {
+  piece: TemplePiece;
+  selected: boolean;
+  onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+}) {
+  const material =
+    TEMPLE_MATERIALS.find((item) => item.id === piece.material) ??
+    TEMPLE_MATERIALS[0];
+
+  const commonStyle = {
+    left: `${piece.x}%`,
+    top: `${piece.y}%`,
+    width: `${piece.width}%`,
+    height: `${piece.height}%`,
+    transform: `translate(-50%, -50%) rotate(${piece.rotation}deg)`,
+    zIndex: piece.layer,
+  };
+
+  const base = "absolute touch-none border transition-shadow";
+  const selectedRing = selected
+    ? "ring-2 ring-amber-300 ring-offset-2 ring-offset-transparent"
+    : "";
+
+  if (piece.type === "wall") {
     return (
       <button
         type="button"
@@ -96,11 +331,11 @@ function nearestSnap(
         style={{
           ...commonStyle,
           backgroundImage:
-            "linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px)",
+            "linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px)",
           backgroundSize: "12px 12px",
         }}
       >
-        <span className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/70 px-2 py-0.5 text-[9px] text-amber-100">
+        <span className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/75 px-2 py-0.5 text-[9px] text-amber-100">
           {Math.round(piece.width)} × {Math.round(piece.height)}
         </span>
       </button>
@@ -381,7 +616,6 @@ export default function TempleBuilderPage() {
     next.pieces.push(newPiece);
     commit(next);
     setSelectedId(newPiece.id);
-
     setPendingVariant(null);
     setPendingGuide(null);
     setSnapGuide(null);
@@ -390,13 +624,13 @@ export default function TempleBuilderPage() {
       pulseSnap(resolved.snap.key);
       setStatus(
         newPiece.type === "wall"
-          ? `Wall room placed: ${resolved.snap.label}. Drag the corner handles to reshape it.`
+          ? `Wall room placed: ${resolved.snap.label}. Pull a corner to reshape it.`
           : `Snapped: ${resolved.snap.label}. Drag to fine-tune.`
       );
     } else {
       setStatus(
         newPiece.type === "wall"
-          ? "Wall room placed. Drag the corner handles to reshape it."
+          ? "Wall room placed. Pull a corner to reshape it."
           : "Placed. Drag it to fine-tune."
       );
     }
@@ -454,7 +688,7 @@ export default function TempleBuilderPage() {
         x: resolved.x,
         y: resolved.y,
         width: draft.width,
-        height: draft.type === "wall" ? 3 : draft.height,
+        height: draft.height,
         key: resolved.snap?.key ?? "free-pending",
         label: resolved.snap?.label ?? "Place here",
         rotation: resolved.rotation,
@@ -502,7 +736,7 @@ export default function TempleBuilderPage() {
         x: resolved.x,
         y: resolved.y,
         width: movingPiece.width,
-        height: movingPiece.type === "wall" ? 3 : movingPiece.height,
+        height: movingPiece.height,
         rotation: resolved.rotation,
       });
       pulseSnap(resolved.snap.key);
@@ -540,6 +774,7 @@ export default function TempleBuilderPage() {
     corner: "nw" | "ne" | "sw" | "se"
   ) => {
     event.stopPropagation();
+    setPendingVariant(null);
     resizeRef.current = {
       id: piece.id,
       pointerId: event.pointerId,
@@ -560,8 +795,10 @@ export default function TempleBuilderPage() {
     const rect = stageRef.current.getBoundingClientRect();
     const dx = ((event.clientX - resize.startX) / rect.width) * 100;
     const dy = ((event.clientY - resize.startY) / rect.height) * 100;
-    const widthDelta = (resize.corner === "nw" || resize.corner === "sw") ? -dx : dx;
-    const depthDelta = (resize.corner === "nw" || resize.corner === "ne") ? -dy : dy;
+    const widthDelta =
+      resize.corner === "nw" || resize.corner === "sw" ? -dx : dx;
+    const depthDelta =
+      resize.corner === "nw" || resize.corner === "ne" ? -dy : dy;
 
     setHistory((current) => ({
       ...current,
@@ -584,6 +821,7 @@ export default function TempleBuilderPage() {
   const endWallResize = (event: ReactPointerEvent<HTMLDivElement>) => {
     const resize = resizeRef.current;
     if (!resize || resize.pointerId !== event.pointerId) return;
+
     resizeRef.current = null;
     setHistory((current) => ({
       past: [...current.past, resize.before].slice(-40),
@@ -823,7 +1061,7 @@ export default function TempleBuilderPage() {
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
             onPointerLeave={() => {
-              if (!dragRef.current) setPendingGuide(null);
+              if (!dragRef.current && !resizeRef.current) setPendingGuide(null);
             }}
             className={`relative min-h-[54vh] flex-1 overflow-hidden rounded-3xl border ${
               pendingVariant
@@ -881,8 +1119,11 @@ export default function TempleBuilderPage() {
                   const angle = (selectedPiece.rotation * Math.PI) / 180;
                   const localX = Number(sx) * selectedPiece.width / 2;
                   const localY = Number(sy) * selectedPiece.height / 2;
-                  const rotatedX = localX * Math.cos(angle) - localY * Math.sin(angle);
-                  const rotatedY = localX * Math.sin(angle) + localY * Math.cos(angle);
+                  const rotatedX =
+                    localX * Math.cos(angle) - localY * Math.sin(angle);
+                  const rotatedY =
+                    localX * Math.sin(angle) + localY * Math.cos(angle);
+
                   return (
                     <button
                       key={corner}
@@ -895,7 +1136,7 @@ export default function TempleBuilderPage() {
                           corner as "nw" | "ne" | "sw" | "se"
                         )
                       }
-                      className="absolute z-[120] h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-md border-2 border-black bg-amber-200 shadow-lg"
+                      className="absolute z-[120] h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-md border-2 border-black bg-amber-200 shadow-lg"
                       style={{
                         left: `${selectedPiece.x + rotatedX}%`,
                         top: `${selectedPiece.y + rotatedY}%`,
