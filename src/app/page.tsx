@@ -19,6 +19,7 @@ import type {
   TemplePiece,
   TemplePieceType,
 } from "@/lib/temple-builder/types";
+import Temple3DPreview from "@/components/Temple3DPreview";
 
 const STORAGE_KEY = "echoes-temple-builder-v2";
 const SNAP_DISTANCE = 6;
@@ -438,6 +439,7 @@ export default function TempleBuilderPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [status, setStatus] = useState("Choose a piece, then tap the build area.");
   const [snapEnabled, setSnapEnabled] = useState(true);
+  const [viewMode, setViewMode] = useState<"build" | "3d">("build");
   const [snapGuide, setSnapGuide] = useState<Guide | null>(null);
   const [pendingGuide, setPendingGuide] = useState<Guide | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -878,8 +880,25 @@ export default function TempleBuilderPage() {
         </header>
 
         <section className="flex flex-1 flex-col gap-3 p-3 sm:p-5">
-          <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2">
             <div className="text-xs text-white/60">{status}</div>
+            <div className="flex items-center gap-2">
+              <div className="flex rounded-xl border border-white/10 bg-black/20 p-1">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("build")}
+                  className={`rounded-lg px-3 py-1.5 text-xs ${viewMode === "build" ? "bg-white text-black" : "text-white/60"}`}
+                >
+                  Build
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode("3d")}
+                  className={`rounded-lg px-3 py-1.5 text-xs ${viewMode === "3d" ? "bg-white text-black" : "text-white/60"}`}
+                >
+                  3D Preview
+                </button>
+              </div>
             <button
               type="button"
               onClick={() => {
@@ -896,8 +915,12 @@ export default function TempleBuilderPage() {
             >
               {snapEnabled ? "Snapping On" : "Free Move"}
             </button>
+            </div>
           </div>
 
+          {viewMode === "3d" ? (
+            <Temple3DPreview build={build} />
+          ) : (
           <div
             ref={stageRef}
             onPointerDown={handleStagePointerDown}
@@ -964,8 +987,9 @@ export default function TempleBuilderPage() {
               </div>
             )}
           </div>
+          )}
 
-          {selectedPiece && (
+          {viewMode === "build" && selectedPiece && (
             <div className="rounded-2xl border border-amber-200/25 bg-amber-200/[0.06] p-3">
               <div className="mb-3 flex items-center justify-between gap-2">
                 <div>
@@ -1071,6 +1095,7 @@ export default function TempleBuilderPage() {
             </div>
           )}
 
+          {viewMode === "build" && (
           <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04]">
             <div className="flex gap-1 overflow-x-auto p-2">
               {PIECE_CATEGORIES.map((category) => (
@@ -1123,6 +1148,7 @@ export default function TempleBuilderPage() {
               </div>
             </div>
           </div>
+          )}
 
           <div className="flex flex-wrap items-center justify-between gap-2 pb-3">
             <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/60">
