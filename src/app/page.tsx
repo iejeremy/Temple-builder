@@ -1,251 +1,662 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  PointerEvent as ReactPointerEvent,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import {
+  PIECE_CATEGORIES,
   TEMPLE_MATERIALS,
-  TEMPLE_TEMPLATES,
   createTempleBuild,
+  piecesForCategory,
 } from "@/lib/temple-builder/catalog";
 import type {
   TempleBuild,
   TempleMaterial,
-  TempleTemplateId,
+  TemplePiece,
+  TemplePieceType,
 } from "@/lib/temple-builder/types";
 
-const STORAGE_KEY = "echoes-temple-builder-v1";
+const STORAGE_KEY = "echoes-temple-builder-v2";
 
-function TemplePreview({ build }: { build: TempleBuild }) {
+type HistoryState = {
+  past: TempleBuild[];
+  present: TempleBuild;
+  future: TempleBuild[];
+};
+
+function cloneBuild(build: TempleBuild): TempleBuild {
+  return JSON.parse(JSON.stringify(build)) as TempleBuild;
+}
+
+function PieceShape({
+  piece,
+  selected,
+  onPointerDown,
+}: {
+  piece: TemplePiece;
+  selected: boolean;
+  onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
+}) {
   const material =
-    TEMPLE_MATERIALS.find((candidate) => candidate.id === build.material) ??
+    TEMPLE_MATERIALS.find((item) => item.id === piece.material) ??
     TEMPLE_MATERIALS[0];
 
-  const columns = Array.from(
-    { length: Math.max(2, build.columnCount) },
-    (_, index) => index
-  );
+  const commonStyle = {
+    left: `${piece.x}%`,
+    top: `${piece.y}%`,
+    width: `${piece.width}%`,
+    height: `${piece.height}%`,
+    transform: `translate(-50%, -50%) rotate(${piece.rotation}deg)`,
+    zIndex: piece.layer,
+  };
 
-  const templeWidth = `${build.width}%`;
-  const templeHeight = `${build.height}%`;
+  const base = "absolute touch-none border transition-shadow";
+  const selectedRing = selected
+    ? "ring-2 ring-amber-300 ring-offset-2 ring-offset-transparent"
+    : "";
+
+  if (piece.type === "roof" && piece.variant === "roof-pediment") {
+    return (
+      <button
+        type="button"
+        aria-label="Temple piece"
+        onPointerDown={onPointerDown}
+        className={`${base} ${selectedRing} border-black/20`}
+        style={{
+          ...commonStyle,
+          background: material.accent,
+          clipPath: "polygon(50% 0, 100% 100%, 0 100%)",
+        }}
+      />
+    );
+  }
+
+  if (piece.type === "roof" && piece.variant === "roof-dome") {
+    return (
+      <button
+        type="button"
+        aria-label="Temple piece"
+        onPointerDown={onPointerDown}
+        className={`${base} ${selectedRing} rounded-t-[999px] border-black/20`}
+        style={{ ...commonStyle, background: material.surface }}
+      />
+    );
+  }
+
+  if (piece.type === "arch") {
+    return (
+      <button
+        type="button"
+        aria-label="Temple piece"
+        onPointerDown={onPointerDown}
+        className={`${base} ${selectedRing} rounded-t-[999px] border-[5px] bg-transparent`}
+        style={{
+          ...commonStyle,
+          borderColor: material.surface,
+          borderBottomColor: "transparent",
+        }}
+      />
+    );
+  }
+
+  if (piece.type === "column") {
+    return (
+      <button
+        type="button"
+        aria-label="Temple piece"
+        onPointerDown={onPointerDown}
+        className={`${base} ${selectedRing} rounded-sm border-black/20`}
+        style={{
+          ...commonStyle,
+          background: `linear-gradient(90deg,${material.surface},${material.accent},${material.surface})`,
+        }}
+      >
+        <span
+          className="absolute -left-[20%] -right-[20%] top-0 h-[7%] rounded-sm"
+          style={{ background: material.accent }}
+        />
+        <span
+          className="absolute -left-[24%] -right-[24%] bottom-0 h-[8%] rounded-sm"
+          style={{ background: material.accent }}
+        />
+      </button>
+    );
+  }
+
+  if (piece.type === "door") {
+    return (
+      <button
+        type="button"
+        aria-label="Temple piece"
+        onPointerDown={onPointerDown}
+        className={`${base} ${selectedRing} rounded-t-md border-black/40`}
+        style={{
+          ...commonStyle,
+          background: `linear-gradient(90deg,#251812,${material.surface},#251812)`,
+        }}
+      />
+    );
+  }
+
+  if (piece.type === "window") {
+    return (
+      <button
+        type="button"
+        aria-label="Temple piece"
+        onPointerDown={onPointerDown}
+        className={`${base} ${selectedRing} ${
+          piece.variant === "window-arched" ? "rounded-t-full" : "rounded-sm"
+        } border-white/20 bg-slate-950/80`}
+        style={commonStyle}
+      />
+    );
+  }
+
+  if (piece.type === "tower" && piece.variant === "tower-round") {
+    return (
+      <button
+        type="button"
+        aria-label="Temple piece"
+        onPointerDown={onPointerDown}
+        className={`${base} ${selectedRing} rounded-t-[45%] border-black/20`}
+        style={{
+          ...commonStyle,
+          background: `linear-gradient(90deg,${material.surface},${material.accent},${material.surface})`,
+        }}
+      />
+    );
+  }
 
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-3xl border border-white/15 bg-[radial-gradient(circle_at_50%_22%,rgba(120,140,180,0.35),transparent_38%),linear-gradient(180deg,#111827_0%,#1f2937_50%,#0b1020_100%)] shadow-2xl">
-      <div className="absolute inset-x-0 bottom-0 h-[36%] bg-[linear-gradient(180deg,#233128_0%,#172019_100%)]" />
-      <div className="absolute inset-x-0 bottom-[34%] h-px bg-white/10" />
-
-      <div
-        className="absolute bottom-[16%] left-1/2 -translate-x-1/2"
-        style={{ width: templeWidth, height: templeHeight }}
-      >
-        {build.hasDome && (
-          <div
-            className="absolute left-1/2 top-[4%] h-[34%] w-[42%] -translate-x-1/2 rounded-t-[999px] border border-black/20"
-            style={{ background: material.surface }}
-          />
-        )}
-
-        {build.hasPediment && (
-          <div
-            className="absolute left-1/2 top-[18%] h-[24%] w-[82%] -translate-x-1/2"
-            style={{
-              background: material.accent,
-              clipPath: "polygon(50% 0, 100% 100%, 0 100%)",
-            }}
-          />
-        )}
-
-        <div
-          className="absolute bottom-[18%] left-1/2 h-[56%] w-[86%] -translate-x-1/2 rounded-sm border border-black/20 shadow-[0_28px_70px_rgba(0,0,0,0.5)]"
-          style={{ background: material.surface }}
-        >
-          <div className="absolute inset-y-0 left-[7%] right-[7%] flex items-end justify-between">
-            {columns.map((column) => (
-              <div
-                key={column}
-                className="relative h-[86%] w-[5.5%] min-w-[8px]"
-              >
-                <div
-                  className="absolute inset-x-[-22%] top-0 h-[7%] rounded-sm"
-                  style={{ background: material.accent }}
-                />
-                <div
-                  className="absolute inset-x-0 bottom-[7%] top-[6%] rounded-sm border-x border-black/15"
-                  style={{
-                    background: `linear-gradient(90deg,${material.surface},${material.accent},${material.surface})`,
-                  }}
-                />
-                <div
-                  className="absolute inset-x-[-25%] bottom-0 h-[8%] rounded-sm"
-                  style={{ background: material.accent }}
-                />
-              </div>
-            ))}
-          </div>
-
-          <div className="absolute bottom-0 left-1/2 h-[54%] w-[18%] -translate-x-1/2 rounded-t-sm bg-black/35" />
-        </div>
-
-        {build.hasStairs && (
-          <>
-            <div
-              className="absolute bottom-[12%] left-1/2 h-[8%] w-[96%] -translate-x-1/2 border border-black/20"
-              style={{ background: material.accent }}
-            />
-            <div
-              className="absolute bottom-[6%] left-1/2 h-[7%] w-full -translate-x-1/2 border border-black/20 opacity-95"
-              style={{ background: material.surface }}
-            />
-            <div
-              className="absolute bottom-0 left-1/2 h-[7%] w-[106%] -translate-x-1/2 border border-black/20 opacity-90"
-              style={{ background: material.accent }}
-            />
-          </>
-        )}
-      </div>
-
-      <div className="absolute left-5 top-5 rounded-full border border-white/10 bg-black/35 px-4 py-2 text-xs uppercase tracking-[0.24em] text-white/70 backdrop-blur">
-        Builder Preview
-      </div>
-    </div>
+    <button
+      type="button"
+      aria-label="Temple piece"
+      onPointerDown={onPointerDown}
+      className={`${base} ${selectedRing} rounded-sm border-black/20`}
+      style={{
+        ...commonStyle,
+        background: piece.type === "floor" ? material.accent : material.surface,
+      }}
+    />
   );
 }
 
 export default function TempleBuilderPage() {
-  const [build, setBuild] = useState<TempleBuild>(() => createTempleBuild());
-  const [status, setStatus] = useState("Prototype");
+  const [history, setHistory] = useState<HistoryState>(() => ({
+    past: [],
+    present: createTempleBuild(),
+    future: [],
+  }));
+  const [activeCategory, setActiveCategory] =
+    useState<TemplePieceType>("wall");
+  const [pendingVariant, setPendingVariant] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [status, setStatus] = useState("Choose a piece, then tap the build area.");
+  const stageRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{
+    id: string;
+    pointerId: number;
+    startX: number;
+    startY: number;
+    pieceX: number;
+    pieceY: number;
+    before: TempleBuild;
+  } | null>(null);
 
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(STORAGE_KEY);
-      if (!saved) return;
-      const parsed = JSON.parse(saved) as TempleBuild;
-      if (parsed?.version === 1) {
-        setBuild(parsed);
-        setStatus("Loaded saved build");
-      }
-    } catch {
-      setStatus("Could not load saved build");
-    }
-  }, []);
-
-  const selectedTemplate = useMemo(
-    () =>
-      TEMPLE_TEMPLATES.find(
-        (candidate) => candidate.id === build.templateId
-      ) ?? TEMPLE_TEMPLATES[0],
-    [build.templateId]
+  const build = history.present;
+  const selectedPiece = useMemo(
+    () => build.pieces.find((piece) => piece.id === selectedId) ?? null,
+    [build.pieces, selectedId]
+  );
+  const categoryPieces = useMemo(
+    () => piecesForCategory(activeCategory),
+    [activeCategory]
   );
 
-  const update = <K extends keyof TempleBuild>(
-    key: K,
-    value: TempleBuild[K]
-  ) => {
-    setBuild((previous) => ({ ...previous, [key]: value }));
-    setStatus("Unsaved changes");
+  const commit = (next: TempleBuild) => {
+    setHistory((current) => ({
+      past: [...current.past, cloneBuild(current.present)].slice(-40),
+      present: next,
+      future: [],
+    }));
   };
 
-  const applyTemplate = (templateId: TempleTemplateId) => {
-    const template =
-      TEMPLE_TEMPLATES.find((candidate) => candidate.id === templateId) ??
-      TEMPLE_TEMPLATES[0];
+  const updateSelected = (patch: Partial<TemplePiece>) => {
+    if (!selectedId) return;
+    const next = cloneBuild(build);
+    next.pieces = next.pieces.map((piece) =>
+      piece.id === selectedId ? { ...piece, ...patch } : piece
+    );
+    commit(next);
+    setStatus("Piece updated.");
+  };
 
-    setBuild((previous) => ({
-      ...previous,
-      templateId,
-      ...template.defaults,
+  const placePendingPiece = (clientX: number, clientY: number) => {
+    if (!pendingVariant || !stageRef.current) return;
+
+    const definition = categoryPieces.find(
+      (piece) => piece.id === pendingVariant
+    );
+    if (!definition) return;
+
+    const rect = stageRef.current.getBoundingClientRect();
+    const x = Math.max(3, Math.min(97, ((clientX - rect.left) / rect.width) * 100));
+    const y = Math.max(3, Math.min(97, ((clientY - rect.top) / rect.height) * 100));
+    const newPiece: TemplePiece = {
+      id: `${definition.id}-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 7)}`,
+      type: definition.type,
+      variant: definition.id,
+      material: build.defaultMaterial,
+      x,
+      y,
+      width: definition.width,
+      height: definition.height,
+      rotation: 0,
+      layer: build.pieces.length + 1,
+    };
+
+    const next = cloneBuild(build);
+    next.pieces.push(newPiece);
+    commit(next);
+    setSelectedId(newPiece.id);
+    setPendingVariant(null);
+    setStatus("Placed. Drag it to fine-tune.");
+  };
+
+  const handleStagePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (pendingVariant) {
+      placePendingPiece(event.clientX, event.clientY);
+      return;
+    }
+    setSelectedId(null);
+  };
+
+  const beginDrag = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    piece: TemplePiece
+  ) => {
+    event.stopPropagation();
+    setSelectedId(piece.id);
+    dragRef.current = {
+      id: piece.id,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      pieceX: piece.x,
+      pieceY: piece.y,
+      before: cloneBuild(build),
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const moveDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId || !stageRef.current) return;
+
+    const rect = stageRef.current.getBoundingClientRect();
+    const dx = ((event.clientX - drag.startX) / rect.width) * 100;
+    const dy = ((event.clientY - drag.startY) / rect.height) * 100;
+
+    setHistory((current) => ({
+      ...current,
+      present: {
+        ...current.present,
+        pieces: current.present.pieces.map((piece) =>
+          piece.id === drag.id
+            ? {
+                ...piece,
+                x: Math.max(2, Math.min(98, drag.pieceX + dx)),
+                y: Math.max(2, Math.min(98, drag.pieceY + dy)),
+              }
+            : piece
+        ),
+      },
     }));
-    setStatus("Template applied");
+  };
+
+  const endDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    setHistory((current) => ({
+      past: [...current.past, drag.before].slice(-40),
+      present: current.present,
+      future: [],
+    }));
+    setStatus("Piece moved.");
+  };
+
+  const duplicateSelected = () => {
+    if (!selectedPiece) return;
+    const copy: TemplePiece = {
+      ...selectedPiece,
+      id: `${selectedPiece.variant}-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 7)}`,
+      x: Math.min(94, selectedPiece.x + 5),
+      y: Math.min(94, selectedPiece.y + 5),
+      layer: build.pieces.length + 1,
+    };
+    const next = cloneBuild(build);
+    next.pieces.push(copy);
+    commit(next);
+    setSelectedId(copy.id);
+    setStatus("Piece duplicated.");
+  };
+
+  const deleteSelected = () => {
+    if (!selectedId) return;
+    const next = cloneBuild(build);
+    next.pieces = next.pieces.filter((piece) => piece.id !== selectedId);
+    commit(next);
+    setSelectedId(null);
+    setStatus("Piece deleted.");
+  };
+
+  const undo = () => {
+    setHistory((current) => {
+      if (!current.past.length) return current;
+      const previous = current.past[current.past.length - 1];
+      return {
+        past: current.past.slice(0, -1),
+        present: cloneBuild(previous),
+        future: [cloneBuild(current.present), ...current.future],
+      };
+    });
+    setSelectedId(null);
+    setStatus("Undo.");
+  };
+
+  const redo = () => {
+    setHistory((current) => {
+      if (!current.future.length) return current;
+      const next = current.future[0];
+      return {
+        past: [...current.past, cloneBuild(current.present)],
+        present: cloneBuild(next),
+        future: current.future.slice(1),
+      };
+    });
+    setSelectedId(null);
+    setStatus("Redo.");
   };
 
   const save = () => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(build));
-    setStatus("Saved on this device");
+    setStatus("Saved on this device.");
   };
 
-  const reset = () => {
-    const fresh = createTempleBuild();
-    setBuild(fresh);
-    window.localStorage.removeItem(STORAGE_KEY);
-    setStatus("Reset");
-  };
-
-  const exportJson = async () => {
-    const data = JSON.stringify(build, null, 2);
+  const load = () => {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      setStatus("No saved temple found.");
+      return;
+    }
     try {
-      await navigator.clipboard.writeText(data);
-      setStatus("Build JSON copied");
+      const saved = JSON.parse(raw) as TempleBuild;
+      if (saved.version !== 2) throw new Error("Old format");
+      setHistory({ past: [], present: saved, future: [] });
+      setSelectedId(null);
+      setStatus("Saved temple loaded.");
     } catch {
-      setStatus("Clipboard unavailable");
+      setStatus("Saved temple could not be loaded.");
     }
   };
 
+  const reset = () => {
+    setHistory({ past: [], present: createTempleBuild(), future: [] });
+    setSelectedId(null);
+    setPendingVariant(null);
+    setStatus("Builder cleared.");
+  };
+
   return (
-    <main className="min-h-screen bg-[#070b14] px-4 py-5 text-white sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-5">
-        <header className="flex flex-col gap-3 rounded-3xl border border-white/10 bg-white/[0.04] p-5 backdrop-blur sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-amber-200/70">
-              Echoes Lab
-            </p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight">
-              Temple Builder
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm text-white/60">
-              Experimental builder isolated from the production Echoes flow.
-            </p>
+    <main className="min-h-screen bg-[#070b14] text-white">
+      <div className="mx-auto flex min-h-screen max-w-6xl flex-col">
+        <header className="flex items-center justify-between gap-3 border-b border-white/10 bg-black/20 px-3 py-3 sm:px-5">
+          <div className="min-w-0">
+            <div className="text-[10px] uppercase tracking-[0.28em] text-amber-200/60">
+              Echoes
+            </div>
+            <input
+              value={build.name}
+              onChange={(event) =>
+                setHistory((current) => ({
+                  ...current,
+                  present: { ...current.present, name: event.target.value },
+                }))
+              }
+              className="w-full truncate bg-transparent text-lg font-semibold outline-none"
+            />
           </div>
-          <div className="rounded-full border border-white/10 bg-black/25 px-4 py-2 text-sm text-white/70">
-            {status}
+
+          <div className="flex shrink-0 gap-2">
+            <button
+              onClick={undo}
+              disabled={!history.past.length}
+              className="rounded-xl border border-white/10 px-3 py-2 text-sm disabled:opacity-30"
+            >
+              Undo
+            </button>
+            <button
+              onClick={redo}
+              disabled={!history.future.length}
+              className="rounded-xl border border-white/10 px-3 py-2 text-sm disabled:opacity-30"
+            >
+              Redo
+            </button>
+            <button
+              onClick={save}
+              className="rounded-xl bg-amber-200 px-4 py-2 text-sm font-semibold text-black"
+            >
+              Save
+            </button>
           </div>
         </header>
 
-        <section className="grid gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
-          <aside className="space-y-4 rounded-3xl border border-white/10 bg-white/[0.04] p-5">
-            <label className="block">
-              <span className="mb-2 block text-xs font-medium uppercase tracking-[0.18em] text-white/50">
-                Temple name
-              </span>
-              <input
-                value={build.name}
-                onChange={(event) => update("name", event.target.value)}
-                className="w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 outline-none ring-amber-200/40 focus:ring-2"
-              />
-            </label>
+        <section className="flex flex-1 flex-col gap-3 p-3 sm:p-5">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/60">
+            {status}
+          </div>
 
-            <div>
-              <span className="mb-2 block text-xs font-medium uppercase tracking-[0.18em] text-white/50">
-                Template
-              </span>
-              <div className="grid gap-2">
-                {TEMPLE_TEMPLATES.map((template) => (
+          <div
+            ref={stageRef}
+            onPointerDown={handleStagePointerDown}
+            onPointerMove={moveDrag}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+            className={`relative min-h-[54vh] flex-1 overflow-hidden rounded-3xl border ${
+              pendingVariant
+                ? "cursor-crosshair border-amber-300/50"
+                : "border-white/10"
+            } bg-[radial-gradient(circle_at_50%_22%,rgba(120,140,180,0.28),transparent_36%),linear-gradient(180deg,#111827_0%,#202938_55%,#0f1720_100%)] shadow-2xl`}
+          >
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[27%] bg-[linear-gradient(180deg,#29392d,#172019)]" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-[26%] border-t border-dashed border-white/10" />
+
+            {build.pieces.map((piece) => (
+              <PieceShape
+                key={piece.id}
+                piece={piece}
+                selected={piece.id === selectedId}
+                onPointerDown={(event) => beginDrag(event, piece)}
+              />
+            ))}
+
+            {!build.pieces.length && !pendingVariant && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-8 text-center text-sm text-white/35">
+                Choose one of the eight categories below to start building.
+              </div>
+            )}
+
+            {pendingVariant && (
+              <div className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-amber-200 px-4 py-2 text-xs font-semibold text-black shadow-xl">
+                Tap where you want to place it
+              </div>
+            )}
+          </div>
+
+          {selectedPiece && (
+            <div className="rounded-2xl border border-amber-200/25 bg-amber-200/[0.06] p-3">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-white/40">
+                    Selected
+                  </div>
+                  <div className="font-medium capitalize">
+                    {selectedPiece.variant.replaceAll("-", " ")}
+                  </div>
+                </div>
+                <button
+                  onClick={deleteSelected}
+                  className="rounded-xl border border-red-300/20 px-3 py-2 text-sm text-red-200"
+                >
+                  Delete
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                <label className="rounded-xl border border-white/10 bg-black/20 p-2 text-xs">
+                  Width
+                  <input
+                    type="range"
+                    min="4"
+                    max="70"
+                    value={selectedPiece.width}
+                    onChange={(event) =>
+                      updateSelected({ width: Number(event.target.value) })
+                    }
+                    className="mt-2 w-full"
+                  />
+                </label>
+
+                <label className="rounded-xl border border-white/10 bg-black/20 p-2 text-xs">
+                  Height
+                  <input
+                    type="range"
+                    min="4"
+                    max="70"
+                    value={selectedPiece.height}
+                    onChange={(event) =>
+                      updateSelected({ height: Number(event.target.value) })
+                    }
+                    className="mt-2 w-full"
+                  />
+                </label>
+
+                <label className="rounded-xl border border-white/10 bg-black/20 p-2 text-xs">
+                  Rotation
+                  <input
+                    type="range"
+                    min="-45"
+                    max="45"
+                    value={selectedPiece.rotation}
+                    onChange={(event) =>
+                      updateSelected({ rotation: Number(event.target.value) })
+                    }
+                    className="mt-2 w-full"
+                  />
+                </label>
+
+                <label className="rounded-xl border border-white/10 bg-black/20 p-2 text-xs">
+                  Material
+                  <select
+                    value={selectedPiece.material}
+                    onChange={(event) =>
+                      updateSelected({
+                        material: event.target.value as TempleMaterial,
+                      })
+                    }
+                    className="mt-2 w-full bg-[#111827] text-xs"
+                  >
+                    {TEMPLE_MATERIALS.map((material) => (
+                      <option key={material.id} value={material.id}>
+                        {material.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <button
+                  onClick={duplicateSelected}
+                  className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm"
+                >
+                  Duplicate
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04]">
+            <div className="flex gap-1 overflow-x-auto p-2">
+              {PIECE_CATEGORIES.map((category) => (
+                <button
+                  key={category.type}
+                  onClick={() => {
+                    setActiveCategory(category.type);
+                    setPendingVariant(null);
+                  }}
+                  className={`shrink-0 rounded-xl px-3 py-2 text-sm ${
+                    activeCategory === category.type
+                      ? "bg-amber-200 font-semibold text-black"
+                      : "bg-black/25 text-white/70"
+                  }`}
+                >
+                  {category.name}
+                </button>
+              ))}
+            </div>
+
+            <div className="border-t border-white/10 p-3">
+              <div className="mb-2 text-xs uppercase tracking-[0.18em] text-white/40">
+                Choose a piece
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {categoryPieces.map((piece) => (
                   <button
-                    key={template.id}
-                    onClick={() => applyTemplate(template.id)}
-                    className={`rounded-2xl border px-4 py-3 text-left transition ${
-                      build.templateId === template.id
-                        ? "border-amber-200/60 bg-amber-200/10"
-                        : "border-white/10 bg-black/20 hover:bg-white/[0.05]"
+                    key={piece.id}
+                    onClick={() => {
+                      setPendingVariant(piece.id);
+                      setSelectedId(null);
+                      setStatus(`${piece.name} selected. Tap the build area to place it.`);
+                    }}
+                    className={`min-w-[130px] rounded-2xl border px-3 py-3 text-left ${
+                      pendingVariant === piece.id
+                        ? "border-amber-300 bg-amber-200/10"
+                        : "border-white/10 bg-black/20"
                     }`}
                   >
-                    <div className="font-medium">{template.name}</div>
-                    <div className="mt-1 text-xs leading-5 text-white/50">
-                      {template.description}
+                    <div className="font-medium">{piece.name}</div>
+                    <div className="mt-1 text-xs text-white/40">
+                      {piece.width} × {piece.height}
                     </div>
                   </button>
                 ))}
               </div>
             </div>
+          </div>
 
-            <label className="block">
-              <span className="mb-2 block text-xs font-medium uppercase tracking-[0.18em] text-white/50">
-                Material
-              </span>
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-3">
+            <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/60">
+              New pieces
               <select
-                value={build.material}
+                value={build.defaultMaterial}
                 onChange={(event) =>
-                  update("material", event.target.value as TempleMaterial)
+                  setHistory((current) => ({
+                    ...current,
+                    present: {
+                      ...current.present,
+                      defaultMaterial: event.target.value as TempleMaterial,
+                    },
+                  }))
                 }
-                className="w-full rounded-2xl border border-white/10 bg-[#111827] px-4 py-3 outline-none"
+                className="bg-[#111827] text-white"
               >
                 {TEMPLE_MATERIALS.map((material) => (
                   <option key={material.id} value={material.id}>
@@ -255,129 +666,19 @@ export default function TempleBuilderPage() {
               </select>
             </label>
 
-            <div className="space-y-4 rounded-2xl border border-white/10 bg-black/20 p-4">
-              <label className="block">
-                <div className="mb-2 flex items-center justify-between text-sm">
-                  <span>Width</span>
-                  <span className="text-white/50">{build.width}</span>
-                </div>
-                <input
-                  type="range"
-                  min="48"
-                  max="92"
-                  value={build.width}
-                  onChange={(event) => update("width", Number(event.target.value))}
-                  className="w-full"
-                />
-              </label>
-
-              <label className="block">
-                <div className="mb-2 flex items-center justify-between text-sm">
-                  <span>Height</span>
-                  <span className="text-white/50">{build.height}</span>
-                </div>
-                <input
-                  type="range"
-                  min="42"
-                  max="86"
-                  value={build.height}
-                  onChange={(event) => update("height", Number(event.target.value))}
-                  className="w-full"
-                />
-              </label>
-
-              <label className="block">
-                <div className="mb-2 flex items-center justify-between text-sm">
-                  <span>Columns</span>
-                  <span className="text-white/50">{build.columnCount}</span>
-                </div>
-                <input
-                  type="range"
-                  min="2"
-                  max="12"
-                  step="2"
-                  value={build.columnCount}
-                  onChange={(event) =>
-                    update("columnCount", Number(event.target.value))
-                  }
-                  className="w-full"
-                />
-              </label>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                ["hasStairs", "Stairs"],
-                ["hasPediment", "Pediment"],
-                ["hasDome", "Dome"],
-              ].map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() =>
-                    update(
-                      key as "hasStairs" | "hasPediment" | "hasDome",
-                      !build[key as "hasStairs" | "hasPediment" | "hasDome"]
-                    )
-                  }
-                  className={`rounded-2xl border px-2 py-3 text-sm ${
-                    build[key as "hasStairs" | "hasPediment" | "hasDome"]
-                      ? "border-amber-200/60 bg-amber-200/10"
-                      : "border-white/10 bg-black/20 text-white/50"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 pt-1">
+            <div className="flex gap-2">
               <button
-                onClick={save}
-                className="rounded-2xl bg-amber-200 px-3 py-3 text-sm font-semibold text-black"
+                onClick={load}
+                className="rounded-xl border border-white/10 px-3 py-2 text-xs text-white/70"
               >
-                Save
-              </button>
-              <button
-                onClick={exportJson}
-                className="rounded-2xl border border-white/15 bg-white/[0.05] px-3 py-3 text-sm"
-              >
-                Copy JSON
+                Load
               </button>
               <button
                 onClick={reset}
-                className="rounded-2xl border border-white/10 bg-black/20 px-3 py-3 text-sm text-white/60"
+                className="rounded-xl border border-white/10 px-3 py-2 text-xs text-white/50"
               >
-                Reset
+                Clear
               </button>
-            </div>
-          </aside>
-
-          <div className="min-h-[620px] rounded-3xl border border-white/10 bg-white/[0.03] p-3 sm:p-5">
-            <TemplePreview build={build} />
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-white/40">
-                  Template
-                </div>
-                <div className="mt-1 font-medium">{selectedTemplate.name}</div>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-white/40">
-                  Footprint
-                </div>
-                <div className="mt-1 font-medium">
-                  {build.width} × {build.height}
-                </div>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                <div className="text-xs uppercase tracking-[0.18em] text-white/40">
-                  Architecture
-                </div>
-                <div className="mt-1 font-medium">
-                  {build.columnCount} columns
-                </div>
-              </div>
             </div>
           </div>
         </section>
