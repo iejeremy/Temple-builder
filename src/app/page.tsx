@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import {
   PointerEvent as ReactPointerEvent,
   useMemo,
@@ -19,7 +20,17 @@ import type {
   TemplePiece,
   TemplePieceType,
 } from "@/lib/temple-builder/types";
-import Temple3DPreview from "@/components/Temple3DPreview";
+const Temple3DPreview = dynamic(
+  () => import("@/components/Temple3DPreview"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex min-h-[54vh] items-center justify-center rounded-3xl border border-white/10 bg-[#0b1020] text-sm text-white/50">
+        Loading 3D preview…
+      </div>
+    ),
+  }
+);
 
 const STORAGE_KEY = "echoes-temple-builder-v2";
 const SNAP_DISTANCE = 6;
