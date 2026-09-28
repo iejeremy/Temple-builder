@@ -29,6 +29,35 @@ function PieceMesh({ piece }: { piece: TemplePiece }) {
       ? 0.18
       : Math.max(0.35, height / 2);
 
+  if (piece.type === "wall") {
+    const roomWidth = Math.max(1, piece.width / 7);
+    const roomDepth = Math.max(1, piece.height / 7);
+    const wallHeight = Math.max(0.8, (piece.wallHeight ?? 22) / 7);
+    const thickness = 0.35;
+    const rotationY = (piece.rotation * Math.PI) / 180;
+
+    return (
+      <group position={[x, 0, z]} rotation={[0, rotationY, 0]}>
+        <mesh position={[0, wallHeight / 2, -roomDepth / 2]} castShadow receiveShadow>
+          <boxGeometry args={[roomWidth, wallHeight, thickness]} />
+          <meshStandardMaterial color={colorFor(piece)} roughness={0.72} metalness={0.04} />
+        </mesh>
+        <mesh position={[0, wallHeight / 2, roomDepth / 2]} castShadow receiveShadow>
+          <boxGeometry args={[roomWidth, wallHeight, thickness]} />
+          <meshStandardMaterial color={colorFor(piece)} roughness={0.72} metalness={0.04} />
+        </mesh>
+        <mesh position={[-roomWidth / 2, wallHeight / 2, 0]} castShadow receiveShadow>
+          <boxGeometry args={[thickness, wallHeight, roomDepth]} />
+          <meshStandardMaterial color={colorFor(piece)} roughness={0.72} metalness={0.04} />
+        </mesh>
+        <mesh position={[roomWidth / 2, wallHeight / 2, 0]} castShadow receiveShadow>
+          <boxGeometry args={[thickness, wallHeight, roomDepth]} />
+          <meshStandardMaterial color={colorFor(piece)} roughness={0.72} metalness={0.04} />
+        </mesh>
+      </group>
+    );
+  }
+
   if (piece.type === "column") {
     return (
       <mesh position={[x, y, z]} rotation={[0, (piece.rotation * Math.PI) / 180, 0]} castShadow receiveShadow>
