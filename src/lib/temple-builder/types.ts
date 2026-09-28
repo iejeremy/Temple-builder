@@ -25,6 +25,7 @@ export interface TemplePiece {
   y: number;
   width: number;
   height: number;
+  wallHeight?: number;
   rotation: number;
   layer: number;
 }
