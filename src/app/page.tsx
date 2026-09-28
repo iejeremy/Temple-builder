@@ -89,32 +89,42 @@ function nearestSnap(
   if (piece.type === "wall") {
     for (const target of others.filter((candidate) => candidate.type === "wall")) {
       const targetEnds = wallEndpoints(target);
-      const ownAngle = (piece.rotation * Math.PI) / 180;
-      const ownDx = Math.cos(ownAngle) * (piece.width / 2);
-      const ownDy = Math.sin(ownAngle) * (piece.width / 2);
+      const rotations = [
+        { value: target.rotation, label: "Wall end" },
+        { value: target.rotation + 90, label: "90° corner" },
+        { value: target.rotation - 90, label: "90° corner" },
+      ];
 
       targetEnds.forEach((end, targetIndex) => {
-        candidates.push(
-          {
-            x: end.x + ownDx,
-            y: end.y + ownDy,
-            key: `wall-${target.id}-${targetIndex}-a`,
-            label: "Wall end",
-          },
-          {
-            x: end.x - ownDx,
-            y: end.y - ownDy,
-            key: `wall-${target.id}-${targetIndex}-b`,
-            label: "Wall end",
-          }
-        );
+        rotations.forEach((option, rotationIndex) => {
+          const angle = (option.value * Math.PI) / 180;
+          const ownDx = Math.cos(angle) * (piece.width / 2);
+          const ownDy = Math.sin(angle) * (piece.width / 2);
+
+          candidates.push(
+            {
+              x: end.x + ownDx,
+              y: end.y + ownDy,
+              rotation: option.value,
+              key: `wall-${target.id}-${targetIndex}-${rotationIndex}-a`,
+              label: option.label,
+            },
+            {
+              x: end.x - ownDx,
+              y: end.y - ownDy,
+              rotation: option.value,
+              key: `wall-${target.id}-${targetIndex}-${rotationIndex}-b`,
+              label: option.label,
+            }
+          );
+        });
       });
     }
 
     for (const floor of others.filter((candidate) => candidate.type === "floor")) {
       candidates.push({
         x: floor.x,
-        y: floor.y - floor.height / 2 - piece.height / 2,
+        y: floor.y - floor.height / 2,
         key: `wall-floor-${floor.id}`,
         label: "Floor edge",
       });
@@ -311,6 +321,26 @@ function PieceShape({
   const selectedRing = selected
     ? "ring-2 ring-amber-300 ring-offset-2 ring-offset-transparent"
     : "";
+
+  if (piece.type === "wall") {
+    return (
+      <button
+        type="button"
+        aria-label="Temple wall"
+        onPointerDown={onPointerDown}
+        className={`${base} ${selectedRing} rounded-full border-black/30 shadow-md`}
+        style={{
+          ...commonStyle,
+          height: "3%",
+          minHeight: "10px",
+          background: `linear-gradient(180deg,${material.accent},${material.surface})`,
+        }}
+      >
+        <span className="absolute left-0 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/40 bg-amber-100 shadow" />
+        <span className="absolute right-0 top-1/2 h-3 w-3 translate-x-1/2 -translate-y-1/2 rounded-full border border-black/40 bg-amber-100 shadow" />
+      </button>
+    );
+  }
 
   if (piece.type === "roof" && piece.variant === "roof-pediment") {
     return (
@@ -575,15 +605,28 @@ export default function TempleBuilderPage() {
     next.pieces.push(newPiece);
     commit(next);
     setSelectedId(newPiece.id);
-    setPendingVariant(null);
+
+    const keepPlacingWalls = newPiece.type === "wall";
+    if (!keepPlacingWalls) {
+      setPendingVariant(null);
+    }
+
     setPendingGuide(null);
     setSnapGuide(null);
 
     if (resolved.snap) {
       pulseSnap(resolved.snap.key);
-      setStatus(`Snapped: ${resolved.snap.label}. Drag to fine-tune.`);
+      setStatus(
+        keepPlacingWalls
+          ? `Snapped: ${resolved.snap.label}. Tap again to add another wall.`
+          : `Snapped: ${resolved.snap.label}. Drag to fine-tune.`
+      );
     } else {
-      setStatus("Placed. Drag it to fine-tune.");
+      setStatus(
+        keepPlacingWalls
+          ? "Wall placed. Tap again to keep building."
+          : "Placed. Drag it to fine-tune."
+      );
     }
   };
 
@@ -634,7 +677,7 @@ export default function TempleBuilderPage() {
         x: resolved.x,
         y: resolved.y,
         width: draft.width,
-        height: draft.height,
+        height: draft.type === "wall" ? 3 : draft.height,
         key: resolved.snap?.key ?? "free-pending",
         label: resolved.snap?.label ?? "Place here",
         rotation: resolved.rotation,
@@ -682,7 +725,7 @@ export default function TempleBuilderPage() {
         x: resolved.x,
         y: resolved.y,
         width: movingPiece.width,
-        height: movingPiece.height,
+        height: movingPiece.type === "wall" ? 3 : movingPiece.height,
         rotation: resolved.rotation,
       });
       pulseSnap(resolved.snap.key);
@@ -994,7 +1037,9 @@ export default function TempleBuilderPage() {
 
             {pendingVariant && (
               <div className="pointer-events-none absolute left-1/2 top-4 z-[110] -translate-x-1/2 rounded-full bg-amber-200 px-4 py-2 text-xs font-semibold text-black shadow-xl">
-                Tap where you want to place it
+                {activeCategory === "wall"
+                  ? "Wall mode — keep tapping to add wall segments"
+                  : "Tap where you want to place it"}
               </div>
             )}
           </div>
