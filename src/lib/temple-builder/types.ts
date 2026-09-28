@@ -7,43 +7,31 @@ export type TempleMaterial =
   | "bronze";
 
 export type TemplePieceType =
-  | "base"
-  | "stairs"
-  | "column"
   | "wall"
-  | "pediment"
-  | "dome"
-  | "tower"
   | "door"
-  | "statue";
-
-export type TempleTemplateId =
-  | "classical"
-  | "sanctuary"
-  | "monumental";
+  | "floor"
+  | "tower"
+  | "window"
+  | "arch"
+  | "column"
+  | "roof";
 
 export interface TemplePiece {
   id: string;
   type: TemplePieceType;
+  variant: string;
   material: TempleMaterial;
   x: number;
   y: number;
   width: number;
   height: number;
-  rotation?: number;
+  rotation: number;
   layer: number;
 }
 
 export interface TempleBuild {
-  version: 1;
+  version: 2;
   name: string;
-  templateId: TempleTemplateId;
-  material: TempleMaterial;
-  width: number;
-  height: number;
-  columnCount: number;
-  hasDome: boolean;
-  hasPediment: boolean;
-  hasStairs: boolean;
+  defaultMaterial: TempleMaterial;
   pieces: TemplePiece[];
 }
