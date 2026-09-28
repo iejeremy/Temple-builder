@@ -24,6 +24,7 @@ export interface PieceDefinition {
   name: string;
   width: number;
   height: number;
+  wallHeight?: number;
 }
 
 export const PIECE_CATEGORIES: {
@@ -42,8 +43,8 @@ export const PIECE_CATEGORIES: {
 ];
 
 export const PIECE_LIBRARY: PieceDefinition[] = [
-  { id: "wall-straight", type: "wall", name: "Straight Wall", width: 28, height: 22 },
-  { id: "wall-tall", type: "wall", name: "Tall Wall", width: 22, height: 34 },
+  { id: "wall-straight", type: "wall", name: "Standard Wall Room", width: 32, height: 32, wallHeight: 22 },
+  { id: "wall-tall", type: "wall", name: "Tall Wall Room", width: 32, height: 32, wallHeight: 34 },
   { id: "door-single", type: "door", name: "Single Door", width: 9, height: 18 },
   { id: "door-double", type: "door", name: "Double Door", width: 15, height: 20 },
   { id: "floor-square", type: "floor", name: "Square Floor", width: 36, height: 10 },
