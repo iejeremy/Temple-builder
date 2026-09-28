@@ -1,7 +1,7 @@
 import type {
   TempleBuild,
   TempleMaterial,
-  TempleTemplateId,
+  TemplePieceType,
 } from "./types";
 
 export const TEMPLE_MATERIALS: {
@@ -18,70 +18,58 @@ export const TEMPLE_MATERIALS: {
   { id: "bronze", name: "Bronze", surface: "#7f5d3f", accent: "#ad8358" },
 ];
 
-export const TEMPLE_TEMPLATES: {
-  id: TempleTemplateId;
+export interface PieceDefinition {
+  id: string;
+  type: TemplePieceType;
   name: string;
-  description: string;
-  defaults: Pick<
-    TempleBuild,
-    "width" | "height" | "columnCount" | "hasDome" | "hasPediment" | "hasStairs"
-  >;
+  width: number;
+  height: number;
+}
+
+export const PIECE_CATEGORIES: {
+  type: TemplePieceType;
+  name: string;
+  shortName: string;
 }[] = [
-  {
-    id: "classical",
-    name: "Classical",
-    description: "Balanced Greek/Roman frontage with columns and a pediment.",
-    defaults: {
-      width: 72,
-      height: 62,
-      columnCount: 6,
-      hasDome: false,
-      hasPediment: true,
-      hasStairs: true,
-    },
-  },
-  {
-    id: "sanctuary",
-    name: "Sanctuary",
-    description: "A broader sacred structure built around an open central chamber.",
-    defaults: {
-      width: 82,
-      height: 58,
-      columnCount: 8,
-      hasDome: true,
-      hasPediment: false,
-      hasStairs: true,
-    },
-  },
-  {
-    id: "monumental",
-    name: "Monumental",
-    description: "Tall, imposing architecture intended to read clearly at world scale.",
-    defaults: {
-      width: 66,
-      height: 76,
-      columnCount: 8,
-      hasDome: true,
-      hasPediment: true,
-      hasStairs: true,
-    },
-  },
+  { type: "wall", name: "Walls", shortName: "Wall" },
+  { type: "door", name: "Doors", shortName: "Door" },
+  { type: "floor", name: "Floors", shortName: "Floor" },
+  { type: "tower", name: "Towers", shortName: "Tower" },
+  { type: "window", name: "Windows", shortName: "Window" },
+  { type: "arch", name: "Arches", shortName: "Arch" },
+  { type: "column", name: "Columns", shortName: "Column" },
+  { type: "roof", name: "Roofs", shortName: "Roof" },
 ];
 
-export function createTempleBuild(
-  templateId: TempleTemplateId = "classical",
-  material: TempleMaterial = "marble"
-): TempleBuild {
-  const template =
-    TEMPLE_TEMPLATES.find((candidate) => candidate.id === templateId) ??
-    TEMPLE_TEMPLATES[0];
+export const PIECE_LIBRARY: PieceDefinition[] = [
+  { id: "wall-straight", type: "wall", name: "Straight Wall", width: 28, height: 22 },
+  { id: "wall-tall", type: "wall", name: "Tall Wall", width: 22, height: 34 },
+  { id: "door-single", type: "door", name: "Single Door", width: 9, height: 18 },
+  { id: "door-double", type: "door", name: "Double Door", width: 15, height: 20 },
+  { id: "floor-square", type: "floor", name: "Square Floor", width: 36, height: 10 },
+  { id: "floor-wide", type: "floor", name: "Wide Floor", width: 55, height: 10 },
+  { id: "tower-square", type: "tower", name: "Square Tower", width: 18, height: 42 },
+  { id: "tower-round", type: "tower", name: "Round Tower", width: 18, height: 42 },
+  { id: "window-rect", type: "window", name: "Rectangle Window", width: 7, height: 10 },
+  { id: "window-arched", type: "window", name: "Arched Window", width: 8, height: 12 },
+  { id: "arch-classic", type: "arch", name: "Classic Arch", width: 18, height: 22 },
+  { id: "arch-wide", type: "arch", name: "Wide Arch", width: 28, height: 20 },
+  { id: "column-round", type: "column", name: "Round Column", width: 6, height: 28 },
+  { id: "column-square", type: "column", name: "Square Column", width: 7, height: 28 },
+  { id: "roof-flat", type: "roof", name: "Flat Roof", width: 38, height: 9 },
+  { id: "roof-pediment", type: "roof", name: "Pediment", width: 40, height: 16 },
+  { id: "roof-dome", type: "roof", name: "Dome", width: 30, height: 20 },
+];
 
+export function createTempleBuild(): TempleBuild {
   return {
-    version: 1,
+    version: 2,
     name: "My Temple",
-    templateId: template.id,
-    material,
-    ...template.defaults,
+    defaultMaterial: "marble",
     pieces: [],
   };
+}
+
+export function piecesForCategory(type: TemplePieceType) {
+  return PIECE_LIBRARY.filter((piece) => piece.type === type);
 }
