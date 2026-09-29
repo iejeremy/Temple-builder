@@ -688,10 +688,12 @@ export default function TempleBuilderPage() {
     (clientX: number, clientY: number) => {
       const point = pointFromClient(clientX, clientY);
       if (!point) return;
+
       const draft = createPendingPiece(point.x, point.y);
       if (!draft) return;
 
       const resolved = resolvePosition(draft, point.x, point.y, build.pieces);
+
       const newPiece: TemplePiece = {
         ...draft,
         id: `\( {draft.variant}- \){Date.now()}-${Math.random()
@@ -709,25 +711,32 @@ export default function TempleBuilderPage() {
       setSelectedId(newPiece.id);
       setPendingVariant(null);
       setPendingGuide(null);
-              `${piece.name} selected. Tap the build area to place it.`
-                        );
-                      }}
-                      className={`min-w-[130px] rounded-2xl border px-3 py-3 text-left ${
-                        pendingVariant === piece.id
-                          ? "border-amber-300 bg-amber-200/10"
-                          : "border-white/10 bg-black/20"
-                      }`}
-                    >
-                      <div className="font-medium">{piece.name}</div>
-                      <div className="mt-1 text-xs text-white/40">
-                        {piece.width} × {piece.height}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+      setSnapGuide(null);
+
+      if (resolved.snap) {
+        pulseSnap(resolved.snap.key);
+        setStatus(
+          newPiece.type === "wall"
+            ? `Wall room placed: ${resolved.snap.label}. Pull a corner to reshape it.`
+            : `Snapped: ${resolved.snap.label}. Drag to fine-tune.`
+        );
+      } else {
+        setStatus(
+          newPiece.type === "wall"
+            ? "Wall room placed. Pull a corner to reshape it."
+            : "Placed. Drag it to fine-tune."
+        );
+      }
+    },
+    [
+      pointFromClient,
+      createPendingPiece,
+      resolvePosition,
+      build,
+      commit,
+      pulseSnap,
+    ]
+  );
 
           <div className="flex flex-wrap items-center justify-between gap-2 pb-3">
             <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/60">
