@@ -1,8 +1,7 @@
 "use client";
 
-import { Canvas, ThreeEvent } from "@react-three/fiber";
-import { ContactShadows, OrbitControls } from "@react-three/drei";
-import { useRef } from "react";
+import { Canvas } from "@react-three/fiber";
+import { OrbitControls } from "@react-three/drei";
 import type { TempleBuild, TemplePiece } from "@/lib/temple-builder/types";
 import { TEMPLE_MATERIALS } from "@/lib/temple-builder/catalog";
 
@@ -50,7 +49,6 @@ export default function Temple3DPreview({
   onSelect?: (id: string | null) => void;
   onMove?: (id: string, x: number, y: number) => void;
 }) {
-  const down = useRef<{x:number;y:number}|null>(null);
   return (
     <div className="absolute inset-0 bg-[#b9c4cb]">
       <Canvas shadows camera={{ position: [9, 8, 11], fov: 43 }} dpr={[1, 1.6]}
@@ -60,9 +58,7 @@ export default function Temple3DPreview({
         <hemisphereLight intensity={1.7} groundColor="#7f7a6c" />
         <directionalLight position={[7, 14, 8]} intensity={2.4} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
 
-        <mesh rotation={[-Math.PI/2,0,0]} position={[0,-.02,0]} receiveShadow
-          onPointerDown={(e: ThreeEvent<PointerEvent>) => { down.current={x:e.point.x,y:e.point.z}; }}
-          onPointerUp={() => { down.current=null; }}>
+        <mesh rotation={[-Math.PI/2,0,0]} position={[0,-.02,0]} receiveShadow>
           <planeGeometry args={[38,38]} />
           <meshStandardMaterial color="#8b8a78" roughness={1} />
         </mesh>
@@ -72,7 +68,6 @@ export default function Temple3DPreview({
           <Building key={piece.id} piece={piece} selected={piece.id===selectedId} onSelect={() => onSelect?.(piece.id)} />
         ))}
 
-        <ContactShadows position={[0,.01,0]} opacity={.42} scale={28} blur={2.4} far={12} />
         <OrbitControls makeDefault enablePan={false} minDistance={5} maxDistance={25}
           minPolarAngle={.45} maxPolarAngle={Math.PI/2.08} target={[0,1.5,0]} />
       </Canvas>
