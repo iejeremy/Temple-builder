@@ -585,6 +585,14 @@ export default function TempleBuilderPage() {
     before: TempleBuild;
   } | null>(null);
 
+  const drawWallRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    variant: string;
+    before: TempleBuild;
+  } | null>(null);
+
   const selectedPiece = useMemo(
     () => build.pieces.find((piece) => piece.id === selectedId) ?? null,
     [build.pieces, selectedId]
@@ -693,12 +701,9 @@ export default function TempleBuilderPage() {
       if (!draft) return;
 
       const resolved = resolvePosition(draft, point.x, point.y, build.pieces);
-
       const newPiece: TemplePiece = {
         ...draft,
-        id: `\( {draft.variant}- \){Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2, 7)}`,
+        id: `${draft.variant}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         x: resolved.x,
         y: resolved.y,
         rotation: resolved.rotation,
@@ -711,15 +716,44 @@ export default function TempleBuilderPage() {
       setSelectedId(newPiece.id);
       setPendingVariant(null);
       setPendingGuide(null);
- const handleStagePointerDown = useCallback(
+      setStatus("Piece placed.");
+    },
+    [pointFromClient, createPendingPiece, resolvePosition, build, commit]
+  );
+
+  const handleStagePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (pendingVariant && activeCategory === "wall") {
+        const point = pointFromClient(event.clientX, event.clientY);
+        if (!point) return;
+        drawWallRef.current = {
+          pointerId: event.pointerId,
+          startX: point.x,
+          startY: point.y,
+          variant: pendingVariant,
+          before: cloneBuild(build),
+        };
+        event.currentTarget.setPointerCapture(event.pointerId);
+        setPendingGuide({
+          x: point.x,
+          y: point.y,
+          width: 2,
+          height: 2,
+          key: "draw-wall",
+          label: "Pull to size",
+          rotation: 0,
+        });
+        setStatus("Pull to set the room width and length, then release.");
+        return;
+      }
+
       if (pendingVariant) {
         placePendingPiece(event.clientX, event.clientY);
         return;
       }
       setSelectedId(null);
     },
-    [pendingVariant, placePendingPiece]
+    [pendingVariant, activeCategory, pointFromClient, build, placePendingPiece]
   );
 
   const beginDrag = useCallback(
@@ -798,6 +832,29 @@ export default function TempleBuilderPage() {
 
   const handleStagePointerMove = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
+      const drawing = drawWallRef.current;
+      if (drawing && drawing.pointerId === event.pointerId) {
+        const point = pointFromClient(event.clientX, event.clientY);
+        if (!point) return;
+        const minX = Math.min(drawing.startX, point.x);
+        const maxX = Math.max(drawing.startX, point.x);
+        const minY = Math.min(drawing.startY, point.y);
+        const maxY = Math.max(drawing.startY, point.y);
+        const grid = 2;
+        const width = Math.max(6, Math.round((maxX - minX) / grid) * grid);
+        const height = Math.max(6, Math.round((maxY - minY) / grid) * grid);
+        setPendingGuide({
+          x: clamp((minX + maxX) / 2, 2, 98),
+          y: clamp((minY + maxY) / 2, 2, 98),
+          width,
+          height,
+          key: "draw-wall",
+          label: `${width} × ${height} — release to snap`,
+          rotation: 0,
+        });
+        return;
+      }
+
       if (resizeRef.current) {
         moveWallResize(event);
         return;
@@ -899,6 +956,38 @@ export default function TempleBuilderPage() {
 
   const endDrag = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
+      const drawing = drawWallRef.current;
+      if (drawing && drawing.pointerId === event.pointerId) {
+        const guide = pendingGuide;
+        drawWallRef.current = null;
+        if (guide) {
+          const definition = PIECE_CATEGORIES && categoryPieces.find((item) => item.id === drawing.variant);
+          const newPiece: TemplePiece = {
+            id: `${drawing.variant}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            type: "wall",
+            variant: drawing.variant,
+            material: build.defaultMaterial,
+            x: guide.x,
+            y: guide.y,
+            width: guide.width,
+            height: guide.height,
+            wallHeight: definition?.wallHeight ?? 22,
+            rotation: 0,
+            layer: build.pieces.length + 1,
+          };
+          const next = cloneBuild(build);
+          next.pieces.push(newPiece);
+          commit(next);
+          setSelectedId(newPiece.id);
+          setPendingVariant(null);
+          setPendingGuide(null);
+          setDirty(true);
+          pulseSnap("wall-drawn");
+          setStatus("Wall room snapped into place. Tap it to customize.");
+        }
+        return;
+      }
+
       if (resizeRef.current) {
         const resize = resizeRef.current;
         if (resize.pointerId !== event.pointerId) return;
@@ -927,7 +1016,7 @@ export default function TempleBuilderPage() {
       setDirty(true);
       setStatus(snapEnabled ? "Piece placed." : "Piece moved freely.");
     },
-    [setHistory, snapEnabled]
+    [pendingGuide, categoryPieces, build, commit, pulseSnap, setHistory, snapEnabled]
   );
 
   const beginWallResize = useCallback(
@@ -1230,7 +1319,7 @@ export default function TempleBuilderPage() {
                   setPendingGuide(null);
                 }
               }}
-              className={`relative min-h-[54vh] flex-1 overflow-hidden rounded-3xl border ${
+              className={`relative min-h-[54vh] flex-1 touch-none overflow-hidden rounded-3xl border ${
                 pendingVariant
                   ? "cursor-crosshair border-amber-300/50"
                   : "border-white/10"
@@ -1323,7 +1412,7 @@ export default function TempleBuilderPage() {
             {pendingVariant && (
               <div className="pointer-events-none absolute left-1/2 top-4 z-[110] -translate-x-1/2 rounded-full bg-amber-200 px-4 py-2 text-xs font-semibold text-black shadow-xl">
                 {activeCategory === "wall"
-                  ? "Tap to place a wall room, then pull its corners"
+                  ? "Touch and pull to size the room • release to snap"
                   : "Tap where you want to place it"}
               </div>
             )}
