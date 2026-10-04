@@ -23,14 +23,14 @@ function Building({ piece, selected, onSelect }: { piece: TemplePiece; selected:
 
   return (
     <group position={[x, 0, z]} rotation={[0, piece.rotation * Math.PI / 180, 0]} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-      <mesh position={[0, 0.08, 0]} receiveShadow>
+      <mesh position={[0, 0.08, 0]}>
         <boxGeometry args={[width + .25, .16, depth + .25]} />
         <meshStandardMaterial color="#9a9384" roughness={1} />
       </mesh>
-      <mesh position={[0, height/2, -depth/2]} castShadow receiveShadow><boxGeometry args={[width,height,t]} />{wallMaterial()}</mesh>
-      <mesh position={[0, height/2, depth/2]} castShadow receiveShadow><boxGeometry args={[width,height,t]} />{wallMaterial()}</mesh>
-      <mesh position={[-width/2, height/2, 0]} castShadow receiveShadow><boxGeometry args={[t,height,depth]} />{wallMaterial()}</mesh>
-      <mesh position={[width/2, height/2, 0]} castShadow receiveShadow><boxGeometry args={[t,height,depth]} />{wallMaterial()}</mesh>
+      <mesh position={[0, height/2, -depth/2]}><boxGeometry args={[width,height,t]} />{wallMaterial()}</mesh>
+      <mesh position={[0, height/2, depth/2]}><boxGeometry args={[width,height,t]} />{wallMaterial()}</mesh>
+      <mesh position={[-width/2, height/2, 0]}><boxGeometry args={[t,height,depth]} />{wallMaterial()}</mesh>
+      <mesh position={[width/2, height/2, 0]}><boxGeometry args={[t,height,depth]} />{wallMaterial()}</mesh>
       {selected && (
         <mesh position={[0,.04,0]}>
           <boxGeometry args={[width+.55,.06,depth+.55]} />
@@ -42,7 +42,7 @@ function Building({ piece, selected, onSelect }: { piece: TemplePiece; selected:
 }
 
 export default function Temple3DPreview({
-  build, selectedId, onSelect, onMove,
+  build, selectedId, onSelect,
 }: {
   build: TempleBuild;
   selectedId?: string | null;
@@ -51,18 +51,22 @@ export default function Temple3DPreview({
 }) {
   return (
     <div className="absolute inset-0 bg-[#b9c4cb]">
-      <Canvas shadows camera={{ position: [9, 8, 11], fov: 43 }} dpr={[1, 1.6]}
-        onPointerMissed={() => onSelect?.(null)}>
+      <Canvas
+        gl={{ antialias: false, powerPreference: "default", alpha: false }}
+        camera={{ position: [9, 8, 11], fov: 43 }}
+        dpr={1}
+        onPointerMissed={() => onSelect?.(null)}
+      >
         <color attach="background" args={["#b9c4cb"]} />
         <fog attach="fog" args={["#b9c4cb", 22, 45]} />
         <hemisphereLight intensity={1.7} groundColor="#7f7a6c" />
-        <directionalLight position={[7, 14, 8]} intensity={2.4} castShadow shadow-mapSize-width={1024} shadow-mapSize-height={1024} />
+        <directionalLight position={[7, 14, 8]} intensity={2.2} />
 
-        <mesh rotation={[-Math.PI/2,0,0]} position={[0,-.02,0]} receiveShadow>
+        <mesh rotation={[-Math.PI/2,0,0]} position={[0,-.02,0]}>
           <planeGeometry args={[38,38]} />
           <meshStandardMaterial color="#8b8a78" roughness={1} />
         </mesh>
-        <gridHelper args={[38,38,"#6f7065","#818276"]} position={[0,.005,0]} />
+        <gridHelper args={[38, 24, "#74766b", "#85877b"]} position={[0, .005, 0]} />
 
         {build.pieces.filter(p => p.type === "wall").map((piece) => (
           <Building key={piece.id} piece={piece} selected={piece.id===selectedId} onSelect={() => onSelect?.(piece.id)} />
