@@ -44,8 +44,26 @@ export default function TempleBuilderPage() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setBuild(JSON.parse(raw));
-    } catch {}
+      if (!raw) return;
+      const saved = JSON.parse(raw) as Partial<TempleBuild>;
+      if (
+        saved.version === 2 &&
+        Array.isArray(saved.pieces) &&
+        saved.pieces.every((piece) =>
+          piece &&
+          typeof piece.id === "string" &&
+          typeof piece.type === "string" &&
+          typeof piece.width === "number" &&
+          typeof piece.height === "number"
+        )
+      ) {
+        setBuild(saved as TempleBuild);
+      } else {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    } catch {
+      localStorage.removeItem(STORAGE_KEY);
+    }
   }, []);
 
   const selected = useMemo(
