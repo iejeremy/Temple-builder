@@ -1287,22 +1287,7 @@ export default function TempleBuilderPage() {
                   3D Preview
                 </button>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setSnapEnabled((enabled) => !enabled);
-                  setSnapGuide(null);
-                  setPendingGuide(null);
-                  lastSnapKeyRef.current = null;
-                }}
-                className={`shrink-0 rounded-xl border px-3 py-2 text-xs font-medium ${
-                  snapEnabled
-                    ? "border-amber-200/40 bg-amber-200/10 text-amber-100"
-                    : "border-white/10 bg-black/20 text-white/60"
-                }`}
-              >
-                {snapEnabled ? "Snapping On" : "Free Move"}
-              </button>
+              
             </div>
           </div>
 
@@ -1422,14 +1407,34 @@ export default function TempleBuilderPage() {
         {viewMode === "3d" && <Temple3DPreview build={build} />}
 
         {viewMode === "build" && selectedPiece && (
-          <div className="rounded-2xl border border-amber-200/25 bg-amber-200/[0.06] p-3">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <div>
-                <div className="text-xs uppercase tracking-[0.18em] text-white/40">
-                  Selected
-                </div>
-                <div className="font-medium capitalize">
-                  {selectedPiece.variant.replaceAll("-", " ")}
+          <div className="rounded-2xl border border-white/10 bg-black/35 p-3">
+            <div className="flex items-center gap-2 overflow-x-auto">
+              <div className="mr-auto min-w-[110px]">
+                <div className="text-[10px] uppercase tracking-[0.18em] text-white/40">Edit</div>
+                <div className="truncate text-sm font-medium capitalize">{selectedPiece.variant.replaceAll("-", " ")}</div>
+              </div>
+              {selectedPiece.type === "wall" && (
+                <>
+                  <label className="shrink-0 rounded-xl border border-white/10 px-3 py-2 text-xs">
+                    Height
+                    <input type="range" min="10" max="60" value={selectedPiece.wallHeight ?? 22}
+                      onChange={(event) => updateSelected({ wallHeight: Number(event.target.value) })}
+                      className="ml-2 w-20 align-middle" />
+                  </label>
+                  <label className="shrink-0 rounded-xl border border-white/10 px-3 py-2 text-xs">
+                    Material
+                    <select value={selectedPiece.material}
+                      onChange={(event) => updateSelected({ material: event.target.value as TempleMaterial })}
+                      className="ml-2 bg-[#111827]">
+                      {TEMPLE_MATERIALS.map((material) => <option key={material.id} value={material.id}>{material.name}</option>)}
+                    </select>
+                  </label>
+                </>
+              )}
+              <button onClick={deleteSelected} className="shrink-0 rounded-xl border border-red-300/20 px-3 py-2 text-xs text-red-200">Delete</button>
+            </div>
+          </div>
+        )}
                 </div>
               </div>
               <button
@@ -1546,25 +1551,35 @@ export default function TempleBuilderPage() {
         )}
 
         {viewMode === "build" && (
-          <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04]">
-            <div className="flex gap-1 overflow-x-auto p-2">
-              {PIECE_CATEGORIES.map((category) => (
-                <button
-                  key={category.type}
-                  onClick={() => {
-                    setActiveCategory(category.type);
-                    setPendingVariant(null);
-                    setPendingGuide(null);
-                  }}
-                  className={`shrink-0 rounded-xl px-3 py-2 text-sm ${
-                    activeCategory === category.type
-                      ? "bg-amber-200 font-semibold text-black"
-                      : "bg-black/25 text-white/70"
-                  }`}
-                >
-                  {category.name}
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-2">
+            <div className="grid grid-cols-4 gap-2">
+              {([
+                ["wall", "Buildings"],
+                ["door", "Doors"],
+                ["window", "Windows"],
+                ["column", "Details"],
+              ] as const).map(([type, label]) => (
+                <button key={type}
+                  onClick={() => { setActiveCategory(type); setPendingVariant(null); setPendingGuide(null); }}
+                  className={`rounded-xl px-2 py-3 text-sm ${activeCategory === type ? "bg-amber-200 font-semibold text-black" : "bg-black/25 text-white/70"}`}>
+                  {label}
                 </button>
               ))}
+            </div>
+            <div className="mt-2 flex gap-2 overflow-x-auto">
+              {categoryPieces.map((piece) => (
+                <button key={piece.id}
+                  onClick={() => {
+                    setPendingVariant(piece.id); setSelectedId(null); setPendingGuide(null);
+                    setStatus(activeCategory === "wall" ? "Touch the build area and pull to size." : `${piece.name} selected. Tap to place it.`);
+                  }}
+                  className={`shrink-0 rounded-xl border px-3 py-2 text-sm ${pendingVariant === piece.id ? "border-amber-300 bg-amber-200/10" : "border-white/10 bg-black/20"}`}>
+                  {piece.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
             </div>
 
             <div className="border-t border-white/10 p-3">
@@ -1600,43 +1615,7 @@ export default function TempleBuilderPage() {
           </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-3">
-          <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/60">
-            New pieces
-            <select
-              value={build.defaultMaterial}
-              onChange={(event) => {
-                replacePresent({
-                  ...build,
-                  defaultMaterial: event.target.value as TempleMaterial,
-                });
-                setDirty(true);
-              }}
-              className="bg-[#111827] text-white"
-            >
-              {TEMPLE_MATERIALS.map((material) => (
-                <option key={material.id} value={material.id}>
-                  {material.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="flex gap-2">
-            <button
-              onClick={load}
-              className="rounded-xl border border-white/10 px-3 py-2 text-xs text-white/70"
-            >
-              Load
-            </button>
-            <button
-              onClick={reset}
-              className="rounded-xl border border-white/10 px-3 py-2 text-xs text-white/50"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
+        
       </section>
     </div>
   </main>
