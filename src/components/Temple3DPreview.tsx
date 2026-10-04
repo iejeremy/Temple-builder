@@ -18,7 +18,9 @@ function Building({ piece, selected, onSelect }: { piece: TemplePiece; selected:
   const height = Math.max(1.2, (piece.wallHeight ?? 22) / 7);
   const t = 0.24;
   const color = colorFor(piece);
-  const material = <meshStandardMaterial color={color} roughness={0.78} metalness={0.02} />;
+  const wallMaterial = () => (
+    <meshStandardMaterial color={color} roughness={0.78} metalness={0.02} />
+  );
 
   return (
     <group position={[x, 0, z]} rotation={[0, piece.rotation * Math.PI / 180, 0]} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
@@ -26,10 +28,10 @@ function Building({ piece, selected, onSelect }: { piece: TemplePiece; selected:
         <boxGeometry args={[width + .25, .16, depth + .25]} />
         <meshStandardMaterial color="#9a9384" roughness={1} />
       </mesh>
-      <mesh position={[0, height/2, -depth/2]} castShadow receiveShadow><boxGeometry args={[width,height,t]} />{material}</mesh>
-      <mesh position={[0, height/2, depth/2]} castShadow receiveShadow><boxGeometry args={[width,height,t]} />{material}</mesh>
-      <mesh position={[-width/2, height/2, 0]} castShadow receiveShadow><boxGeometry args={[t,height,depth]} />{material}</mesh>
-      <mesh position={[width/2, height/2, 0]} castShadow receiveShadow><boxGeometry args={[t,height,depth]} />{material}</mesh>
+      <mesh position={[0, height/2, -depth/2]} castShadow receiveShadow><boxGeometry args={[width,height,t]} />{wallMaterial()}</mesh>
+      <mesh position={[0, height/2, depth/2]} castShadow receiveShadow><boxGeometry args={[width,height,t]} />{wallMaterial()}</mesh>
+      <mesh position={[-width/2, height/2, 0]} castShadow receiveShadow><boxGeometry args={[t,height,depth]} />{wallMaterial()}</mesh>
+      <mesh position={[width/2, height/2, 0]} castShadow receiveShadow><boxGeometry args={[t,height,depth]} />{wallMaterial()}</mesh>
       {selected && (
         <mesh position={[0,.04,0]}>
           <boxGeometry args={[width+.55,.06,depth+.55]} />
