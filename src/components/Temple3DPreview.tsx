@@ -8,15 +8,18 @@ const COLORS: Record<BuilderMaterial, number> = {
   marble: 0xd9d4cc, sandstone: 0xb98b5b, limestone: 0xc6b898, obsidian: 0x25262b,
 };
 
-export default function Temple3DPreview({ levels, sitePieces, selectedLevel, onSelectLevel, onSelectFace, onMoveLevel, onPatioChange, onMoveWindow }: {
+export default function Temple3DPreview({ levels, sitePieces, selectedLevel, selectedPieceId, onSelectLevel, onSelectFace, onMoveLevel, onPatioChange, onMoveWindow, onSelectPiece, onMovePiece }: {
   levels: BuildingLevel[];
   sitePieces: SitePiece[];
   selectedLevel: number;
+  selectedPieceId?: string | null;
   onSelectLevel?: (index: number) => void;
   onSelectFace?: (index: number, face: WallFace) => void;
   onMoveLevel?: (index: number, x: number, z: number) => void;
   onPatioChange?: (index: number, patio: boolean) => void;
   onMoveWindow?: (levelIndex: number, id: string, u: number, v: number) => void;
+  onSelectPiece?: (id: string) => void;
+  onMovePiece?: (id: string, x: number, z: number) => void;
 }) {
   const hostRef = useRef<HTMLDivElement|null>(null);
   const groupRef = useRef<THREE.Group|null>(null);
@@ -30,6 +33,10 @@ export default function Temple3DPreview({ levels, sitePieces, selectedLevel, onS
   const pointerDownRef = useRef<{x:number;y:number}|null>(null);
   const movingLevelRef = useRef<number|null>(null);
   const dragPlaneRef = useRef(new THREE.Plane(new THREE.Vector3(0,1,0),0));
+  const siteGroupsRef = useRef<THREE.Group[]>([]);
+  const movingPieceRef = useRef<string|null>(null);
+  const liveRef = useRef({levels,selectedLevel,selectedPieceId,onSelectLevel,onSelectFace,onMoveLevel,onSelectPiece,onMovePiece});
+  liveRef.current={levels,selectedLevel,selectedPieceId,onSelectLevel,onSelectFace,onMoveLevel,onSelectPiece,onMovePiece};
 
   useEffect(() => {
     const host=hostRef.current; if(!host) return;
@@ -53,9 +60,9 @@ export default function Temple3DPreview({ levels, sitePieces, selectedLevel, onS
     const canvas=renderer.domElement; canvas.style.touchAction="none";
     const pointers=new Map<number,{x:number,y:number}>();
     const distance=()=>{const pts=[...pointers.values()];return pts.length<2?0:Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);};
-    const down=(e:PointerEvent)=>{pointerDownRef.current={x:e.clientX,y:e.clientY};const rect=canvas.getBoundingClientRect();const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);const hits=raycasterRef.current.intersectObjects(levelGroupsRef.current,true);if(hits.length){let obj:THREE.Object3D|null=hits[0].object;while(obj&&obj.userData.levelIndex===undefined)obj=obj.parent;if(obj&&obj.userData.levelIndex!==undefined){const idx=obj.userData.levelIndex as number;onSelectLevel?.(idx);if(idx>0&&idx===selectedLevel){movingLevelRef.current=idx;const y=levels.slice(0,idx).reduce((s,l)=>s+l.height/7,0);dragPlaneRef.current.set(new THREE.Vector3(0,1,0),-y);}}}pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const o=orbitRef.current;if(pointers.size===1){o.dragging=true;o.lastX=e.clientX;o.lastY=e.clientY;}else if(pointers.size===2){o.dragging=false;o.pinch=distance();}canvas.setPointerCapture?.(e.pointerId);};
-    const move=(e:PointerEvent)=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const o=orbitRef.current;if(pointers.size===2){movingLevelRef.current=null;const next=distance();if(o.pinch>0){const scale=o.pinch/next;o.radius=Math.max(6,Math.min(24,o.radius*scale));}o.pinch=next;render();return;}if(movingLevelRef.current!==null&&pointers.size===1){const rect=canvas.getBoundingClientRect();const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);const hit=new THREE.Vector3();if(raycasterRef.current.ray.intersectPlane(dragPlaneRef.current,hit)){const snap=.25;onMoveLevel?.(movingLevelRef.current,Math.round(hit.x/snap)*snap,Math.round(hit.z/snap)*snap);}return;}if(!o.dragging)return;const dx=e.clientX-o.lastX,dy=e.clientY-o.lastY;o.lastX=e.clientX;o.lastY=e.clientY;o.theta-=dx*.008;o.phi=Math.max(.16,Math.min(1.56,o.phi+dy*.006));render();};
-    const up=(e:PointerEvent)=>{movingLevelRef.current=null;const start=pointerDownRef.current;pointerDownRef.current=null;if(start&&Math.hypot(e.clientX-start.x,e.clientY-start.y)<8&&pointers.size===1){const rect=canvas.getBoundingClientRect();const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);const hits=raycasterRef.current.intersectObjects(levelGroupsRef.current,true);if(hits.length){let obj:THREE.Object3D|null=hits[0].object;while(obj&&obj.userData.levelIndex===undefined)obj=obj.parent;if(obj&&obj.userData.levelIndex!==undefined){const idx=obj.userData.levelIndex as number;onSelectLevel?.(idx);const hit=hits[0];if(hit.face){const n=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);const ax=Math.abs(n.x),az=Math.abs(n.z);const face:WallFace=ax>az?(n.x>0?"right":"left"):(n.z>0?"front":"back");onSelectFace?.(idx,face);}}}}pointers.delete(e.pointerId);const o=orbitRef.current;o.pinch=0;if(pointers.size===1){const pt=[...pointers.values()][0];o.dragging=true;o.lastX=pt.x;o.lastY=pt.y;}else{o.dragging=false;}};
+    const down=(e:PointerEvent)=>{pointerDownRef.current={x:e.clientX,y:e.clientY};const rect=canvas.getBoundingClientRect();const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);const siteHits=raycasterRef.current.intersectObjects(siteGroupsRef.current,true);if(siteHits.length){let so:THREE.Object3D|null=siteHits[0].object;while(so&&so.userData.sitePieceId===undefined)so=so.parent;if(so){const id=so.userData.sitePieceId as string;liveRef.current.onSelectPiece?.(id);if(id===liveRef.current.selectedPieceId){movingPieceRef.current=id;dragPlaneRef.current.set(new THREE.Vector3(0,1,0),0);}}}const hits=siteHits.length?[]:raycasterRef.current.intersectObjects(levelGroupsRef.current,true);if(hits.length){let obj:THREE.Object3D|null=hits[0].object;while(obj&&obj.userData.levelIndex===undefined)obj=obj.parent;if(obj&&obj.userData.levelIndex!==undefined){const idx=obj.userData.levelIndex as number;onSelectLevel?.(idx);if(idx>0&&idx===selectedLevel){movingLevelRef.current=idx;const y=levels.slice(0,idx).reduce((s,l)=>s+l.height/7,0);dragPlaneRef.current.set(new THREE.Vector3(0,1,0),-y);}}}pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const o=orbitRef.current;if(pointers.size===1){o.dragging=true;o.lastX=e.clientX;o.lastY=e.clientY;}else if(pointers.size===2){o.dragging=false;o.pinch=distance();}canvas.setPointerCapture?.(e.pointerId);};
+    const move=(e:PointerEvent)=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const o=orbitRef.current;if(pointers.size===2){movingLevelRef.current=null;const next=distance();if(o.pinch>0){const scale=o.pinch/next;o.radius=Math.max(6,Math.min(24,o.radius*scale));}o.pinch=next;render();return;}if(movingPieceRef.current!==null&&pointers.size===1){const rect=canvas.getBoundingClientRect();const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);const hit=new THREE.Vector3();if(raycasterRef.current.ray.intersectPlane(dragPlaneRef.current,hit)){let x=Math.round(hit.x/.25)*.25,z=Math.round(hit.z/.25)*.25;for(const other of siteGroupsRef.current){if(other.userData.sitePieceId===movingPieceRef.current)continue;if(Math.hypot(x-other.position.x,z-other.position.z)<.65){x=other.position.x;z=other.position.z;break;}}liveRef.current.onMovePiece?.(movingPieceRef.current,x,z);}return;}if(movingLevelRef.current!==null&&pointers.size===1){const rect=canvas.getBoundingClientRect();const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);const hit=new THREE.Vector3();if(raycasterRef.current.ray.intersectPlane(dragPlaneRef.current,hit)){const snap=.25;onMoveLevel?.(movingLevelRef.current,Math.round(hit.x/snap)*snap,Math.round(hit.z/snap)*snap);}return;}if(!o.dragging)return;const dx=e.clientX-o.lastX,dy=e.clientY-o.lastY;o.lastX=e.clientX;o.lastY=e.clientY;o.theta-=dx*.008;o.phi=Math.max(.16,Math.min(1.56,o.phi+dy*.006));render();};
+    const up=(e:PointerEvent)=>{movingLevelRef.current=null;movingPieceRef.current=null;const start=pointerDownRef.current;pointerDownRef.current=null;if(start&&Math.hypot(e.clientX-start.x,e.clientY-start.y)<8&&pointers.size===1){const rect=canvas.getBoundingClientRect();const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);const hits=raycasterRef.current.intersectObjects(levelGroupsRef.current,true);if(hits.length){let obj:THREE.Object3D|null=hits[0].object;while(obj&&obj.userData.levelIndex===undefined)obj=obj.parent;if(obj&&obj.userData.levelIndex!==undefined){const idx=obj.userData.levelIndex as number;onSelectLevel?.(idx);const hit=hits[0];if(hit.face){const n=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);const ax=Math.abs(n.x),az=Math.abs(n.z);const face:WallFace=ax>az?(n.x>0?"right":"left"):(n.z>0?"front":"back");onSelectFace?.(idx,face);}}}}pointers.delete(e.pointerId);const o=orbitRef.current;o.pinch=0;if(pointers.size===1){const pt=[...pointers.values()][0];o.dragging=true;o.lastX=pt.x;o.lastY=pt.y;}else{o.dragging=false;}};
     const wheel=(e:WheelEvent)=>{e.preventDefault();const o=orbitRef.current;o.radius=Math.max(6,Math.min(24,o.radius+e.deltaY*.012));render();};
     canvas.addEventListener("pointerdown",down);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",up);canvas.addEventListener("pointercancel",up);canvas.addEventListener("wheel",wheel,{passive:false});
     window.addEventListener("resize",resize); resize();
@@ -149,10 +156,11 @@ export default function Temple3DPreview({ levels, sitePieces, selectedLevel, onS
         if(exposed!==level.patio) queueMicrotask(()=>onPatioChange?.(index,exposed));
       }
     });
-    const siteMat=(m:SitePiece["material"])=>new THREE.MeshStandardMaterial({color:COLORS[m],roughness:.78});
+    const siteMat=(m:SitePiece["material"],selected=false)=>new THREE.MeshStandardMaterial({color:selected?new THREE.Color(COLORS[m]).offsetHSL(0,0,.1):COLORS[m],roughness:.78,emissive:selected?0x493d13:0,emissiveIntensity:selected?.18:0});
+    siteGroupsRef.current=[];
     sitePieces.forEach(piece=>{
-      const pg=new THREE.Group();pg.position.set(piece.x,0,piece.z);pg.rotation.y=THREE.MathUtils.degToRad(piece.rotation);group.add(pg);
-      const addSite=(geo:THREE.BufferGeometry,x:number,y:number,z:number)=>{const mesh=new THREE.Mesh(geo,siteMat(piece.material));mesh.position.set(x,y,z);pg.add(mesh);};
+      const pg=new THREE.Group();pg.userData.sitePieceId=piece.id;pg.position.set(piece.x,0,piece.z);siteGroupsRef.current.push(pg);pg.rotation.y=THREE.MathUtils.degToRad(piece.rotation);group.add(pg);
+      const addSite=(geo:THREE.BufferGeometry,x:number,y:number,z:number)=>{const mesh=new THREE.Mesh(geo,siteMat(piece.material,piece.id===selectedPieceId));mesh.position.set(x,y,z);pg.add(mesh);};
       if(piece.type==="wall") addSite(new THREE.BoxGeometry(piece.width,piece.height,.28),0,piece.height/2,0);
       if(piece.type==="pillar") addSite(new THREE.BoxGeometry(.55,piece.height,.55),0,piece.height/2,0);
       if(piece.type==="columns"){for(const x of [-.7,.7])addSite(new THREE.CylinderGeometry(.18,.22,piece.height,12),x,piece.height/2,0);}
@@ -162,7 +170,7 @@ export default function Temple3DPreview({ levels, sitePieces, selectedLevel, onS
       if(piece.type==="tower"){const r=piece.width/2,s=piece.towerShape;let geo:THREE.BufferGeometry;if(s==="square")geo=new THREE.BoxGeometry(piece.width,piece.height,piece.width);else if(s==="star"){const sh=new THREE.Shape();for(let i=0;i<10;i++){const rr=i%2===0?r:r*.48,a=-Math.PI/2+i*Math.PI/5;i?sh.lineTo(Math.cos(a)*rr,Math.sin(a)*rr):sh.moveTo(Math.cos(a)*rr,Math.sin(a)*rr);}sh.closePath();geo=new THREE.ExtrudeGeometry(sh,{depth:piece.height,bevelEnabled:false});geo.rotateX(Math.PI/2);geo.translate(0,piece.height,0);}else geo=new THREE.CylinderGeometry(r,r,piece.height,s==="octagon"?8:s==="hexagon"?6:s==="spire"?16:24);addSite(geo,0,s==="star"?0:piece.height/2,0);if(s==="spire")addSite(new THREE.ConeGeometry(r*1.05,piece.height*.55,16),0,piece.height*1.275,0);}
     });
     const o=orbitRef.current;camera.position.set(Math.sin(o.theta)*Math.sin(o.phi)*o.radius,Math.cos(o.phi)*o.radius,Math.cos(o.theta)*Math.sin(o.phi)*o.radius);camera.lookAt(0,targetYRef.current,0);renderer.render(scene,camera);
-  },[levels,sitePieces,selectedLevel]);
+  },[levels,sitePieces,selectedLevel,selectedPieceId]);
 
   return <div ref={hostRef} className="absolute inset-0"><div className="pointer-events-none absolute bottom-[128px] left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-2 text-xs text-white/70">Drag to look around • pinch to zoom</div></div>;
 }
