@@ -12,7 +12,10 @@ export type BuildingShape = "rectangle" | "square" | "wide" | "l-shape" | "t-sha
 export type BuilderMaterial = "marble" | "sandstone" | "limestone" | "obsidian";
 export type RoofStyle = "flat" | "pyramid" | "dome" | "cone" | "steeple" | "none";
 export type WallFace = "front" | "back" | "left" | "right";
-export type WindowAttachment = { id: string; face: WallFace; u: number; v: number; width: number; height: number; };
+export type WindowStyle = "classic" | "tall" | "arched" | "round" | "double" | "rose" | "stained";
+export type DoorStyle = "single" | "double" | "arched" | "bronze" | "temple" | "portico";
+export type WindowAttachment = { id: string; face: WallFace; u: number; v: number; width: number; height: number; style: WindowStyle; };
+export type DoorAttachment = { id: string; face: WallFace; u: number; width: number; height: number; style: DoorStyle; };
 export type BuildingLevel = {
   id: string;
   shape: BuildingShape;
@@ -26,6 +29,7 @@ export type BuildingLevel = {
   z: number;
   rotation: number;
   windows: WindowAttachment[];
+  doors: DoorAttachment[];
 };
 
 export default function TempleBuilderPage() {
@@ -38,6 +42,7 @@ export default function TempleBuilderPage() {
   const [levels, setLevels] = useState<BuildingLevel[]>([]);
   const [selectedLevel, setSelectedLevel] = useState(0);
   const [selectedFace, setSelectedFace] = useState<WallFace | null>(null);
+  const [detailCategory, setDetailCategory] = useState<"windows"|"doors"|"trim"|"columns"|"arches"|null>(null);
   const [panel, setPanel] = useState<"walls" | "buildings" | "fountains" | "statues" | "stairs" | "more" | "edit" | null>("buildings");
 
   const chooseShape = (next: BuildingShape) => {
@@ -53,7 +58,7 @@ export default function TempleBuilderPage() {
     if (next === "rotunda") { setWidth(32); setDepth(32); }
     if (next === "courtyard") { setWidth(46); setDepth(40); }
     setHeight(22);
-    setLevels([{ id: "level-1", shape: next, material, width: next === "wide" ? 46 : next === "courtyard" ? 46 : next === "l-shape" ? 38 : next === "t-shape" || next === "cross" ? 40 : next === "u-shape" ? 42 : next === "square" || next === "octagon" || next === "rotunda" ? 28 : 34, depth: next === "wide" ? 24 : next === "courtyard" ? 40 : next === "l-shape" || next === "t-shape" ? 34 : next === "u-shape" ? 36 : next === "cross" ? 40 : next === "square" || next === "octagon" || next === "rotunda" ? 28 : 26, height: 22, roof: "flat", patio: false, x: 0, z: 0, rotation: 0, windows: [] }]);
+    setLevels([{ id: "level-1", shape: next, material, width: next === "wide" ? 46 : next === "courtyard" ? 46 : next === "l-shape" ? 38 : next === "t-shape" || next === "cross" ? 40 : next === "u-shape" ? 42 : next === "square" || next === "octagon" || next === "rotunda" ? 28 : 34, depth: next === "wide" ? 24 : next === "courtyard" ? 40 : next === "l-shape" || next === "t-shape" ? 34 : next === "u-shape" ? 36 : next === "cross" ? 40 : next === "square" || next === "octagon" || next === "rotunda" ? 28 : 26, height: 22, roof: "flat", patio: false, x: 0, z: 0, rotation: 0, windows: [], doors: [] }]);
     setSelectedLevel(0);
     setPanel(null);
   };
@@ -87,7 +92,7 @@ export default function TempleBuilderPage() {
           <div className="mb-3 flex items-center justify-between"><span className="font-semibold">Level {selectedLevel + 1}</span><button onClick={() => setPanel(null)} className="text-sm text-white/60">Done</button></div>
           <div className="mb-3 flex gap-2 overflow-x-auto">
             {levels.map((_,i)=><button key={i} onClick={()=>setSelectedLevel(i)} className={`shrink-0 rounded-xl px-3 py-2 text-xs ${i===selectedLevel?"bg-amber-200 text-black":"bg-white/10"}`}>Level {i+1}</button>)}
-            {levels.length<4 && <button onClick={()=>{const base=levels[levels.length-1];setLevels([...levels,{...base,id:`level-${levels.length+1}`,width:Math.max(16,Math.round(base.width*.84)),depth:Math.max(16,Math.round(base.depth*.84)),roof:"flat",patio:false,x:0,z:0,rotation:0,windows:[]}]);setSelectedLevel(levels.length);}} className="shrink-0 rounded-xl bg-white/10 px-3 py-2 text-xs">+ Stack level</button>}
+            {levels.length<4 && <button onClick={()=>{const base=levels[levels.length-1];setLevels([...levels,{...base,id:`level-${levels.length+1}`,width:Math.max(16,Math.round(base.width*.84)),depth:Math.max(16,Math.round(base.depth*.84)),roof:"flat",patio:false,x:0,z:0,rotation:0,windows:[],doors:[]}]);setSelectedLevel(levels.length);}} className="shrink-0 rounded-xl bg-white/10 px-3 py-2 text-xs">+ Stack level</button>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <label className="text-xs text-white/70">Width<input className="mt-2 w-full" type="range" min="16" max="60" value={levels[selectedLevel].width} onChange={e=>setLevels(levels.map((l,i)=>i===selectedLevel?{...l,width:Number(e.target.value)}:l))}/></label>
@@ -104,13 +109,18 @@ export default function TempleBuilderPage() {
           <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3">
             <div className="text-xs font-semibold text-white/80">Wall surface</div>
             <div className="mt-1 text-xs text-white/50">{selectedFace ? `${selectedFace} wall selected` : "Tap a wall face on the building to customize it."}</div>
-            {selectedFace && <div className="mt-3 flex gap-2 overflow-x-auto">
-              <button onClick={()=>setLevels(levels.map((l,i)=>i===selectedLevel?{...l,windows:[...l.windows,{id:`window-${Date.now()}`,face:selectedFace,u:0,v:.55,width:1,height:1.25}]}:l))} className="rounded-xl bg-amber-200 px-4 py-2 text-xs font-semibold text-black">+ Window</button>
-              <button disabled={selectedLevel>0&&!levels[selectedLevel].patio} className="rounded-xl bg-white/10 px-4 py-2 text-xs disabled:opacity-30">Door</button>
-              <button className="rounded-xl bg-white/10 px-4 py-2 text-xs">Trim</button>
-              <button className="rounded-xl bg-white/10 px-4 py-2 text-xs">Columns</button>
-              <button className="rounded-xl bg-white/10 px-4 py-2 text-xs">Arches</button>
-            </div>}
+            {selectedFace && <>
+              <div className="mt-3 flex gap-2 overflow-x-auto">
+                {(["windows","doors","trim","columns","arches"] as const).map(cat=><button key={cat} disabled={cat==="doors"&&selectedLevel>0&&!levels[selectedLevel].patio} onClick={()=>setDetailCategory(cat)} className={`rounded-xl px-4 py-2 text-xs capitalize disabled:opacity-30 ${detailCategory===cat?"bg-amber-200 text-black":"bg-white/10"}`}>{cat}</button>)}
+              </div>
+              {detailCategory==="windows" && <div className="mt-3 flex gap-2 overflow-x-auto">
+                {([["classic","Classic"],["tall","Tall"],["arched","Arched"],["round","Round"],["double","Double"],["rose","Rose"],["stained","Stained Glass"]] as [WindowStyle,string][]).map(([style,name])=><button key={style} onClick={()=>setLevels(levels.map((l,i)=>i===selectedLevel?{...l,windows:[...l.windows,{id:`window-${Date.now()}`,face:selectedFace,u:0,v:.55,width:style==="double"?1.7:style==="round"||style==="rose"?1.25:1,height:style==="tall"||style==="arched"?1.7:1.25,style}]}:l))} className="min-w-[105px] rounded-xl bg-white/10 p-3 text-left text-xs"><div className="mb-2 h-8 rounded border border-amber-100/40"/>{name}</button>)}
+              </div>}
+              {detailCategory==="doors" && <div className="mt-3 flex gap-2 overflow-x-auto">
+                {([["single","Single"],["double","Double"],["arched","Arched"],["bronze","Bronze"],["temple","Temple"],["portico","Portico"]] as [DoorStyle,string][]).map(([style,name])=><button key={style} onClick={()=>setLevels(levels.map((l,i)=>i===selectedLevel?{...l,doors:[...l.doors,{id:`door-${Date.now()}`,face:selectedFace,u:0,width:style==="double"||style==="temple"||style==="portico"?1.8:1.1,height:style==="temple"||style==="portico"?2.5:2,style}]}:l))} className="min-w-[105px] rounded-xl bg-white/10 p-3 text-left text-xs"><div className="mb-2 h-8 rounded border border-amber-100/40"/>{name}</button>)}
+              </div>}
+              {(detailCategory==="trim"||detailCategory==="columns"||detailCategory==="arches") && <div className="mt-3 rounded-xl bg-white/5 p-3 text-xs text-white/50">Multiple {detailCategory} styles are next in the same catalog system.</div>}
+            </>}
           </div>
         </div>
       )}
