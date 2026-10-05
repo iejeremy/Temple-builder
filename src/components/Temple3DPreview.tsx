@@ -53,24 +53,37 @@ export default function Temple3DPreview({ shape, material, width, depth, height 
     const group=groupRef.current,scene=sceneRef.current,renderer=rendererRef.current,camera=cameraRef.current;if(!group||!scene||!renderer||!camera)return;
     while(group.children.length){const o=group.children.pop()!;if(o instanceof THREE.Mesh){o.geometry.dispose();const m=o.material;if(Array.isArray(m))m.forEach(x=>x.dispose());else m.dispose();}}
     if(shape){
-      const w=width/7,d=depth/7,h=height/7,t=.22,color=COLORS[material];
+      const w=width/7,d=depth/7,h=height/7,color=COLORS[material];
       const mat=()=>new THREE.MeshStandardMaterial({color,roughness:.78});
-      const add=(sx:number,sy:number,sz:number,x:number,y:number,z:number)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),mat());m.position.set(x,y,z);group.add(m);};
-      add(w+.35,.18,d+.35,0,.09,0);
-      add(w,h,t,0,h/2,-d/2); add(w,h,t,0,h/2,d/2); add(t,h,d,-w/2,h/2,0); add(t,h,d,w/2,h/2,0);
+      const roofMat=()=>new THREE.MeshStandardMaterial({color,roughness:.72});
+      const box=(sx:number,sy:number,sz:number,x:number,y:number,z:number,m=mat())=>{const mesh=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),m);mesh.position.set(x,y,z);group.add(mesh);};
+      const roofBox=(sx:number,sz:number,x:number,z:number)=>box(sx,.18,sz,x,h+.09,z,roofMat());
+      const room=(rw:number,rd:number,x=0,z=0,roof=true)=>{
+        box(rw+.12,.18,rd+.12,x,.09,z);
+        // Solid massing makes each preset read as a complete building. Open/custom walls remain a separate tool.
+        box(rw,h,rd,x,h/2,z);
+        if(roof) roofBox(rw+.22,rd+.22,x,z);
+      };
+      const pyramidRoof=(rw:number,rd:number,x=0,z=0)=>{
+        const rh=Math.max(.65,Math.min(1.25,rw*.17));
+        const g=new THREE.CylinderGeometry(0,1,rh,4,1,false);g.rotateY(Math.PI/4);g.scale(rw*.72,1,rd*.72);
+        const mesh=new THREE.Mesh(g,roofMat());mesh.position.set(x,h+rh/2,z);group.add(mesh);
+      };
 
-      // A Building is a complete enclosed shell. Standalone open sections belong under Walls.
-      const roofMaterial=new THREE.MeshStandardMaterial({color,roughness:.72});
-      if(shape==="wide"){
-        const roof=new THREE.Mesh(new THREE.BoxGeometry(w+.22,.18,d+.22),roofMaterial);
-        roof.position.set(0,h+.09,0); group.add(roof);
-      } else {
-        const roofHeight=Math.max(.75,Math.min(1.35,w*.18));
-        const roofGeometry=new THREE.CylinderGeometry(0,1,roofHeight,4,1,false);
-        roofGeometry.rotateY(Math.PI/4);
-        roofGeometry.scale(w*.72,1,d*.72);
-        const roof=new THREE.Mesh(roofGeometry,roofMaterial);
-        roof.position.set(0,h+roofHeight/2,0); group.add(roof);
+      if(shape==="rectangle"||shape==="square"){ room(w,d,0,0,false); pyramidRoof(w,d); }
+      else if(shape==="wide"){ room(w,d); }
+      else if(shape==="l-shape"){ room(w*.42,d, -w*.29,0); room(w*.72,d*.42,w*.14,d*.29); }
+      else if(shape==="t-shape"){ room(w,d*.38,0,d*.30); room(w*.36,d*.76,0,-d*.12); }
+      else if(shape==="u-shape"){ room(w*.28,d,-w*.36,0); room(w*.28,d,w*.36,0); room(w*.72,d*.28,0,-d*.36); }
+      else if(shape==="cross"){ room(w*.34,d,0,0); room(w,d*.34,0,0); }
+      else if(shape==="courtyard"){ room(w,d*.24,0,-d*.38); room(w,d*.24,0,d*.38); room(w*.24,d*.58,-w*.38,0); room(w*.24,d*.58,w*.38,0); }
+      else if(shape==="octagon"||shape==="rotunda"){
+        const sides=shape==="rotunda"?32:8;
+        const radius=Math.min(w,d)*.5;
+        const body=new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,h,sides),mat());body.position.y=h/2;group.add(body);
+        const roofHeight=shape==="rotunda"?radius*.42:radius*.34;
+        const roof=new THREE.Mesh(new THREE.ConeGeometry(radius*1.04,roofHeight,sides),roofMat());roof.position.y=h+roofHeight/2;group.add(roof);
+        const base=new THREE.Mesh(new THREE.CylinderGeometry(radius*1.06,radius*1.06,.18,sides),mat());base.position.y=.09;group.add(base);
       }
     }
     const o=orbitRef.current;camera.position.set(Math.sin(o.theta)*Math.sin(o.phi)*o.radius,Math.cos(o.phi)*o.radius,Math.cos(o.theta)*Math.sin(o.phi)*o.radius);camera.lookAt(0,1.4,0);renderer.render(scene,camera);
