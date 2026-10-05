@@ -95,16 +95,41 @@ export default function Temple3DPreview({ levels, selectedLevel, onSelectLevel, 
         for(const [rw,rd,x,z] of parts)addRoof(lg,level.roof,rw,rd,x,z,baseY+h,color);
       }
       for(const win of level.windows||[]){
-        const ww=win.width/2.4,wh=win.height/2.4;
-        const frame=new THREE.Mesh(new THREE.BoxGeometry(ww,wh,.08),new THREE.MeshStandardMaterial({color:0x273746,roughness:.35,metalness:.15}));
-        const edge=.04;
+        const ww=win.width/2.4,wh=win.height/2.4,edge=.04;
+        let geometry:THREE.BufferGeometry;
+        if(win.style==="round"||win.style==="rose") geometry=new THREE.CylinderGeometry(ww*.55,ww*.55,.08,24);
+        else if(win.style==="arched") geometry=new THREE.CapsuleGeometry(ww*.5,Math.max(.15,wh-ww),6,12);
+        else geometry=new THREE.BoxGeometry(ww,wh,.08);
+        const glassColor=win.style==="stained"?0x6d4d8b:win.style==="rose"?0x7a3f4f:0x273746;
+        const frame=new THREE.Mesh(geometry,new THREE.MeshStandardMaterial({color:glassColor,roughness:.3,metalness:.15}));
+        if(win.style==="round"||win.style==="rose") frame.rotation.x=Math.PI/2;
         if(win.face==="front"||win.face==="back"){
           frame.position.set((win.u||0)*(w*.38),baseY+h*(win.v||.55),win.face==="front"?d/2+edge:-d/2-edge);
+          if(win.face==="back") frame.rotation.y+=Math.PI;
         }else{
-          frame.geometry.dispose();frame.geometry=new THREE.BoxGeometry(.08,wh,ww);
+          if(win.style!=="round"&&win.style!=="rose"){frame.geometry.dispose();frame.geometry=win.style==="arched"?new THREE.CapsuleGeometry(ww*.5,Math.max(.15,wh-ww),6,12):new THREE.BoxGeometry(.08,wh,ww);}
           frame.position.set(win.face==="right"?w/2+edge:-w/2-edge,baseY+h*(win.v||.55),(win.u||0)*(d*.38));
+          frame.rotation.y+=Math.PI/2;
+        }
+        if(win.style==="double"){
+          const mullion=new THREE.Mesh(new THREE.BoxGeometry(.035,wh*.92,.1),new THREE.MeshStandardMaterial({color:0xd8c9a8,roughness:.65}));mullion.position.copy(frame.position);mullion.rotation.copy(frame.rotation);lg.add(mullion);
         }
         frame.userData.levelIndex=index;frame.userData.windowId=win.id;lg.add(frame);
+      }
+      for(const door of level.doors||[]){
+        const dw=door.width/2.2,dh=door.height/2.2,edge=.055;
+        const arched=door.style==="arched"||door.style==="temple"||door.style==="portico";
+        const dg=arched?new THREE.CapsuleGeometry(dw*.5,Math.max(.2,dh-dw),6,12):new THREE.BoxGeometry(dw,dh,.1);
+        const dc=door.style==="bronze"?0x7b552e:door.style==="temple"||door.style==="portico"?0x6b4a2d:0x4b3527;
+        const mesh=new THREE.Mesh(dg,new THREE.MeshStandardMaterial({color:dc,roughness:.72,metalness:door.style==="bronze"?.5:.08}));
+        const y=baseY+dh/2+.08;
+        if(door.face==="front"||door.face==="back"){mesh.position.set((door.u||0)*(w*.38),y,door.face==="front"?d/2+edge:-d/2-edge);if(door.face==="back")mesh.rotation.y=Math.PI;}
+        else{mesh.position.set(door.face==="right"?w/2+edge:-w/2-edge,y,(door.u||0)*(d*.38));mesh.rotation.y=Math.PI/2;}
+        mesh.userData.levelIndex=index;mesh.userData.doorId=door.id;lg.add(mesh);
+        if(door.style==="portico"){
+          const colMat=new THREE.MeshStandardMaterial({color:0xd9d4cc,roughness:.75});
+          for(const side of [-1,1]){const col=new THREE.Mesh(new THREE.CylinderGeometry(.08,.1,dh,10),colMat.clone());if(door.face==="front"||door.face==="back")col.position.set(mesh.position.x+side*(dw*.72),y,mesh.position.z+(door.face==="front"?.08:-.08));else col.position.set(mesh.position.x+(door.face==="right"?.08:-.08),y,mesh.position.z+side*(dw*.72));lg.add(col);}
+        }
       }
       baseY+=h;
       if(index>0){
