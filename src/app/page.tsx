@@ -17,7 +17,7 @@ export default function TempleBuilderPage() {
   const [width, setWidth] = useState(32);
   const [depth, setDepth] = useState(26);
   const [height, setHeight] = useState(22);
-  const [panel, setPanel] = useState<"buildings" | "edit" | null>("buildings");
+  const [panel, setPanel] = useState<"walls" | "buildings" | "fountains" | "statues" | "stairs" | "more" | "edit" | null>("buildings");
 
   const chooseShape = (next: BuildingShape) => {
     setShape(next);
@@ -60,11 +60,13 @@ export default function TempleBuilderPage() {
       )}
 
       <div className="absolute inset-x-0 bottom-0 z-30 rounded-t-[28px] border-t border-white/10 bg-[#111820]/95 pb-[max(10px,env(safe-area-inset-bottom))] shadow-2xl backdrop-blur">
-        <div className="grid grid-cols-4 gap-1 p-2">
-          <button onClick={()=>setPanel(panel==="buildings"?null:"buildings")} className="rounded-xl bg-amber-200 px-2 py-3 text-xs font-semibold text-black">Buildings</button>
-          <button className="rounded-xl px-2 py-3 text-xs text-white/55">Doors</button>
-          <button className="rounded-xl px-2 py-3 text-xs text-white/55">Windows</button>
-          <button className="rounded-xl px-2 py-3 text-xs text-white/55">Details</button>
+        <div className="flex gap-1 overflow-x-auto p-2">
+          {(["walls","buildings","fountains","statues","stairs","more"] as const).map((item) => (
+            <button key={item} onClick={()=>setPanel(panel===item?null:item)}
+              className={`shrink-0 rounded-xl px-4 py-3 text-xs font-medium capitalize ${panel===item ? "bg-amber-200 text-black" : "text-white/65"}`}>
+              {item}
+            </button>
+          ))}
         </div>
         {panel === "buildings" && (
           <div className="flex gap-2 overflow-x-auto border-t border-white/10 px-3 py-3">
@@ -74,6 +76,15 @@ export default function TempleBuilderPage() {
                 <div className="text-sm font-medium">{name}</div>
               </button>
             ))}
+          </div>
+        )}
+        {panel && panel !== "buildings" && panel !== "edit" && (
+          <div className="border-t border-white/10 px-4 py-4 text-center text-sm text-white/55">
+            {panel === "walls" ? "Place individual walls anywhere on the site." :
+             panel === "fountains" ? "Place fountains as separate site pieces." :
+             panel === "statues" ? "Place statues as separate site pieces." :
+             panel === "stairs" ? "Place stairs and entrances." :
+             "More separate pieces will live here."}
           </div>
         )}
       </div>
