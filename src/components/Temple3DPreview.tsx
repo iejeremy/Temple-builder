@@ -165,12 +165,17 @@ export default function Temple3DPreview({ levels, sitePieces, selectedLevel, sel
         const path=piece.wallPath||"straight";
         if(path==="straight") addSite(new THREE.BoxGeometry(piece.width,piece.height,.28),0,piece.height/2,0);
         else if(path==="ring"){
-          const r=Math.max(.7,piece.width/2);addSite(new THREE.CylinderGeometry(r,r,piece.height,40,1,true),0,piece.height/2,0);
-          const inner=new THREE.Mesh(new THREE.CylinderGeometry(Math.max(.4,r-.28),Math.max(.4,r-.28),piece.height+.02,40,1,true),siteMat(piece.material,piece.id===selectedPieceId));inner.material.side=THREE.BackSide;inner.position.y=piece.height/2;pg.add(inner);
+          const r=Math.max(.7,piece.width/2);
+          const outer=new THREE.CylinderGeometry(r,r,piece.height,40,1,true);
+          addSite(outer,0,piece.height/2,0);
+          const innerMaterial=siteMat(piece.material,piece.id===selectedPieceId);
+          innerMaterial.side=THREE.BackSide;
+          const inner=new THREE.Mesh(new THREE.CylinderGeometry(Math.max(.4,r-.28),Math.max(.4,r-.28),piece.height+.02,40,1,true),innerMaterial);
+          inner.position.y=piece.height/2;pg.add(inner);
         }else{
           const pts:THREE.Vector3[]=[];
           const n=path==="zigzag"?8:18;
-          for(let i=0;i<=n;i++){const t=i/n,x=(t-.5)*piece.width;let z=0;if(path==="curve")z=Math.sin(t*Math.PI)*piece.width*.22;else if(path==="semicircle"){const a=Math.PI*(1-t);x;z=0;}else if(path==="s-curve")z=Math.sin((t-.5)*Math.PI*2)*piece.width*.16;else if(path==="zigzag")z=(i%2?1:-1)*piece.width*.08;pts.push(path==="semicircle"?new THREE.Vector3(Math.cos(Math.PI*(1-t))*piece.width/2,0,Math.sin(Math.PI*(1-t))*piece.width/2):new THREE.Vector3(x,0,z));}
+          for(let i=0;i<=n;i++){const t=i/n,x=(t-.5)*piece.width;let z=0;if(path==="curve")z=Math.sin(t*Math.PI)*piece.width*.22;else if(path==="semicircle"){z=0;}else if(path==="s-curve")z=Math.sin((t-.5)*Math.PI*2)*piece.width*.16;else if(path==="zigzag")z=(i%2?1:-1)*piece.width*.08;pts.push(path==="semicircle"?new THREE.Vector3(Math.cos(Math.PI*(1-t))*piece.width/2,0,Math.sin(Math.PI*(1-t))*piece.width/2):new THREE.Vector3(x,0,z));}
           for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1],dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz);const mesh=new THREE.Mesh(new THREE.BoxGeometry(len,piece.height,.28),siteMat(piece.material,piece.id===selectedPieceId));mesh.position.set((a.x+b.x)/2,piece.height/2,(a.z+b.z)/2);mesh.rotation.y=-Math.atan2(dz,dx);pg.add(mesh);}
         }
       }
