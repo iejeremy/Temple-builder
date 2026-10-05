@@ -2,18 +2,20 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import type { BuildingLevel, RoofStyle } from "@/app/page";
+import type { BuildingLevel, RoofStyle, WallFace } from "@/app/page";
 
 const COLORS: Record<BuilderMaterial, number> = {
   marble: 0xd9d4cc, sandstone: 0xb98b5b, limestone: 0xc6b898, obsidian: 0x25262b,
 };
 
-export default function Temple3DPreview({ levels, selectedLevel, onSelectLevel, onMoveLevel, onPatioChange }: {
+export default function Temple3DPreview({ levels, selectedLevel, onSelectLevel, onSelectFace, onMoveLevel, onPatioChange, onMoveWindow }: {
   levels: BuildingLevel[];
   selectedLevel: number;
   onSelectLevel?: (index: number) => void;
+  onSelectFace?: (index: number, face: WallFace) => void;
   onMoveLevel?: (index: number, x: number, z: number) => void;
   onPatioChange?: (index: number, patio: boolean) => void;
+  onMoveWindow?: (levelIndex: number, id: string, u: number, v: number) => void;
 }) {
   const hostRef = useRef<HTMLDivElement|null>(null);
   const groupRef = useRef<THREE.Group|null>(null);
@@ -52,7 +54,7 @@ export default function Temple3DPreview({ levels, selectedLevel, onSelectLevel, 
     const distance=()=>{const pts=[...pointers.values()];return pts.length<2?0:Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);};
     const down=(e:PointerEvent)=>{pointerDownRef.current={x:e.clientX,y:e.clientY};const rect=canvas.getBoundingClientRect();const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);const hits=raycasterRef.current.intersectObjects(levelGroupsRef.current,true);if(hits.length){let obj:THREE.Object3D|null=hits[0].object;while(obj&&obj.userData.levelIndex===undefined)obj=obj.parent;if(obj&&obj.userData.levelIndex!==undefined){const idx=obj.userData.levelIndex as number;onSelectLevel?.(idx);if(idx>0&&idx===selectedLevel){movingLevelRef.current=idx;const y=levels.slice(0,idx).reduce((s,l)=>s+l.height/7,0);dragPlaneRef.current.set(new THREE.Vector3(0,1,0),-y);}}}pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const o=orbitRef.current;if(pointers.size===1){o.dragging=true;o.lastX=e.clientX;o.lastY=e.clientY;}else if(pointers.size===2){o.dragging=false;o.pinch=distance();}canvas.setPointerCapture?.(e.pointerId);};
     const move=(e:PointerEvent)=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const o=orbitRef.current;if(pointers.size===2){movingLevelRef.current=null;const next=distance();if(o.pinch>0){const scale=o.pinch/next;o.radius=Math.max(6,Math.min(24,o.radius*scale));}o.pinch=next;render();return;}if(movingLevelRef.current!==null&&pointers.size===1){const rect=canvas.getBoundingClientRect();const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);const hit=new THREE.Vector3();if(raycasterRef.current.ray.intersectPlane(dragPlaneRef.current,hit)){const snap=.25;onMoveLevel?.(movingLevelRef.current,Math.round(hit.x/snap)*snap,Math.round(hit.z/snap)*snap);}return;}if(!o.dragging)return;const dx=e.clientX-o.lastX,dy=e.clientY-o.lastY;o.lastX=e.clientX;o.lastY=e.clientY;o.theta-=dx*.008;o.phi=Math.max(.16,Math.min(1.56,o.phi+dy*.006));render();};
-    const up=(e:PointerEvent)=>{movingLevelRef.current=null;const start=pointerDownRef.current;pointerDownRef.current=null;if(start&&Math.hypot(e.clientX-start.x,e.clientY-start.y)<8&&pointers.size===1){const rect=canvas.getBoundingClientRect();const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);const hits=raycasterRef.current.intersectObjects(levelGroupsRef.current,true);if(hits.length){let obj:THREE.Object3D|null=hits[0].object;while(obj&&obj.userData.levelIndex===undefined)obj=obj.parent;if(obj&&obj.userData.levelIndex!==undefined)onSelectLevel?.(obj.userData.levelIndex);}}pointers.delete(e.pointerId);const o=orbitRef.current;o.pinch=0;if(pointers.size===1){const pt=[...pointers.values()][0];o.dragging=true;o.lastX=pt.x;o.lastY=pt.y;}else{o.dragging=false;}};
+    const up=(e:PointerEvent)=>{movingLevelRef.current=null;const start=pointerDownRef.current;pointerDownRef.current=null;if(start&&Math.hypot(e.clientX-start.x,e.clientY-start.y)<8&&pointers.size===1){const rect=canvas.getBoundingClientRect();const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);const hits=raycasterRef.current.intersectObjects(levelGroupsRef.current,true);if(hits.length){let obj:THREE.Object3D|null=hits[0].object;while(obj&&obj.userData.levelIndex===undefined)obj=obj.parent;if(obj&&obj.userData.levelIndex!==undefined){const idx=obj.userData.levelIndex as number;onSelectLevel?.(idx);const hit=hits[0];if(hit.face){const n=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);const ax=Math.abs(n.x),az=Math.abs(n.z);const face:WallFace=ax>az?(n.x>0?"right":"left"):(n.z>0?"front":"back");onSelectFace?.(idx,face);}}}}pointers.delete(e.pointerId);const o=orbitRef.current;o.pinch=0;if(pointers.size===1){const pt=[...pointers.values()][0];o.dragging=true;o.lastX=pt.x;o.lastY=pt.y;}else{o.dragging=false;}};
     const wheel=(e:WheelEvent)=>{e.preventDefault();const o=orbitRef.current;o.radius=Math.max(6,Math.min(24,o.radius+e.deltaY*.012));render();};
     canvas.addEventListener("pointerdown",down);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",up);canvas.addEventListener("pointercancel",up);canvas.addEventListener("wheel",wheel,{passive:false});
     window.addEventListener("resize",resize); resize();
@@ -91,6 +93,18 @@ export default function Temple3DPreview({ levels, selectedLevel, onSelectLevel, 
       }else{
         for(const [rw,rd,x,z] of parts){box(rw+.12,.18,rd+.12,x,baseY+.09,z);box(rw,h,rd,x,baseY+h/2,z);}
         for(const [rw,rd,x,z] of parts)addRoof(lg,level.roof,rw,rd,x,z,baseY+h,color);
+      }
+      for(const win of level.windows||[]){
+        const ww=win.width/2.4,wh=win.height/2.4;
+        const frame=new THREE.Mesh(new THREE.BoxGeometry(ww,wh,.08),new THREE.MeshStandardMaterial({color:0x273746,roughness:.35,metalness:.15}));
+        const edge=.04;
+        if(win.face==="front"||win.face==="back"){
+          frame.position.set((win.u||0)*(w*.38),baseY+h*(win.v||.55),win.face==="front"?d/2+edge:-d/2-edge);
+        }else{
+          frame.geometry.dispose();frame.geometry=new THREE.BoxGeometry(.08,wh,ww);
+          frame.position.set(win.face==="right"?w/2+edge:-w/2-edge,baseY+h*(win.v||.55),(win.u||0)*(d*.38));
+        }
+        frame.userData.levelIndex=index;frame.userData.windowId=win.id;lg.add(frame);
       }
       baseY+=h;
       if(index>0){
