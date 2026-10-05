@@ -2,15 +2,17 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import type { BuildingLevel, RoofStyle, WallFace, Perimeter, BuilderMaterial } from "@/app/page";
+import type { BuildingLevel, RoofStyle, WallFace, Perimeter, BuilderMaterial, Statue } from "@/app/page";
 
 const COLORS: Record<BuilderMaterial, number> = {
   marble: 0xd9d4cc, sandstone: 0xb98b5b, limestone: 0xc6b898, obsidian: 0x25262b,
 };
 
-export default function Temple3DPreview({ levels, perimeter, selectedLevel, onSelectLevel, onSelectFace, onMoveLevel, onPatioChange, onMoveWindow, onSelectPerimeter }: {
+export default function Temple3DPreview({ levels, perimeter, statues, selectedStatueId, selectedLevel, onSelectLevel, onSelectFace, onMoveLevel, onPatioChange, onMoveWindow, onSelectPerimeter, onSelectStatue, onMoveStatue }: {
   levels: BuildingLevel[];
   perimeter: Perimeter | null;
+  statues: Statue[];
+  selectedStatueId?: string | null;
   selectedLevel: number;
   onSelectLevel?: (index: number) => void;
   onSelectFace?: (index: number, face: WallFace) => void;
@@ -18,6 +20,8 @@ export default function Temple3DPreview({ levels, perimeter, selectedLevel, onSe
   onPatioChange?: (index: number, patio: boolean) => void;
   onMoveWindow?: (levelIndex: number, id: string, u: number, v: number) => void;
   onSelectPerimeter?: () => void;
+  onSelectStatue?: (id:string) => void;
+  onMoveStatue?: (id:string,x:number,z:number) => void;
 }) {
   const hostRef = useRef<HTMLDivElement|null>(null);
   const groupRef = useRef<THREE.Group|null>(null);
@@ -32,8 +36,10 @@ export default function Temple3DPreview({ levels, perimeter, selectedLevel, onSe
   const movingLevelRef = useRef<number|null>(null);
   const dragPlaneRef = useRef(new THREE.Plane(new THREE.Vector3(0,1,0),0));
   const perimeterGroupRef = useRef<THREE.Group | null>(null);
-  const liveRef = useRef({levels,selectedLevel,onSelectLevel,onSelectFace,onMoveLevel,onSelectPerimeter});
-  liveRef.current={levels,selectedLevel,onSelectLevel,onSelectFace,onMoveLevel,onSelectPerimeter};
+  const statueGroupsRef = useRef<THREE.Group[]>([]);
+  const movingStatueRef = useRef<string | null>(null);
+  const liveRef = useRef({levels,selectedLevel,onSelectLevel,onSelectFace,onMoveLevel,onSelectPerimeter,onSelectStatue,onMoveStatue,selectedStatueId});
+  liveRef.current={levels,selectedLevel,onSelectLevel,onSelectFace,onMoveLevel,onSelectPerimeter,onSelectStatue,onMoveStatue,selectedStatueId};
 
   useEffect(() => {
     const host=hostRef.current; if(!host) return;
@@ -57,9 +63,9 @@ export default function Temple3DPreview({ levels, perimeter, selectedLevel, onSe
     const canvas=renderer.domElement; canvas.style.touchAction="none";
     const pointers=new Map<number,{x:number,y:number}>();
     const distance=()=>{const pts=[...pointers.values()];return pts.length<2?0:Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);};
-    const down=(e:PointerEvent)=>{pointerDownRef.current={x:e.clientX,y:e.clientY};const rect=canvas.getBoundingClientRect();const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);const perimeterHits=perimeterGroupRef.current?raycasterRef.current.intersectObjects(perimeterGroupRef.current.children,true):[];if(perimeterHits.length)liveRef.current.onSelectPerimeter?.();const hits=perimeterHits.length?[]:raycasterRef.current.intersectObjects(levelGroupsRef.current,true);if(hits.length){let obj:THREE.Object3D|null=hits[0].object;while(obj&&obj.userData.levelIndex===undefined)obj=obj.parent;if(obj&&obj.userData.levelIndex!==undefined){const idx=obj.userData.levelIndex as number;onSelectLevel?.(idx);if(idx>0&&idx===selectedLevel){movingLevelRef.current=idx;const y=levels.slice(0,idx).reduce((s,l)=>s+l.height/7,0);dragPlaneRef.current.set(new THREE.Vector3(0,1,0),-y);}}}pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const o=orbitRef.current;if(pointers.size===1){o.dragging=true;o.lastX=e.clientX;o.lastY=e.clientY;}else if(pointers.size===2){o.dragging=false;o.pinch=distance();}canvas.setPointerCapture?.(e.pointerId);};
-    const move=(e:PointerEvent)=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const o=orbitRef.current;if(pointers.size===2){movingLevelRef.current=null;const next=distance();if(o.pinch>0){const scale=o.pinch/next;o.radius=Math.max(6,Math.min(24,o.radius*scale));}o.pinch=next;render();return;}if(movingLevelRef.current!==null&&pointers.size===1){const rect=canvas.getBoundingClientRect();const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);const hit=new THREE.Vector3();if(raycasterRef.current.ray.intersectPlane(dragPlaneRef.current,hit)){const snap=.25;onMoveLevel?.(movingLevelRef.current,Math.round(hit.x/snap)*snap,Math.round(hit.z/snap)*snap);}return;}if(!o.dragging)return;const dx=e.clientX-o.lastX,dy=e.clientY-o.lastY;o.lastX=e.clientX;o.lastY=e.clientY;o.theta-=dx*.008;o.phi=Math.max(.16,Math.min(1.56,o.phi+dy*.006));render();};
-    const up=(e:PointerEvent)=>{movingLevelRef.current=null;const start=pointerDownRef.current;pointerDownRef.current=null;if(start&&Math.hypot(e.clientX-start.x,e.clientY-start.y)<8&&pointers.size===1){const rect=canvas.getBoundingClientRect();const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);const perimeterTap=perimeterGroupRef.current?raycasterRef.current.intersectObjects(perimeterGroupRef.current.children,true):[];if(perimeterTap.length)liveRef.current.onSelectPerimeter?.();const hits=perimeterTap.length?[]:raycasterRef.current.intersectObjects(levelGroupsRef.current,true);if(hits.length){let obj:THREE.Object3D|null=hits[0].object;while(obj&&obj.userData.levelIndex===undefined)obj=obj.parent;if(obj&&obj.userData.levelIndex!==undefined){const idx=obj.userData.levelIndex as number;onSelectLevel?.(idx);const hit=hits[0];if(hit.face){const n=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);const ax=Math.abs(n.x),az=Math.abs(n.z);const face:WallFace=ax>az?(n.x>0?"right":"left"):(n.z>0?"front":"back");onSelectFace?.(idx,face);}}}}pointers.delete(e.pointerId);const o=orbitRef.current;o.pinch=0;if(pointers.size===1){const pt=[...pointers.values()][0];o.dragging=true;o.lastX=pt.x;o.lastY=pt.y;}else{o.dragging=false;}};
+    const down=(e:PointerEvent)=>{pointerDownRef.current={x:e.clientX,y:e.clientY};const rect=canvas.getBoundingClientRect();const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);const statueHits=raycasterRef.current.intersectObjects(statueGroupsRef.current,true);if(statueHits.length){let so:THREE.Object3D|null=statueHits[0].object;while(so&&so.userData.statueId===undefined)so=so.parent;if(so){const id=so.userData.statueId as string;liveRef.current.onSelectStatue?.(id);if(id===liveRef.current.selectedStatueId)movingStatueRef.current=id;}}const perimeterHits=statueHits.length?[]:(perimeterGroupRef.current?raycasterRef.current.intersectObjects(perimeterGroupRef.current.children,true):[]);if(perimeterHits.length)liveRef.current.onSelectPerimeter?.();const hits=(statueHits.length||perimeterHits.length)?[]:raycasterRef.current.intersectObjects(levelGroupsRef.current,true);if(hits.length){let obj:THREE.Object3D|null=hits[0].object;while(obj&&obj.userData.levelIndex===undefined)obj=obj.parent;if(obj&&obj.userData.levelIndex!==undefined){const idx=obj.userData.levelIndex as number;onSelectLevel?.(idx);if(idx>0&&idx===selectedLevel){movingLevelRef.current=idx;const y=levels.slice(0,idx).reduce((s,l)=>s+l.height/7,0);dragPlaneRef.current.set(new THREE.Vector3(0,1,0),-y);}}}pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const o=orbitRef.current;if(pointers.size===1){o.dragging=true;o.lastX=e.clientX;o.lastY=e.clientY;}else if(pointers.size===2){o.dragging=false;o.pinch=distance();}canvas.setPointerCapture?.(e.pointerId);};
+    const move=(e:PointerEvent)=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const o=orbitRef.current;if(pointers.size===2){movingLevelRef.current=null;const next=distance();if(o.pinch>0){const scale=o.pinch/next;o.radius=Math.max(6,Math.min(24,o.radius*scale));}o.pinch=next;render();return;}if(movingStatueRef.current!==null&&pointers.size===1){const rect=canvas.getBoundingClientRect();const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);const plane=new THREE.Plane(new THREE.Vector3(0,1,0),0),hit=new THREE.Vector3();if(raycasterRef.current.ray.intersectPlane(plane,hit))liveRef.current.onMoveStatue?.(movingStatueRef.current,Math.round(hit.x*4)/4,Math.round(hit.z*4)/4);return;}if(movingLevelRef.current!==null&&pointers.size===1){const rect=canvas.getBoundingClientRect();const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);const hit=new THREE.Vector3();if(raycasterRef.current.ray.intersectPlane(dragPlaneRef.current,hit)){const snap=.25;onMoveLevel?.(movingLevelRef.current,Math.round(hit.x/snap)*snap,Math.round(hit.z/snap)*snap);}return;}if(!o.dragging)return;const dx=e.clientX-o.lastX,dy=e.clientY-o.lastY;o.lastX=e.clientX;o.lastY=e.clientY;o.theta-=dx*.008;o.phi=Math.max(.16,Math.min(1.56,o.phi+dy*.006));render();};
+    const up=(e:PointerEvent)=>{movingLevelRef.current=null;movingStatueRef.current=null;const start=pointerDownRef.current;pointerDownRef.current=null;if(start&&Math.hypot(e.clientX-start.x,e.clientY-start.y)<8&&pointers.size===1){const rect=canvas.getBoundingClientRect();const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);const statueTap=raycasterRef.current.intersectObjects(statueGroupsRef.current,true);if(statueTap.length){let so:THREE.Object3D|null=statueTap[0].object;while(so&&so.userData.statueId===undefined)so=so.parent;if(so)liveRef.current.onSelectStatue?.(so.userData.statueId as string);}const perimeterTap=statueTap.length?[]:(perimeterGroupRef.current?raycasterRef.current.intersectObjects(perimeterGroupRef.current.children,true):[]);if(perimeterTap.length)liveRef.current.onSelectPerimeter?.();const hits=(statueTap.length||perimeterTap.length)?[]:raycasterRef.current.intersectObjects(levelGroupsRef.current,true);if(hits.length){let obj:THREE.Object3D|null=hits[0].object;while(obj&&obj.userData.levelIndex===undefined)obj=obj.parent;if(obj&&obj.userData.levelIndex!==undefined){const idx=obj.userData.levelIndex as number;onSelectLevel?.(idx);const hit=hits[0];if(hit.face){const n=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);const ax=Math.abs(n.x),az=Math.abs(n.z);const face:WallFace=ax>az?(n.x>0?"right":"left"):(n.z>0?"front":"back");onSelectFace?.(idx,face);}}}}pointers.delete(e.pointerId);const o=orbitRef.current;o.pinch=0;if(pointers.size===1){const pt=[...pointers.values()][0];o.dragging=true;o.lastX=pt.x;o.lastY=pt.y;}else{o.dragging=false;}};
     const wheel=(e:WheelEvent)=>{e.preventDefault();const o=orbitRef.current;o.radius=Math.max(6,Math.min(24,o.radius+e.deltaY*.012));render();};
     canvas.addEventListener("pointerdown",down);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",up);canvas.addEventListener("pointercancel",up);canvas.addEventListener("wheel",wheel,{passive:false});
     window.addEventListener("resize",resize); resize();
@@ -165,6 +171,21 @@ export default function Temple3DPreview({ levels, perimeter, selectedLevel, onSe
         if(exposed!==level.patio) queueMicrotask(()=>onPatioChange?.(index,exposed));
       }
     });
+    statueGroupsRef.current=[];
+    const statueColor=(f:Statue["finish"])=>f==="bronze"?0x8a6038:f==="gold"?0xc9a84f:f==="obsidian"?0x25252b:0xd9d4cc;
+    for(const statue of statues){
+      const sg=new THREE.Group();sg.userData.statueId=statue.id;sg.position.set(statue.x,0,statue.z);sg.rotation.y=THREE.MathUtils.degToRad(statue.rotation);sg.scale.setScalar(statue.scale);group.add(sg);statueGroupsRef.current.push(sg);
+      const sm=new THREE.MeshStandardMaterial({color:statueColor(statue.finish),roughness:statue.finish==="gold"||statue.finish==="bronze"?.42:.72,metalness:statue.finish==="gold"?.65:statue.finish==="bronze"?.45:.05,emissive:statue.id===selectedStatueId?0x241d08:0,emissiveIntensity:.22});
+      const mesh=(g:THREE.BufferGeometry,x:number,y:number,z:number)=>{const m=new THREE.Mesh(g,sm.clone());m.position.set(x,y,z);sg.add(m);return m;};
+      mesh(new THREE.CylinderGeometry(.42,.5,.22,18),0,.11,0);
+      if(statue.kind==="lion"){
+        mesh(new THREE.SphereGeometry(.42,16,10),0,.72,0);const body=mesh(new THREE.CapsuleGeometry(.34,.8,6,12),0,.55,-.25);body.rotation.x=Math.PI/2;for(const x of [-.25,.25])for(const z of [-.48,.05])mesh(new THREE.CylinderGeometry(.07,.09,.48,10),x,.3,z);
+      }else{
+        mesh(new THREE.CapsuleGeometry(.24,.9,6,12),0,.8,0);mesh(new THREE.SphereGeometry(.2,16,10),0,1.52,0);
+        if(statue.kind==="angel"){for(const side of [-1,1]){const wing=mesh(new THREE.ConeGeometry(.32,1.15,5),side*.38,1.05,.08);wing.rotation.z=side*.55;}}
+        else {for(const side of [-1,1]){const arm=mesh(new THREE.CylinderGeometry(.065,.075,.65,10),side*.32,.9,0);arm.rotation.z=side*.25;}mesh(new THREE.CylinderGeometry(.12,.18,.7,12),0,.42,0);}
+      }
+    }
     perimeterGroupRef.current=null;
     if(perimeter && levels.length){
       const pg=new THREE.Group();pg.userData.perimeter=true;group.add(pg);perimeterGroupRef.current=pg;
@@ -179,7 +200,7 @@ export default function Temple3DPreview({ levels, perimeter, selectedLevel, onSe
       if(perimeter.columns||perimeter.arches){const frontZ=Math.max(...points.map(p=>p[1]));for(const x of [-1.1,1.1]){if(perimeter.columns){const col=new THREE.Mesh(new THREE.CylinderGeometry(.12,.15,perimeter.height*1.1,12),mat.clone());col.position.set(x,perimeter.height*.55,frontZ);pg.add(col);}}if(perimeter.arches){const arch=new THREE.Mesh(new THREE.TorusGeometry(.75,.12,8,20,Math.PI),mat.clone());arch.rotation.z=Math.PI;arch.position.set(0,perimeter.height*.78,frontZ);pg.add(arch);}}
     }
     const o=orbitRef.current;camera.position.set(Math.sin(o.theta)*Math.sin(o.phi)*o.radius,Math.cos(o.phi)*o.radius,Math.cos(o.theta)*Math.sin(o.phi)*o.radius);camera.lookAt(0,targetYRef.current,0);renderer.render(scene,camera);
-  },[levels,perimeter,selectedLevel]);
+  },[levels,perimeter,statues,selectedStatueId,selectedLevel]);
 
   return <div ref={hostRef} className="absolute inset-0"><div className="pointer-events-none absolute bottom-[128px] left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-2 text-xs text-white/70">Drag to look around • pinch to zoom</div></div>;
 }
