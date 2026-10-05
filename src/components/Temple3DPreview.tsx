@@ -2,14 +2,14 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import type { BuildingShape, BuilderMaterial } from "@/app/page";
+import type { BuildingShape, BuilderMaterial, RoofStyle } from "@/app/page";
 
 const COLORS: Record<BuilderMaterial, number> = {
   marble: 0xd9d4cc, sandstone: 0xb98b5b, limestone: 0xc6b898, obsidian: 0x25262b,
 };
 
-export default function Temple3DPreview({ shape, material, width, depth, height }: {
-  shape: BuildingShape | null; material: BuilderMaterial; width: number; depth: number; height: number;
+export default function Temple3DPreview({ shape, material, width, depth, height, roof, levels }: {
+  shape: BuildingShape | null; material: BuilderMaterial; width: number; depth: number; height: number; roof: RoofStyle; levels: number;
 }) {
   const hostRef = useRef<HTMLDivElement|null>(null);
   const groupRef = useRef<THREE.Group|null>(null);
@@ -53,41 +53,55 @@ export default function Temple3DPreview({ shape, material, width, depth, height 
     const group=groupRef.current,scene=sceneRef.current,renderer=rendererRef.current,camera=cameraRef.current;if(!group||!scene||!renderer||!camera)return;
     while(group.children.length){const o=group.children.pop()!;if(o instanceof THREE.Mesh){o.geometry.dispose();const m=o.material;if(Array.isArray(m))m.forEach(x=>x.dispose());else m.dispose();}}
     if(shape){
-      const w=width/7,d=depth/7,h=height/7,color=COLORS[material];
+      const w=width/7,d=depth/7,h=height/7,color=COLORS[material],count=Math.max(1,Math.min(4,levels));
       const mat=()=>new THREE.MeshStandardMaterial({color,roughness:.78});
-      const roofMat=()=>new THREE.MeshStandardMaterial({color,roughness:.72});
-      const box=(sx:number,sy:number,sz:number,x:number,y:number,z:number,m=mat())=>{const mesh=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),m);mesh.position.set(x,y,z);group.add(mesh);};
-      const roofBox=(sx:number,sz:number,x:number,z:number)=>box(sx,.18,sz,x,h+.09,z,roofMat());
-      const room=(rw:number,rd:number,x=0,z=0,roof=true)=>{
-        box(rw+.12,.18,rd+.12,x,.09,z);
-        // Solid massing makes each preset read as a complete building. Open/custom walls remain a separate tool.
-        box(rw,h,rd,x,h/2,z);
-        if(roof) roofBox(rw+.22,rd+.22,x,z);
-      };
-      const pyramidRoof=(rw:number,rd:number,x=0,z=0)=>{
-        const rh=Math.max(.65,Math.min(1.25,rw*.17));
-        const g=new THREE.CylinderGeometry(0,1,rh,4,1,false);g.rotateY(Math.PI/4);g.scale(rw*.72,1,rd*.72);
-        const mesh=new THREE.Mesh(g,roofMat());mesh.position.set(x,h+rh/2,z);group.add(mesh);
+      const roofMat=()=>new THREE.MeshStandardMaterial({color,roughness:.7});
+      const addMesh=(geometry:THREE.BufferGeometry,x:number,y:number,z:number,m=mat())=>{const mesh=new THREE.Mesh(geometry,m);mesh.position.set(x,y,z);group.add(mesh);return mesh;};
+      const box=(sx:number,sy:number,sz:number,x:number,y:number,z:number,m=mat())=>addMesh(new THREE.BoxGeometry(sx,sy,sz),x,y,z,m);
+
+      const addRoof=(rw:number,rd:number,x:number,z:number,top:number)=>{
+        if(roof==="none") return;
+        if(roof==="flat"){ box(rw+.22,.18,rd+.22,x,top+.09,z,roofMat()); return; }
+        if(roof==="pyramid"){
+          const rh=Math.max(.7,Math.min(1.5,rw*.18));const g=new THREE.CylinderGeometry(0,1,rh,4,1,false);g.rotateY(Math.PI/4);g.scale(rw*.72,1,rd*.72);addMesh(g,x,top+rh/2,z,roofMat());return;
+        }
+        if(roof==="dome"){
+          const r=Math.min(rw,rd)*.53;const g=new THREE.SphereGeometry(r,24,12,0,Math.PI*2,0,Math.PI/2);addMesh(g,x,top,z,roofMat());return;
+        }
+        const r=Math.min(rw,rd)*.52;
+        const rh=roof==="steeple"?Math.max(2.2,r*2.6):Math.max(1.3,r*1.25);
+        addMesh(new THREE.ConeGeometry(r,rh,roof==="cone"?32:8),x,top+rh/2,z,roofMat());
       };
 
-      if(shape==="rectangle"||shape==="square"){ room(w,d,0,0,false); pyramidRoof(w,d); }
-      else if(shape==="wide"){ room(w,d); }
-      else if(shape==="l-shape"){ room(w*.42,d, -w*.29,0); room(w*.72,d*.42,w*.14,d*.29); }
-      else if(shape==="t-shape"){ room(w,d*.38,0,d*.30); room(w*.36,d*.76,0,-d*.12); }
-      else if(shape==="u-shape"){ room(w*.28,d,-w*.36,0); room(w*.28,d,w*.36,0); room(w*.72,d*.28,0,-d*.36); }
-      else if(shape==="cross"){ room(w*.34,d,0,0); room(w,d*.34,0,0); }
-      else if(shape==="courtyard"){ room(w,d*.24,0,-d*.38); room(w,d*.24,0,d*.38); room(w*.24,d*.58,-w*.38,0); room(w*.24,d*.58,w*.38,0); }
-      else if(shape==="octagon"||shape==="rotunda"){
-        const sides=shape==="rotunda"?32:8;
-        const radius=Math.min(w,d)*.5;
-        const body=new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,h,sides),mat());body.position.y=h/2;group.add(body);
-        const roofHeight=shape==="rotunda"?radius*.42:radius*.34;
-        const roof=new THREE.Mesh(new THREE.ConeGeometry(radius*1.04,roofHeight,sides),roofMat());roof.position.y=h+roofHeight/2;group.add(roof);
-        const base=new THREE.Mesh(new THREE.CylinderGeometry(radius*1.06,radius*1.06,.18,sides),mat());base.position.y=.09;group.add(base);
+      const masses:(level:number)=>Array<[number,number,number,number]> = (level)=>{
+        const shrink=Math.pow(.84,level),sw=w*shrink,sd=d*shrink;
+        if(shape==="l-shape") return [[sw*.42,sd,-sw*.29,0],[sw*.72,sd*.42,sw*.14,sd*.29]];
+        if(shape==="t-shape") return [[sw,sd*.38,0,sd*.30],[sw*.36,sd*.76,0,-sd*.12]];
+        if(shape==="u-shape") return [[sw*.28,sd,-sw*.36,0],[sw*.28,sd,sw*.36,0],[sw*.72,sd*.28,0,-sd*.36]];
+        if(shape==="cross") return [[sw*.34,sd,0,0],[sw,sd*.34,0,0]];
+        if(shape==="courtyard") return [[sw,sd*.24,0,-sd*.38],[sw,sd*.24,0,sd*.38],[sw*.24,sd*.58,-sw*.38,0],[sw*.24,sd*.58,sw*.38,0]];
+        return [[sw,sd,0,0]];
+      };
+
+      for(let level=0;level<count;level++){
+        const baseY=level*h;
+        if(shape==="octagon"||shape==="rotunda"){
+          const shrink=Math.pow(.84,level),radius=Math.min(w,d)*.5*shrink,sides=shape==="rotunda"?32:8;
+          addMesh(new THREE.CylinderGeometry(radius*1.04,radius*1.04,.18,sides),0,baseY+.09,0);
+          addMesh(new THREE.CylinderGeometry(radius,radius,h,sides),0,baseY+h/2,0);
+          if(level===count-1) addRoof(radius*2,radius*2,0,0,baseY+h);
+        } else {
+          const parts=masses(level);
+          for(const [rw,rd,x,z] of parts){box(rw+.12,.18,rd+.12,x,baseY+.09,z);box(rw,h,rd,x,baseY+h/2,z);}
+          if(level===count-1){
+            if(parts.length===1) addRoof(parts[0][0],parts[0][1],parts[0][2],parts[0][3],baseY+h);
+            else { const shrink=Math.pow(.84,level); addRoof(w*shrink,d*shrink,0,0,baseY+h); }
+          }
+        }
       }
     }
     const o=orbitRef.current;camera.position.set(Math.sin(o.theta)*Math.sin(o.phi)*o.radius,Math.cos(o.phi)*o.radius,Math.cos(o.theta)*Math.sin(o.phi)*o.radius);camera.lookAt(0,1.4,0);renderer.render(scene,camera);
-  },[shape,material,width,depth,height]);
+  },[shape,material,width,depth,height,roof,levels]);
 
   return <div ref={hostRef} className="absolute inset-0"><div className="pointer-events-none absolute bottom-[128px] left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-2 text-xs text-white/70">Drag to look around • pinch to zoom</div></div>;
 }
