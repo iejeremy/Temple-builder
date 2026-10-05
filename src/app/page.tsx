@@ -112,6 +112,14 @@ export default function TempleBuilderPage() {
             {levels.map((_,i)=><button key={i} onClick={()=>setSelectedLevel(i)} className={`shrink-0 rounded-xl px-3 py-2 text-xs ${i===selectedLevel?"bg-amber-200 text-black":"bg-white/10"}`}>Level {i+1}</button>)}
             {levels.length<4 && <button onClick={()=>{const base=levels[levels.length-1];setLevels([...levels,{...base,id:`level-${levels.length+1}`,width:Math.max(16,Math.round(base.width*.84)),depth:Math.max(16,Math.round(base.depth*.84)),roof:"flat",patio:false,x:0,z:0,rotation:0,windows:[],doors:[]}]);setSelectedLevel(levels.length);}} className="shrink-0 rounded-xl bg-white/10 px-3 py-2 text-xs">+ Stack level</button>}
           </div>
+          <div className="mb-3">
+            <div className="mb-2 text-xs font-semibold text-white/80">Level shape</div>
+            <div className="flex gap-2 overflow-x-auto">
+              {([["star","5-Point Star"],["circle","Circle"],["six-star","6-Point Star"],["rectangle","Rectangle"],["square","Square"],["wide","Wide Hall"],["l-shape","L Shape"],["t-shape","T Shape"],["u-shape","U Shape"],["cross","Cross"],["octagon","Octagon"],["rotunda","Rotunda"],["courtyard","Courtyard"],["triangle","Triangle"],["hexagon","Hexagon"],["diamond","Diamond"],["oval","Oval"],["horseshoe","Horseshoe"],["x-shape","X Shape"],["ring","Ring"]] as [BuildingShape,string][]).map(([id,name])=>(
+                <button key={id} onClick={()=>setLevels(current=>current.map((l,i)=>i===selectedLevel?{...l,shape:id}:l))} className={`min-w-[104px] shrink-0 rounded-2xl border p-3 text-left text-xs ${levels[selectedLevel].shape===id?"border-amber-200 bg-amber-200/15":"border-white/10 bg-white/5"}`}>{name}</button>
+              ))}
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <label className="text-xs text-white/70">Width<input className="mt-2 w-full" type="range" min="16" max="60" value={levels[selectedLevel].width} onChange={e=>setLevels(levels.map((l,i)=>i===selectedLevel?{...l,width:Number(e.target.value)}:l))}/></label>
             <label className="text-xs text-white/70">Length<input className="mt-2 w-full" type="range" min="16" max="60" value={levels[selectedLevel].depth} onChange={e=>setLevels(levels.map((l,i)=>i===selectedLevel?{...l,depth:Number(e.target.value)}:l))}/></label>
