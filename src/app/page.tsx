@@ -18,7 +18,7 @@ export default function TempleBuilderPage() {
   const [width, setWidth] = useState(32);
   const [depth, setDepth] = useState(26);
   const [height, setHeight] = useState(22);
-  const [roof, setRoof] = useState<RoofStyle>("pyramid");
+  const [roof, setRoof] = useState<RoofStyle>("flat");
   const [levels, setLevels] = useState(1);
   const [panel, setPanel] = useState<"walls" | "buildings" | "fountains" | "statues" | "stairs" | "more" | "edit" | null>("buildings");
 
