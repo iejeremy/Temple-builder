@@ -16,10 +16,10 @@ export type WindowStyle = "classic" | "tall" | "arched" | "round" | "double" | "
 export type DoorStyle = "single" | "double" | "arched" | "bronze" | "temple" | "portico";
 export type WindowAttachment = { id: string; face: WallFace; u: number; v: number; width: number; height: number; style: WindowStyle; };
 export type DoorAttachment = { id: string; face: WallFace; u: number; width: number; height: number; style: DoorStyle; };
-export type SitePieceType = "wall"|"gate"|"archway"|"columns"|"tower"|"corner"|"pillar"|"balustrade";
+export type PerimeterStyle = "rectangle"|"circle"|"octagon"|"star";
+export type PerimeterFeature = "towers"|"gate"|"arches"|"columns";
 export type TowerShape = "round"|"square"|"octagon"|"hexagon"|"star"|"spire";
-export type WallPath = "straight"|"curve"|"semicircle"|"ring"|"s-curve"|"zigzag";
-export type SitePiece = { id:string; type:SitePieceType; material:BuilderMaterial; x:number; z:number; rotation:number; width:number; height:number; towerShape?:TowerShape; wallPath?:WallPath; };
+export type Perimeter = { style:PerimeterStyle; material:BuilderMaterial; margin:number; height:number; thickness:number; towerShape:TowerShape; towers:boolean; gate:boolean; arches:boolean; columns:boolean; };
 export type BuildingLevel = {
   id: string;
   shape: BuildingShape;
@@ -44,12 +44,8 @@ export default function TempleBuilderPage() {
   const [height, setHeight] = useState(22);
   const [roof, setRoof] = useState<RoofStyle>("flat");
   const [levels, setLevels] = useState<BuildingLevel[]>([]);
-  const [sitePieces, setSitePieces] = useState<SitePiece[]>([]);
-  const [wallMaterial, setWallMaterial] = useState<BuilderMaterial>("marble");
-  const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null);
-  const [towerShape, setTowerShape] = useState<TowerShape>("round");
-  const [wallPath, setWallPath] = useState<WallPath>("straight");
-  const [wallStep, setWallStep] = useState<"main"|"type"|"options">("main");
+  const [perimeter, setPerimeter] = useState<Perimeter | null>(null);
+  const [wallStep, setWallStep] = useState<"main"|"features"|"options">("main");
   const [selectedLevel, setSelectedLevel] = useState(0);
   const [selectedFace, setSelectedFace] = useState<WallFace | null>(null);
   const [detailCategory, setDetailCategory] = useState<"windows"|"doors"|"trim"|"columns"|"arches"|null>(null);
@@ -79,15 +75,13 @@ export default function TempleBuilderPage() {
 
   return (
     <main className="relative h-[100dvh] overflow-hidden bg-[#b9c4cb] text-white">
-      <TempleWorld levels={levels} sitePieces={sitePieces} selectedLevel={selectedLevel}
+      <TempleWorld levels={levels} perimeter={perimeter} selectedLevel={selectedLevel}
         onSelectLevel={(index) => { setSelectedLevel(index); setPanel("edit"); }}
         onSelectFace={(index,face) => { setSelectedLevel(index); setSelectedFace(face); setPanel("edit"); }}
         onMoveLevel={(index,x,z) => setLevels(current => current.map((l,i)=>i===index?{...l,x,z}:l))}
         onPatioChange={(index,patio) => setLevels(current => current.map((l,i)=>i===index?{...l,patio}:l))}
         onMoveWindow={(levelIndex,id,u,v) => setLevels(current => current.map((l,i)=>i===levelIndex?{...l,windows:l.windows.map(win=>win.id===id?{...win,u,v}:win)}:l))}
-        selectedPieceId={selectedPieceId}
-        onSelectPiece={(id)=>{setSelectedPieceId(id);setPanel("walls");setWallStep("type");}}
-        onMovePiece={(id,x,z)=>setSitePieces(current=>current.map(p=>p.id===id?{...p,x,z}:p))} />
+        onSelectPerimeter={()=>{setPanel("walls");setWallStep("features");}} />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between p-3">
         <div className="rounded-2xl bg-black/50 px-4 py-2 backdrop-blur">
@@ -145,7 +139,7 @@ export default function TempleBuilderPage() {
       <div className="absolute inset-x-0 bottom-0 z-30 rounded-t-[28px] border-t border-white/10 bg-[#111820]/95 pb-[max(10px,env(safe-area-inset-bottom))] shadow-2xl backdrop-blur">
         <div className="flex gap-1 overflow-x-auto p-2">
           {(["walls","buildings","fountains","statues","stairs","more"] as const).map((item) => (
-            <button key={item} onClick={()=>{setPanel(panel===item?null:item);if(item==="walls"){setSelectedPieceId(null);setWallStep("main");}}}
+            <button key={item} onClick={()=>{setPanel(panel===item?null:item);if(item==="walls")setWallStep(perimeter?"features":"main");}}
               className={`shrink-0 rounded-xl px-4 py-3 text-xs font-medium capitalize ${panel===item ? "bg-amber-200 text-black" : "text-white/65"}`}>
               {item}
             </button>
@@ -163,35 +157,36 @@ export default function TempleBuilderPage() {
         )}
         {panel === "walls" && wallStep === "main" && (
           <div className="border-t border-white/10 px-3 py-3">
-            <div className="mb-2 text-sm font-semibold">Add architecture</div>
+            <div className="mb-2 text-sm font-semibold">Choose perimeter</div>
             <div className="flex gap-2 overflow-x-auto">
-              <button onClick={()=>{const id=`wall-${Date.now()}`;setSitePieces(v=>[...v,{id,type:"wall",material:"marble",x:0,z:2,rotation:0,width:4,height:2.5,wallPath:"straight"}]);setSelectedPieceId(id);setWallStep("type");}} className="min-w-[110px] rounded-2xl bg-amber-200 p-4 text-left text-sm font-semibold text-black">Wall</button>
+              {([["rectangle","Classic"],["circle","Circle"],["octagon","Octagon"],["star","Star"]] as [PerimeterStyle,string][]).map(([style,name])=><button key={style} onClick={()=>{setPerimeter({style,material:"marble",margin:3,height:2.5,thickness:.28,towerShape:"round",towers:false,gate:false,arches:false,columns:false});setWallStep("features");}} className="min-w-[105px] rounded-xl bg-white/10 px-4 py-3 text-sm">{name}</button>)}
             </div>
-            <div className="mt-2 text-xs text-white/45">Place a wall, then tap it to choose what it becomes.</div>
+            <div className="mt-2 text-xs text-white/45">One complete wall perimeter is placed around the building.</div>
           </div>
         )}
-        {panel === "walls" && wallStep === "type" && selectedPieceId && sitePieces.find(p=>p.id===selectedPieceId) && (()=>{const piece=sitePieces.find(p=>p.id===selectedPieceId)!;return (
+        {panel === "walls" && perimeter && wallStep === "features" && (
           <div className="border-t border-white/10 px-3 py-3">
-            <div className="mb-2 flex items-center justify-between"><span className="text-sm font-semibold">What is this?</span><button onClick={()=>{setSelectedPieceId(null);setWallStep("main");}} className="text-xs text-white/55">Done</button></div>
+            <div className="mb-2 flex items-center justify-between"><span className="text-sm font-semibold">Perimeter</span><button onClick={()=>setPanel(null)} className="text-xs text-white/60">Done</button></div>
             <div className="flex gap-2 overflow-x-auto">
-              {([["wall","Wall"],["tower","Tower"],["gate","Gate"],["archway","Archway"],["columns","Columns"],["pillar","Pillar"],["corner","Corner"],["balustrade","Balustrade"]] as [SitePieceType,string][]).map(([type,name])=><button key={type} onClick={()=>{setSitePieces(v=>v.map(p=>p.id===piece.id?{...p,type,towerShape:type==="tower"?(p.towerShape||"round"):p.towerShape,wallPath:type==="wall"?(p.wallPath||"straight"):p.wallPath}:p));setWallStep("options");}} className={`min-w-[100px] rounded-xl px-4 py-3 text-sm ${piece.type===type?"bg-amber-200 text-black":"bg-white/10"}`}>{name}</button>)}
+              {([["towers","Towers"],["gate","Gate"],["arches","Arches"],["columns","Columns"]] as [PerimeterFeature,string][]).map(([key,name])=><button key={key} onClick={()=>setPerimeter(p=>p?{...p,[key]:!p[key]}:p)} className={`min-w-[95px] rounded-xl px-3 py-3 text-sm ${perimeter[key]?"bg-amber-200 text-black":"bg-white/10"}`}>{name}</button>)}
+              <button onClick={()=>setWallStep("options")} className="min-w-[95px] rounded-xl bg-white/10 px-3 py-3 text-sm">Options</button>
             </div>
+            <div className="mt-2 text-xs text-white/45">Tap the perimeter anytime to return here.</div>
           </div>
-        )})()}
-        {panel === "walls" && wallStep === "options" && selectedPieceId && sitePieces.find(p=>p.id===selectedPieceId) && (()=>{const piece=sitePieces.find(p=>p.id===selectedPieceId)!;return (
+        )}
+        {panel === "walls" && perimeter && wallStep === "options" && (
           <div className="border-t border-white/10 px-3 py-3">
-            <div className="mb-2 flex items-center justify-between"><button onClick={()=>setWallStep("type")} className="text-xs text-white/60">‹ Back</button><span className="text-sm font-semibold capitalize">{piece.type}</span><button onClick={()=>{setSelectedPieceId(null);setWallStep("main");}} className="text-xs text-white/60">Done</button></div>
-            <div className="mb-3 flex gap-2 overflow-x-auto">{(["marble","sandstone","limestone","obsidian"] as BuilderMaterial[]).map(m=><button key={m} onClick={()=>setSitePieces(v=>v.map(p=>p.id===piece.id?{...p,material:m}:p))} className={`shrink-0 rounded-xl px-3 py-2 text-xs capitalize ${piece.material===m?"bg-amber-200 text-black":"bg-white/10"}`}>{m}</button>)}</div>
-            {piece.type==="wall" && <div className="mb-3 flex gap-2 overflow-x-auto">{(["straight","curve","semicircle","ring","s-curve","zigzag"] as WallPath[]).map(t=><button key={t} onClick={()=>setSitePieces(v=>v.map(p=>p.id===piece.id?{...p,wallPath:t}:p))} className={`shrink-0 rounded-xl px-3 py-2 text-xs capitalize ${piece.wallPath===t?"bg-white/20":"bg-white/5"}`}>{t.replace("-"," ")}</button>)}</div>}
-            {piece.type==="tower" && <div className="mb-3 flex gap-2 overflow-x-auto">{(["round","square","octagon","hexagon","star","spire"] as TowerShape[]).map(t=><button key={t} onClick={()=>setSitePieces(v=>v.map(p=>p.id===piece.id?{...p,towerShape:t}:p))} className={`shrink-0 rounded-xl px-3 py-2 text-xs capitalize ${piece.towerShape===t?"bg-white/20":"bg-white/5"}`}>{t}</button>)}</div>}
+            <div className="mb-2 flex items-center justify-between"><button onClick={()=>setWallStep("features")} className="text-xs text-white/60">‹ Back</button><span className="text-sm font-semibold">Wall options</span><button onClick={()=>setPanel(null)} className="text-xs text-white/60">Done</button></div>
+            <div className="mb-3 flex gap-2 overflow-x-auto">{(["marble","sandstone","limestone","obsidian"] as BuilderMaterial[]).map(m=><button key={m} onClick={()=>setPerimeter(p=>p?{...p,material:m}:p)} className={`shrink-0 rounded-xl px-3 py-2 text-xs capitalize ${perimeter.material===m?"bg-amber-200 text-black":"bg-white/10"}`}>{m}</button>)}</div>
+            {perimeter.towers && <div className="mb-3 flex gap-2 overflow-x-auto">{(["round","square","octagon","hexagon","star","spire"] as TowerShape[]).map(t=><button key={t} onClick={()=>setPerimeter(p=>p?{...p,towerShape:t}:p)} className={`shrink-0 rounded-xl px-3 py-2 text-xs capitalize ${perimeter.towerShape===t?"bg-white/20":"bg-white/5"}`}>{t}</button>)}</div>}
             <div className="grid grid-cols-2 gap-3">
-              <label className="text-xs text-white/60">Width<input type="range" min=".5" max="10" step=".25" value={piece.width} onChange={e=>setSitePieces(v=>v.map(p=>p.id===piece.id?{...p,width:Number(e.target.value)}:p))} className="mt-1 w-full"/></label>
-              <label className="text-xs text-white/60">Height<input type="range" min=".5" max="12" step=".25" value={piece.height} onChange={e=>setSitePieces(v=>v.map(p=>p.id===piece.id?{...p,height:Number(e.target.value)}:p))} className="mt-1 w-full"/></label>
-              <label className="col-span-2 text-xs text-white/60">Rotate<input type="range" min="-180" max="180" step="5" value={piece.rotation} onChange={e=>setSitePieces(v=>v.map(p=>p.id===piece.id?{...p,rotation:Number(e.target.value)}:p))} className="mt-1 w-full"/></label>
+              <label className="text-xs text-white/60">Distance<input type="range" min="1" max="8" step=".25" value={perimeter.margin} onChange={e=>setPerimeter(p=>p?{...p,margin:Number(e.target.value)}:p)} className="mt-1 w-full"/></label>
+              <label className="text-xs text-white/60">Height<input type="range" min="1" max="8" step=".25" value={perimeter.height} onChange={e=>setPerimeter(p=>p?{...p,height:Number(e.target.value)}:p)} className="mt-1 w-full"/></label>
+              <label className="col-span-2 text-xs text-white/60">Thickness<input type="range" min=".15" max=".8" step=".05" value={perimeter.thickness} onChange={e=>setPerimeter(p=>p?{...p,thickness:Number(e.target.value)}:p)} className="mt-1 w-full"/></label>
             </div>
-            <div className="mt-3 flex gap-2"><button onClick={()=>setSitePieces(v=>[...v,{...piece,id:`${piece.type}-${Date.now()}`,x:piece.x+.5,z:piece.z+.5}])} className="rounded-xl bg-white/10 px-4 py-2 text-xs">Duplicate</button><button onClick={()=>{setSitePieces(v=>v.filter(p=>p.id!==piece.id));setSelectedPieceId(null);setWallStep("main");}} className="rounded-xl bg-red-500/20 px-4 py-2 text-xs text-red-200">Delete</button></div>
+            <button onClick={()=>{setPerimeter(null);setWallStep("main");}} className="mt-3 rounded-xl bg-red-500/20 px-4 py-2 text-xs text-red-200">Remove perimeter</button>
           </div>
-        )})()}
+        )}
         {panel && panel !== "buildings" && panel !== "walls" && panel !== "edit" && (
           <div className="border-t border-white/10 px-4 py-4 text-center text-sm text-white/55">
             {panel === "fountains" ? "Place fountains as separate site pieces." :
