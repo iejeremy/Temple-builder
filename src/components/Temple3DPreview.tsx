@@ -87,9 +87,19 @@ export default function Temple3DPreview({ levels, selectedLevel, onSelectLevel, 
       const mat=()=>new THREE.MeshStandardMaterial({color:selected?new THREE.Color(color).offsetHSL(0,0,.08):color,roughness:.78,emissive:selected?0x2b2410:0x000000,emissiveIntensity:selected?.16:0});
       const add=(g:THREE.BufferGeometry,x:number,y:number,z:number)=>{const m=new THREE.Mesh(g,mat());m.position.set(x,y,z);lg.add(m);};
       const box=(rw:number,rh:number,rd:number,x:number,y:number,z:number)=>add(new THREE.BoxGeometry(rw,rh,rd),x,y,z);
-      const parts:Array<[number,number,number,number]>=level.shape==="l-shape"?[[w*.42,d,-w*.29,0],[w*.72,d*.42,w*.14,d*.29]]:level.shape==="t-shape"?[[w,d*.38,0,d*.30],[w*.36,d*.76,0,-d*.12]]:level.shape==="u-shape"?[[w*.28,d,-w*.36,0],[w*.28,d,w*.36,0],[w*.72,d*.28,0,-d*.36]]:level.shape==="cross"?[[w*.34,d,0,0],[w,d*.34,0,0]]:level.shape==="courtyard"?[[w,d*.24,0,-d*.38],[w,d*.24,0,d*.38],[w*.24,d*.58,-w*.38,0],[w*.24,d*.58,w*.38,0]]:[[w,d,0,0]];
-      if(level.shape==="octagon"||level.shape==="rotunda"){
-        const sides=level.shape==="rotunda"?32:8,r=Math.min(w,d)*.5;add(new THREE.CylinderGeometry(r*1.04,r*1.04,.18,sides),0,baseY+.09,0);add(new THREE.CylinderGeometry(r,r,h,sides),0,baseY+h/2,0);addRoof(lg,level.roof,r*2,r*2,0,0,baseY+h,color);
+      const parts:Array<[number,number,number,number]>=level.shape==="l-shape"?[[w*.42,d,-w*.29,0],[w*.72,d*.42,w*.14,d*.29]]:level.shape==="t-shape"?[[w,d*.38,0,d*.30],[w*.36,d*.76,0,-d*.12]]:level.shape==="u-shape"?[[w*.28,d,-w*.36,0],[w*.28,d,w*.36,0],[w*.72,d*.28,0,-d*.36]]:level.shape==="cross"?[[w*.34,d,0,0],[w,d*.34,0,0]]:level.shape==="x-shape"?[[w*.28,d,0,0],[w,d*.28,0,0]]:level.shape==="horseshoe"?[[w*.25,d,-w*.38,0],[w*.25,d,w*.38,0],[w*.75,d*.26,0,-d*.37]]:level.shape==="courtyard"?[[w,d*.24,0,-d*.38],[w,d*.24,0,d*.38],[w*.24,d*.58,-w*.38,0],[w*.24,d*.58,w*.38,0]]:[[w,d,0,0]];
+      const polygonShape=(points:Array<[number,number]>)=>{const s=new THREE.Shape();points.forEach(([x,z],i)=>i?s.lineTo(x,z):s.moveTo(x,z));s.closePath();const g=new THREE.ExtrudeGeometry(s,{depth:h,bevelEnabled:false});g.rotateX(Math.PI/2);g.translate(0,baseY+h,0);return g;};
+      const radialPoints=(count:number,outer:number,inner?:number)=>Array.from({length:inner?count*2:count},(_,i)=>{const r=inner?(i%2===0?outer:inner):outer;const a=-Math.PI/2+i*Math.PI/(inner?count:count/2);return [Math.cos(a)*r,Math.sin(a)*r] as [number,number];});
+      if(level.shape==="star"||level.shape==="six-star"){
+        const n=level.shape==="star"?5:6,r=Math.min(w,d)*.52;add(polygonShape(radialPoints(n,r,r*.46)),0,0,0);addRoof(lg,level.roof,w,d,0,0,baseY+h,color);
+      }else if(level.shape==="triangle"||level.shape==="diamond"||level.shape==="hexagon"){
+        const n=level.shape==="triangle"?3:level.shape==="diamond"?4:6,r=Math.min(w,d)*.52;const pts=radialPoints(n,r);if(level.shape==="diamond")pts.forEach(p=>p[0]*=w/d);add(polygonShape(pts),0,0,0);addRoof(lg,level.roof,w,d,0,0,baseY+h,color);
+      }else if(level.shape==="circle"||level.shape==="oval"||level.shape==="ring"||level.shape==="octagon"||level.shape==="rotunda"){
+        const sides=level.shape==="octagon"?8:32,r=Math.min(w,d)*.5;
+        if(level.shape==="ring"){
+          const s=new THREE.Shape();s.absarc(0,0,r,0,Math.PI*2,false);const hole=new THREE.Path();hole.absarc(0,0,r*.55,0,Math.PI*2,true);s.holes.push(hole);add(polygonShape(s.getPoints(48).map(p=>[p.x,p.y] as [number,number])),0,0,0);
+        }else{const body=new THREE.CylinderGeometry(r,r,h,sides);if(level.shape==="oval")body.scale(w/d,1,1);add(body,0,baseY+h/2,0);}
+        addRoof(lg,level.roof,w,d,0,0,baseY+h,color);
       }else{
         for(const [rw,rd,x,z] of parts){box(rw+.12,.18,rd+.12,x,baseY+.09,z);box(rw,h,rd,x,baseY+h/2,z);}
         for(const [rw,rd,x,z] of parts)addRoof(lg,level.roof,rw,rd,x,z,baseY+h,color);
