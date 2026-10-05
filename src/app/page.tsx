@@ -201,7 +201,6 @@ export default function TempleBuilderPage() {
         {panel && panel !== "buildings" && panel !== "walls" && panel !== "statues" && panel !== "edit" && (
           <div className="border-t border-white/10 px-4 py-4 text-center text-sm text-white/55">
             {panel === "fountains" ? "Place fountains as separate site pieces." :
-             panel === "statues" ? "Place statues as separate site pieces." :
              panel === "stairs" ? "Place stairs and entrances." :
              "More separate pieces will live here."}
           </div>
