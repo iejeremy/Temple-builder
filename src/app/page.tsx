@@ -45,6 +45,7 @@ export default function TempleBuilderPage() {
   const [levels, setLevels] = useState<BuildingLevel[]>([]);
   const [sitePieces, setSitePieces] = useState<SitePiece[]>([]);
   const [wallMaterial, setWallMaterial] = useState<BuilderMaterial>("marble");
+  const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null);
   const [towerShape, setTowerShape] = useState<TowerShape>("round");
   const [selectedLevel, setSelectedLevel] = useState(0);
   const [selectedFace, setSelectedFace] = useState<WallFace | null>(null);
@@ -80,7 +81,10 @@ export default function TempleBuilderPage() {
         onSelectFace={(index,face) => { setSelectedLevel(index); setSelectedFace(face); setPanel("edit"); }}
         onMoveLevel={(index,x,z) => setLevels(current => current.map((l,i)=>i===index?{...l,x,z}:l))}
         onPatioChange={(index,patio) => setLevels(current => current.map((l,i)=>i===index?{...l,patio}:l))}
-        onMoveWindow={(levelIndex,id,u,v) => setLevels(current => current.map((l,i)=>i===levelIndex?{...l,windows:l.windows.map(win=>win.id===id?{...win,u,v}:win)}:l))} />
+        onMoveWindow={(levelIndex,id,u,v) => setLevels(current => current.map((l,i)=>i===levelIndex?{...l,windows:l.windows.map(win=>win.id===id?{...win,u,v}:win)}:l))}
+        selectedPieceId={selectedPieceId}
+        onSelectPiece={(id)=>{setSelectedPieceId(id);setPanel("walls");}}
+        onMovePiece={(id,x,z)=>setSitePieces(current=>current.map(p=>p.id===id?{...p,x,z}:p))} />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between p-3">
         <div className="rounded-2xl bg-black/50 px-4 py-2 backdrop-blur">
@@ -154,6 +158,16 @@ export default function TempleBuilderPage() {
             ))}
           </div>
         )}
+        {panel === "walls" && selectedPieceId && sitePieces.find(p=>p.id===selectedPieceId) && (()=>{const piece=sitePieces.find(p=>p.id===selectedPieceId)!;return <div className="border-t border-white/10 px-3 py-3">
+          <div className="mb-2 flex items-center justify-between"><span className="text-xs font-semibold capitalize">{piece.type} selected</span><button onClick={()=>setSelectedPieceId(null)} className="text-xs text-white/50">Done</button></div>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-xs text-white/60">Width<input type="range" min=".5" max="10" step=".25" value={piece.width} onChange={e=>setSitePieces(v=>v.map(p=>p.id===piece.id?{...p,width:Number(e.target.value)}:p))} className="mt-1 w-full"/></label>
+            <label className="text-xs text-white/60">Height<input type="range" min=".5" max="12" step=".25" value={piece.height} onChange={e=>setSitePieces(v=>v.map(p=>p.id===piece.id?{...p,height:Number(e.target.value)}:p))} className="mt-1 w-full"/></label>
+            <label className="col-span-2 text-xs text-white/60">Rotate<input type="range" min="-180" max="180" step="5" value={piece.rotation} onChange={e=>setSitePieces(v=>v.map(p=>p.id===piece.id?{...p,rotation:Number(e.target.value)}:p))} className="mt-1 w-full"/></label>
+          </div>
+          <div className="mt-3 flex gap-2"><button onClick={()=>setSitePieces(v=>[...v,{...piece,id:`${piece.type}-${Date.now()}`,x:piece.x+.5,z:piece.z+.5}])} className="rounded-xl bg-amber-200 px-4 py-2 text-xs font-semibold text-black">Duplicate</button><button onClick={()=>{setSitePieces(v=>v.filter(p=>p.id!==piece.id));setSelectedPieceId(null);}} className="rounded-xl bg-red-500/20 px-4 py-2 text-xs text-red-200">Delete</button></div>
+          <div className="mt-2 text-[11px] text-white/45">Drag the selected piece on the site. It snaps to the grid and nearby pieces.</div>
+        </div>})()}
         {panel === "walls" && (
           <div className="border-t border-white/10 px-3 py-3">
             <div className="mb-2 flex gap-2 overflow-x-auto">
