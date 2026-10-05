@@ -96,7 +96,7 @@ export default function TempleBuilderPage() {
           <div className="text-[10px] uppercase tracking-[.22em] text-amber-200/80">Echoes</div>
           <div className="text-sm font-semibold">Temple Builder</div>
         </div>
-        {shape && <button onClick={() => setPanel(panel === "edit" ? null : "edit")} className="pointer-events-auto rounded-2xl bg-black/55 px-4 py-3 text-sm font-medium backdrop-blur">Edit building</button>}
+        
       </div>
 
       {!shape && (
