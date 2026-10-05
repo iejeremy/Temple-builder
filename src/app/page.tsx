@@ -11,6 +11,8 @@ const TempleWorld = dynamic(() => import("@/components/Temple3DPreview"), {
 export type BuildingShape = "rectangle" | "square" | "wide" | "l-shape" | "t-shape" | "u-shape" | "cross" | "octagon" | "rotunda" | "courtyard";
 export type BuilderMaterial = "marble" | "sandstone" | "limestone" | "obsidian";
 export type RoofStyle = "flat" | "pyramid" | "dome" | "cone" | "steeple" | "none";
+export type WallFace = "front" | "back" | "left" | "right";
+export type WindowAttachment = { id: string; face: WallFace; u: number; v: number; width: number; height: number; };
 export type BuildingLevel = {
   id: string;
   shape: BuildingShape;
@@ -23,6 +25,7 @@ export type BuildingLevel = {
   x: number;
   z: number;
   rotation: number;
+  windows: WindowAttachment[];
 };
 
 export default function TempleBuilderPage() {
@@ -34,6 +37,7 @@ export default function TempleBuilderPage() {
   const [roof, setRoof] = useState<RoofStyle>("flat");
   const [levels, setLevels] = useState<BuildingLevel[]>([]);
   const [selectedLevel, setSelectedLevel] = useState(0);
+  const [selectedFace, setSelectedFace] = useState<WallFace | null>(null);
   const [panel, setPanel] = useState<"walls" | "buildings" | "fountains" | "statues" | "stairs" | "more" | "edit" | null>("buildings");
 
   const chooseShape = (next: BuildingShape) => {
@@ -49,7 +53,7 @@ export default function TempleBuilderPage() {
     if (next === "rotunda") { setWidth(32); setDepth(32); }
     if (next === "courtyard") { setWidth(46); setDepth(40); }
     setHeight(22);
-    setLevels([{ id: "level-1", shape: next, material, width: next === "wide" ? 46 : next === "courtyard" ? 46 : next === "l-shape" ? 38 : next === "t-shape" || next === "cross" ? 40 : next === "u-shape" ? 42 : next === "square" || next === "octagon" || next === "rotunda" ? 28 : 34, depth: next === "wide" ? 24 : next === "courtyard" ? 40 : next === "l-shape" || next === "t-shape" ? 34 : next === "u-shape" ? 36 : next === "cross" ? 40 : next === "square" || next === "octagon" || next === "rotunda" ? 28 : 26, height: 22, roof: "flat", patio: false, x: 0, z: 0, rotation: 0 }]);
+    setLevels([{ id: "level-1", shape: next, material, width: next === "wide" ? 46 : next === "courtyard" ? 46 : next === "l-shape" ? 38 : next === "t-shape" || next === "cross" ? 40 : next === "u-shape" ? 42 : next === "square" || next === "octagon" || next === "rotunda" ? 28 : 34, depth: next === "wide" ? 24 : next === "courtyard" ? 40 : next === "l-shape" || next === "t-shape" ? 34 : next === "u-shape" ? 36 : next === "cross" ? 40 : next === "square" || next === "octagon" || next === "rotunda" ? 28 : 26, height: 22, roof: "flat", patio: false, x: 0, z: 0, rotation: 0, windows: [] }]);
     setSelectedLevel(0);
     setPanel(null);
   };
@@ -58,8 +62,10 @@ export default function TempleBuilderPage() {
     <main className="relative h-[100dvh] overflow-hidden bg-[#b9c4cb] text-white">
       <TempleWorld levels={levels} selectedLevel={selectedLevel}
         onSelectLevel={(index) => { setSelectedLevel(index); setPanel("edit"); }}
+        onSelectFace={(index,face) => { setSelectedLevel(index); setSelectedFace(face); setPanel("edit"); }}
         onMoveLevel={(index,x,z) => setLevels(current => current.map((l,i)=>i===index?{...l,x,z}:l))}
-        onPatioChange={(index,patio) => setLevels(current => current.map((l,i)=>i===index?{...l,patio}:l))} />
+        onPatioChange={(index,patio) => setLevels(current => current.map((l,i)=>i===index?{...l,patio}:l))}
+        onMoveWindow={(levelIndex,id,u,v) => setLevels(current => current.map((l,i)=>i===levelIndex?{...l,windows:l.windows.map(win=>win.id===id?{...win,u,v}:win)}:l))} />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between p-3">
         <div className="rounded-2xl bg-black/50 px-4 py-2 backdrop-blur">
@@ -81,7 +87,7 @@ export default function TempleBuilderPage() {
           <div className="mb-3 flex items-center justify-between"><span className="font-semibold">Level {selectedLevel + 1}</span><button onClick={() => setPanel(null)} className="text-sm text-white/60">Done</button></div>
           <div className="mb-3 flex gap-2 overflow-x-auto">
             {levels.map((_,i)=><button key={i} onClick={()=>setSelectedLevel(i)} className={`shrink-0 rounded-xl px-3 py-2 text-xs ${i===selectedLevel?"bg-amber-200 text-black":"bg-white/10"}`}>Level {i+1}</button>)}
-            {levels.length<4 && <button onClick={()=>{const base=levels[levels.length-1];setLevels([...levels,{...base,id:`level-${levels.length+1}`,width:Math.max(16,Math.round(base.width*.84)),depth:Math.max(16,Math.round(base.depth*.84)),roof:"flat",patio:false,x:0,z:0,rotation:0}]);setSelectedLevel(levels.length);}} className="shrink-0 rounded-xl bg-white/10 px-3 py-2 text-xs">+ Stack level</button>}
+            {levels.length<4 && <button onClick={()=>{const base=levels[levels.length-1];setLevels([...levels,{...base,id:`level-${levels.length+1}`,width:Math.max(16,Math.round(base.width*.84)),depth:Math.max(16,Math.round(base.depth*.84)),roof:"flat",patio:false,x:0,z:0,rotation:0,windows:[]}]);setSelectedLevel(levels.length);}} className="shrink-0 rounded-xl bg-white/10 px-3 py-2 text-xs">+ Stack level</button>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <label className="text-xs text-white/70">Width<input className="mt-2 w-full" type="range" min="16" max="60" value={levels[selectedLevel].width} onChange={e=>setLevels(levels.map((l,i)=>i===selectedLevel?{...l,width:Number(e.target.value)}:l))}/></label>
@@ -94,6 +100,17 @@ export default function TempleBuilderPage() {
           </div>
           <div className="mt-3 rounded-xl bg-white/5 p-3 text-xs text-white/60">
             Doors: {selectedLevel===0 || levels[selectedLevel].patio ? "allowed on this level" : "upper-level doors require an exposed roof/patio"}
+          </div>
+          <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-3">
+            <div className="text-xs font-semibold text-white/80">Wall surface</div>
+            <div className="mt-1 text-xs text-white/50">{selectedFace ? `${selectedFace} wall selected` : "Tap a wall face on the building to customize it."}</div>
+            {selectedFace && <div className="mt-3 flex gap-2 overflow-x-auto">
+              <button onClick={()=>setLevels(levels.map((l,i)=>i===selectedLevel?{...l,windows:[...l.windows,{id:`window-${Date.now()}`,face:selectedFace,u:0,v:.55,width:1,height:1.25}]}:l))} className="rounded-xl bg-amber-200 px-4 py-2 text-xs font-semibold text-black">+ Window</button>
+              <button disabled={selectedLevel>0&&!levels[selectedLevel].patio} className="rounded-xl bg-white/10 px-4 py-2 text-xs disabled:opacity-30">Door</button>
+              <button className="rounded-xl bg-white/10 px-4 py-2 text-xs">Trim</button>
+              <button className="rounded-xl bg-white/10 px-4 py-2 text-xs">Columns</button>
+              <button className="rounded-xl bg-white/10 px-4 py-2 text-xs">Arches</button>
+            </div>}
           </div>
         </div>
       )}
