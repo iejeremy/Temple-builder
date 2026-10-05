@@ -153,7 +153,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
       }
       for(const door of level.doors||[]){
         const dw=door.width/2.2,dh=door.height/2.2,edge=.055;
-        const arched=door.style==="arched"||door.style==="temple"||door.style==="portico";
+        const arched=door.style==="arched"||door.style==="temple"||door.style==="portico"||door.style==="wood-arch"||door.style==="stone-arch"||door.style==="grand-arch"||door.style==="carved-stone"||door.style==="metal-gate";
         let dg:THREE.BufferGeometry;
         if(arched){
           // Doorway profile: straight sides + flat floor + curved top (never a capsule).
@@ -165,8 +165,8 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
           dg=new THREE.ExtrudeGeometry(profile,{depth:.08,bevelEnabled:false});
           dg.translate(0,0,-.04);
         }else dg=new THREE.BoxGeometry(dw,dh,.08);
-        const dc=door.style==="bronze"?0x7b552e:door.style==="temple"||door.style==="portico"?0x6b4a2d:0x4b3527;
-        const mesh=new THREE.Mesh(dg,new THREE.MeshStandardMaterial({color:dc,roughness:.72,metalness:door.style==="bronze"?.5:.08}));
+        const dc=door.style==="bronze"||door.style==="metal-gate"?0x7b552e:door.style==="stone-arch"||door.style==="carved-stone"?0x77736b:door.style==="temple"||door.style==="portico"||door.style==="grand-arch"?0x6b4a2d:0x4b3527;
+        const mesh=new THREE.Mesh(dg,new THREE.MeshStandardMaterial({color:dc,roughness:.72,metalness:door.style==="bronze"||door.style==="metal-gate"?.5:.08}));
         const y=arched?baseY:baseY+dh/2;
         if(door.face==="front"||door.face==="back"){mesh.position.set((door.u||0)*(w*.38),y,door.face==="front"?d/2+edge:-d/2-edge);if(door.face==="back")mesh.rotation.y=Math.PI;}
         else{mesh.position.set(door.face==="right"?w/2+edge:-w/2-edge,y,(door.u||0)*(d*.38));mesh.rotation.y=Math.PI/2;}
