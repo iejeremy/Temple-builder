@@ -16,6 +16,9 @@ export type WindowStyle = "classic" | "tall" | "arched" | "round" | "double" | "
 export type DoorStyle = "single" | "double" | "arched" | "bronze" | "temple" | "portico";
 export type WindowAttachment = { id: string; face: WallFace; u: number; v: number; width: number; height: number; style: WindowStyle; };
 export type DoorAttachment = { id: string; face: WallFace; u: number; width: number; height: number; style: DoorStyle; };
+export type SitePieceType = "wall"|"gate"|"archway"|"columns"|"tower"|"corner"|"pillar"|"balustrade";
+export type TowerShape = "round"|"square"|"octagon"|"hexagon"|"star"|"spire";
+export type SitePiece = { id:string; type:SitePieceType; material:BuilderMaterial; x:number; z:number; rotation:number; width:number; height:number; towerShape?:TowerShape; };
 export type BuildingLevel = {
   id: string;
   shape: BuildingShape;
@@ -40,6 +43,9 @@ export default function TempleBuilderPage() {
   const [height, setHeight] = useState(22);
   const [roof, setRoof] = useState<RoofStyle>("flat");
   const [levels, setLevels] = useState<BuildingLevel[]>([]);
+  const [sitePieces, setSitePieces] = useState<SitePiece[]>([]);
+  const [wallMaterial, setWallMaterial] = useState<BuilderMaterial>("marble");
+  const [towerShape, setTowerShape] = useState<TowerShape>("round");
   const [selectedLevel, setSelectedLevel] = useState(0);
   const [selectedFace, setSelectedFace] = useState<WallFace | null>(null);
   const [detailCategory, setDetailCategory] = useState<"windows"|"doors"|"trim"|"columns"|"arches"|null>(null);
@@ -69,7 +75,7 @@ export default function TempleBuilderPage() {
 
   return (
     <main className="relative h-[100dvh] overflow-hidden bg-[#b9c4cb] text-white">
-      <TempleWorld levels={levels} selectedLevel={selectedLevel}
+      <TempleWorld levels={levels} sitePieces={sitePieces} selectedLevel={selectedLevel}
         onSelectLevel={(index) => { setSelectedLevel(index); setPanel("edit"); }}
         onSelectFace={(index,face) => { setSelectedLevel(index); setSelectedFace(face); setPanel("edit"); }}
         onMoveLevel={(index,x,z) => setLevels(current => current.map((l,i)=>i===index?{...l,x,z}:l))}
@@ -148,10 +154,20 @@ export default function TempleBuilderPage() {
             ))}
           </div>
         )}
-        {panel && panel !== "buildings" && panel !== "edit" && (
+        {panel === "walls" && (
+          <div className="border-t border-white/10 px-3 py-3">
+            <div className="mb-2 flex gap-2 overflow-x-auto">
+              {(["marble","sandstone","limestone","obsidian"] as BuilderMaterial[]).map(m=><button key={m} onClick={()=>setWallMaterial(m)} className={`shrink-0 rounded-xl px-3 py-2 text-xs capitalize ${wallMaterial===m?"bg-amber-200 text-black":"bg-white/10"}`}>{m}</button>)}
+            </div>
+            <div className="flex gap-2 overflow-x-auto">
+              {([["wall","Wall"],["gate","Gate"],["archway","Archway"],["columns","Columns"],["tower","Tower"],["corner","Corner"],["pillar","Pillar"],["balustrade","Balustrade"]] as [SitePieceType,string][]).map(([type,name])=><button key={type} onClick={()=>setSitePieces(current=>[...current,{id:`${type}-${Date.now()}`,type,material:wallMaterial,x:(current.length%5-2)*1.4,z:2+Math.floor(current.length/5)*1.2,rotation:0,width:type==="wall"?4:type==="gate"||type==="archway"?3:2,height:type==="tower"?5:type==="pillar"||type==="columns"?3.5:2.5,towerShape:type==="tower"?towerShape:undefined}])} className="min-w-[100px] rounded-xl bg-white/10 p-3 text-left text-xs"><div className="mb-2 h-8 rounded border border-amber-100/40"/>{name}</button>)}
+            </div>
+            <div className="mt-2 flex items-center gap-2 overflow-x-auto text-xs text-white/60"><span className="shrink-0">Tower:</span>{(["round","square","octagon","hexagon","star","spire"] as TowerShape[]).map(t=><button key={t} onClick={()=>setTowerShape(t)} className={`shrink-0 rounded-lg px-2 py-1.5 capitalize ${towerShape===t?"bg-white/20 text-white":"bg-white/5"}`}>{t}</button>)}</div>
+          </div>
+        )}
+        {panel && panel !== "buildings" && panel !== "walls" && panel !== "edit" && (
           <div className="border-t border-white/10 px-4 py-4 text-center text-sm text-white/55">
-            {panel === "walls" ? "Place individual walls anywhere on the site." :
-             panel === "fountains" ? "Place fountains as separate site pieces." :
+            {panel === "fountains" ? "Place fountains as separate site pieces." :
              panel === "statues" ? "Place statues as separate site pieces." :
              panel === "stairs" ? "Place stairs and entrances." :
              "More separate pieces will live here."}
