@@ -17,6 +17,7 @@ export default function Temple3DPreview({ shape, material, width, depth, height,
   const rendererRef = useRef<THREE.WebGLRenderer|null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera|null>(null);
   const orbitRef = useRef({ theta: .72, phi: .72, radius: 13, lastX: 0, lastY: 0, dragging: false, pinch: 0 });
+  const targetYRef = useRef(1.4);
 
   useEffect(() => {
     const host=hostRef.current; if(!host) return;
@@ -34,7 +35,7 @@ export default function Temple3DPreview({ shape, material, width, depth, height,
     const render=()=>{
       const o=orbitRef.current;
       camera.position.set(Math.sin(o.theta)*Math.sin(o.phi)*o.radius,Math.cos(o.phi)*o.radius,Math.cos(o.theta)*Math.sin(o.phi)*o.radius);
-      camera.lookAt(0,1.4,0); renderer.render(scene,camera);
+      camera.lookAt(0,targetYRef.current,0); renderer.render(scene,camera);
     };
     const resize=()=>{const w=Math.max(1,host.clientWidth),h=Math.max(1,host.clientHeight);camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);render();};
     const canvas=renderer.domElement; canvas.style.touchAction="none";
@@ -51,6 +52,9 @@ export default function Temple3DPreview({ shape, material, width, depth, height,
 
   useEffect(()=>{
     const group=groupRef.current,scene=sceneRef.current,renderer=rendererRef.current,camera=cameraRef.current;if(!group||!scene||!renderer||!camera)return;
+    const totalWorldHeight=(height/7)*Math.max(1,Math.min(4,levels));
+    targetYRef.current=Math.max(1.4,totalWorldHeight*.52);
+    orbitRef.current.radius=Math.max(orbitRef.current.radius,Math.min(24,10+totalWorldHeight*.72));
     while(group.children.length){const o=group.children.pop()!;if(o instanceof THREE.Mesh){o.geometry.dispose();const m=o.material;if(Array.isArray(m))m.forEach(x=>x.dispose());else m.dispose();}}
     if(shape){
       const w=width/7,d=depth/7,h=height/7,color=COLORS[material],count=Math.max(1,Math.min(4,levels));
@@ -106,7 +110,7 @@ export default function Temple3DPreview({ shape, material, width, depth, height,
         }
       }
     }
-    const o=orbitRef.current;camera.position.set(Math.sin(o.theta)*Math.sin(o.phi)*o.radius,Math.cos(o.phi)*o.radius,Math.cos(o.theta)*Math.sin(o.phi)*o.radius);camera.lookAt(0,1.4,0);renderer.render(scene,camera);
+    const o=orbitRef.current;camera.position.set(Math.sin(o.theta)*Math.sin(o.phi)*o.radius,Math.cos(o.phi)*o.radius,Math.cos(o.theta)*Math.sin(o.phi)*o.radius);camera.lookAt(0,targetYRef.current,0);renderer.render(scene,camera);
   },[shape,material,width,depth,height,roof,levels]);
 
   return <div ref={hostRef} className="absolute inset-0"><div className="pointer-events-none absolute bottom-[128px] left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-2 text-xs text-white/70">Drag to look around • pinch to zoom</div></div>;
