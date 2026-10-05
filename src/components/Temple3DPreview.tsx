@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import type { BuildingLevel, RoofStyle, WallFace, SitePiece } from "@/app/page";
+import type { BuildingLevel, RoofStyle, WallFace, SitePiece, BuilderMaterial } from "@/app/page";
 
 const COLORS: Record<BuilderMaterial, number> = {
   marble: 0xd9d4cc, sandstone: 0xb98b5b, limestone: 0xc6b898, obsidian: 0x25262b,
