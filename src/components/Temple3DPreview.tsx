@@ -1,19 +1,8 @@
 "use client";
 
 import { Canvas } from "@react-three/fiber";
-import type { TempleBuild } from "@/lib/temple-builder/types";
 
-export default function Temple3DPreview({
-  build: _build,
-  selectedId: _selectedId,
-  onSelect: _onSelect,
-  onMove: _onMove,
-}: {
-  build: TempleBuild;
-  selectedId?: string | null;
-  onSelect?: (id: string | null) => void;
-  onMove?: (id: string, x: number, y: number) => void;
-}) {
+export default function Temple3DPreview() {
   return (
     <div className="absolute inset-0 bg-[#b9c4cb]">
       <Canvas
