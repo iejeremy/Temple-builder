@@ -154,10 +154,20 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
       for(const door of level.doors||[]){
         const dw=door.width/2.2,dh=door.height/2.2,edge=.055;
         const arched=door.style==="arched"||door.style==="temple"||door.style==="portico";
-        const dg=arched?new THREE.CapsuleGeometry(dw*.5,Math.max(.2,dh-dw),6,12):new THREE.BoxGeometry(dw,dh,.1);
+        let dg:THREE.BufferGeometry;
+        if(arched){
+          // Doorway profile: straight sides + flat floor + curved top (never a capsule).
+          const radius=dw/2,straight=Math.max(.18,dh-radius);
+          const profile=new THREE.Shape();
+          profile.moveTo(-radius,0);profile.lineTo(radius,0);profile.lineTo(radius,straight);
+          profile.absarc(0,straight,radius,0,Math.PI,false);
+          profile.lineTo(-radius,0);profile.closePath();
+          dg=new THREE.ExtrudeGeometry(profile,{depth:.08,bevelEnabled:false});
+          dg.translate(0,0,-.04);
+        }else dg=new THREE.BoxGeometry(dw,dh,.08);
         const dc=door.style==="bronze"?0x7b552e:door.style==="temple"||door.style==="portico"?0x6b4a2d:0x4b3527;
         const mesh=new THREE.Mesh(dg,new THREE.MeshStandardMaterial({color:dc,roughness:.72,metalness:door.style==="bronze"?.5:.08}));
-        const y=baseY+dh/2;
+        const y=arched?baseY:baseY+dh/2;
         if(door.face==="front"||door.face==="back"){mesh.position.set((door.u||0)*(w*.38),y,door.face==="front"?d/2+edge:-d/2-edge);if(door.face==="back")mesh.rotation.y=Math.PI;}
         else{mesh.position.set(door.face==="right"?w/2+edge:-w/2-edge,y,(door.u||0)*(d*.38));mesh.rotation.y=Math.PI/2;}
         mesh.userData.levelIndex=index;mesh.userData.doorId=door.id;mesh.userData.doorFace=door.face;lg.add(mesh);
