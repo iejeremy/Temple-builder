@@ -10,6 +10,7 @@ const TempleWorld = dynamic(() => import("@/components/Temple3DPreview"), {
 
 export type BuildingShape = "rectangle" | "square" | "wide" | "l-shape" | "t-shape" | "u-shape" | "cross" | "octagon" | "rotunda" | "courtyard";
 export type BuilderMaterial = "marble" | "sandstone" | "limestone" | "obsidian";
+export type RoofStyle = "flat" | "pyramid" | "dome" | "cone" | "steeple" | "none";
 
 export default function TempleBuilderPage() {
   const [shape, setShape] = useState<BuildingShape | null>(null);
@@ -17,6 +18,8 @@ export default function TempleBuilderPage() {
   const [width, setWidth] = useState(32);
   const [depth, setDepth] = useState(26);
   const [height, setHeight] = useState(22);
+  const [roof, setRoof] = useState<RoofStyle>("pyramid");
+  const [levels, setLevels] = useState(1);
   const [panel, setPanel] = useState<"walls" | "buildings" | "fountains" | "statues" | "stairs" | "more" | "edit" | null>("buildings");
 
   const chooseShape = (next: BuildingShape) => {
@@ -37,7 +40,7 @@ export default function TempleBuilderPage() {
 
   return (
     <main className="relative h-[100dvh] overflow-hidden bg-[#b9c4cb] text-white">
-      <TempleWorld shape={shape} material={material} width={width} depth={depth} height={height} />
+      <TempleWorld shape={shape} material={material} width={width} depth={depth} height={height} roof={roof} levels={levels} />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between p-3">
         <div className="rounded-2xl bg-black/50 px-4 py-2 backdrop-blur">
@@ -62,6 +65,8 @@ export default function TempleBuilderPage() {
             <label className="text-xs text-white/70">Length<input className="mt-2 w-full" type="range" min="16" max="60" value={depth} onChange={e=>setDepth(Number(e.target.value))}/></label>
             <label className="text-xs text-white/70">Height<input className="mt-2 w-full" type="range" min="12" max="45" value={height} onChange={e=>setHeight(Number(e.target.value))}/></label>
             <label className="text-xs text-white/70">Material<select className="mt-1 w-full rounded-lg bg-white/10 p-2 text-white" value={material} onChange={e=>setMaterial(e.target.value as BuilderMaterial)}><option value="marble">White Marble</option><option value="sandstone">Sandstone</option><option value="limestone">Limestone</option><option value="obsidian">Obsidian</option></select></label>
+            <label className="text-xs text-white/70">Levels<select className="mt-1 w-full rounded-lg bg-white/10 p-2 text-white" value={levels} onChange={e=>setLevels(Number(e.target.value))}><option value={1}>1 level</option><option value={2}>2 levels</option><option value={3}>3 levels</option><option value={4}>4 levels</option></select></label>
+            <label className="text-xs text-white/70">Roof<select className="mt-1 w-full rounded-lg bg-white/10 p-2 text-white" value={roof} onChange={e=>setRoof(e.target.value as RoofStyle)}><option value="flat">Flat</option><option value="pyramid">Pyramid</option><option value="dome">Dome</option><option value="cone">Cone</option><option value="steeple">Steeple</option><option value="none">No roof</option></select></label>
           </div>
         </div>
       )}
