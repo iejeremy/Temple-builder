@@ -58,6 +58,20 @@ export default function Temple3DPreview({ shape, material, width, depth, height 
       const add=(sx:number,sy:number,sz:number,x:number,y:number,z:number)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),mat());m.position.set(x,y,z);group.add(m);};
       add(w+.35,.18,d+.35,0,.09,0);
       add(w,h,t,0,h/2,-d/2); add(w,h,t,0,h/2,d/2); add(t,h,d,-w/2,h/2,0); add(t,h,d,w/2,h/2,0);
+
+      // A Building is a complete enclosed shell. Standalone open sections belong under Walls.
+      const roofMaterial=new THREE.MeshStandardMaterial({color,roughness:.72});
+      if(shape==="wide"){
+        const roof=new THREE.Mesh(new THREE.BoxGeometry(w+.22,.18,d+.22),roofMaterial);
+        roof.position.set(0,h+.09,0); group.add(roof);
+      } else {
+        const roofHeight=Math.max(.75,Math.min(1.35,w*.18));
+        const roofGeometry=new THREE.CylinderGeometry(0,1,roofHeight,4,1,false);
+        roofGeometry.rotateY(Math.PI/4);
+        roofGeometry.scale(w*.72,1,d*.72);
+        const roof=new THREE.Mesh(roofGeometry,roofMaterial);
+        roof.position.set(0,h+roofHeight/2,0); group.add(roof);
+      }
     }
     const o=orbitRef.current;camera.position.set(Math.sin(o.theta)*Math.sin(o.phi)*o.radius,Math.cos(o.phi)*o.radius,Math.cos(o.theta)*Math.sin(o.phi)*o.radius);camera.lookAt(0,1.4,0);renderer.render(scene,camera);
   },[shape,material,width,depth,height]);
