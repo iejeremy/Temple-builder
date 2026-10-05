@@ -8,7 +8,7 @@ const TempleWorld = dynamic(() => import("@/components/Temple3DPreview"), {
   loading: () => <div className="flex h-[100dvh] items-center justify-center bg-[#b9c4cb] text-black/50">Opening building site…</div>,
 });
 
-export type BuildingShape = "rectangle" | "square" | "wide";
+export type BuildingShape = "rectangle" | "square" | "wide" | "l-shape" | "t-shape" | "u-shape" | "cross" | "octagon" | "rotunda" | "courtyard";
 export type BuilderMaterial = "marble" | "sandstone" | "limestone" | "obsidian";
 
 export default function TempleBuilderPage() {
@@ -24,6 +24,13 @@ export default function TempleBuilderPage() {
     if (next === "square") { setWidth(28); setDepth(28); }
     if (next === "rectangle") { setWidth(34); setDepth(26); }
     if (next === "wide") { setWidth(46); setDepth(24); }
+    if (next === "l-shape") { setWidth(38); setDepth(34); }
+    if (next === "t-shape") { setWidth(40); setDepth(34); }
+    if (next === "u-shape") { setWidth(42); setDepth(36); }
+    if (next === "cross") { setWidth(40); setDepth(40); }
+    if (next === "octagon") { setWidth(32); setDepth(32); }
+    if (next === "rotunda") { setWidth(32); setDepth(32); }
+    if (next === "courtyard") { setWidth(46); setDepth(40); }
     setHeight(22);
     setPanel(null);
   };
@@ -70,7 +77,7 @@ export default function TempleBuilderPage() {
         </div>
         {panel === "buildings" && (
           <div className="flex gap-2 overflow-x-auto border-t border-white/10 px-3 py-3">
-            {[["rectangle","Rectangle"],["square","Square"],["wide","Wide Hall"]].map(([id,name])=>(
+            {[["rectangle","Rectangle"],["square","Square"],["wide","Wide Hall"],["l-shape","L Shape"],["t-shape","T Shape"],["u-shape","U Shape"],["cross","Cross"],["octagon","Octagon"],["rotunda","Rotunda"],["courtyard","Courtyard"]].map(([id,name])=>(
               <button key={id} onClick={()=>chooseShape(id as BuildingShape)} className="min-w-[118px] rounded-2xl border border-white/10 bg-white/5 p-3 text-left">
                 <div className="mb-2 h-10 rounded-md border-2 border-amber-100/60 bg-amber-100/10"/>
                 <div className="text-sm font-medium">{name}</div>
