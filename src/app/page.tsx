@@ -20,6 +20,9 @@ export type BuildingLevel = {
   height: number;
   roof: RoofStyle;
   patio: boolean;
+  x: number;
+  z: number;
+  rotation: number;
 };
 
 export default function TempleBuilderPage() {
@@ -46,14 +49,17 @@ export default function TempleBuilderPage() {
     if (next === "rotunda") { setWidth(32); setDepth(32); }
     if (next === "courtyard") { setWidth(46); setDepth(40); }
     setHeight(22);
-    setLevels([{ id: "level-1", shape: next, material, width: next === "wide" ? 46 : next === "courtyard" ? 46 : next === "l-shape" ? 38 : next === "t-shape" || next === "cross" ? 40 : next === "u-shape" ? 42 : next === "square" || next === "octagon" || next === "rotunda" ? 28 : 34, depth: next === "wide" ? 24 : next === "courtyard" ? 40 : next === "l-shape" || next === "t-shape" ? 34 : next === "u-shape" ? 36 : next === "cross" ? 40 : next === "square" || next === "octagon" || next === "rotunda" ? 28 : 26, height: 22, roof: "flat", patio: false }]);
+    setLevels([{ id: "level-1", shape: next, material, width: next === "wide" ? 46 : next === "courtyard" ? 46 : next === "l-shape" ? 38 : next === "t-shape" || next === "cross" ? 40 : next === "u-shape" ? 42 : next === "square" || next === "octagon" || next === "rotunda" ? 28 : 34, depth: next === "wide" ? 24 : next === "courtyard" ? 40 : next === "l-shape" || next === "t-shape" ? 34 : next === "u-shape" ? 36 : next === "cross" ? 40 : next === "square" || next === "octagon" || next === "rotunda" ? 28 : 26, height: 22, roof: "flat", patio: false, x: 0, z: 0, rotation: 0 }]);
     setSelectedLevel(0);
     setPanel(null);
   };
 
   return (
     <main className="relative h-[100dvh] overflow-hidden bg-[#b9c4cb] text-white">
-      <TempleWorld levels={levels} selectedLevel={selectedLevel} onSelectLevel={(index) => { setSelectedLevel(index); setPanel("edit"); }} />
+      <TempleWorld levels={levels} selectedLevel={selectedLevel}
+        onSelectLevel={(index) => { setSelectedLevel(index); setPanel("edit"); }}
+        onMoveLevel={(index,x,z) => setLevels(current => current.map((l,i)=>i===index?{...l,x,z}:l))}
+        onPatioChange={(index,patio) => setLevels(current => current.map((l,i)=>i===index?{...l,patio}:l))} />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between p-3">
         <div className="rounded-2xl bg-black/50 px-4 py-2 backdrop-blur">
@@ -75,7 +81,7 @@ export default function TempleBuilderPage() {
           <div className="mb-3 flex items-center justify-between"><span className="font-semibold">Level {selectedLevel + 1}</span><button onClick={() => setPanel(null)} className="text-sm text-white/60">Done</button></div>
           <div className="mb-3 flex gap-2 overflow-x-auto">
             {levels.map((_,i)=><button key={i} onClick={()=>setSelectedLevel(i)} className={`shrink-0 rounded-xl px-3 py-2 text-xs ${i===selectedLevel?"bg-amber-200 text-black":"bg-white/10"}`}>Level {i+1}</button>)}
-            {levels.length<4 && <button onClick={()=>{const base=levels[levels.length-1];setLevels([...levels,{...base,id:`level-${levels.length+1}`,width:Math.max(16,Math.round(base.width*.84)),depth:Math.max(16,Math.round(base.depth*.84)),roof:"flat",patio:false}]);setSelectedLevel(levels.length);}} className="shrink-0 rounded-xl bg-white/10 px-3 py-2 text-xs">+ Stack level</button>}
+            {levels.length<4 && <button onClick={()=>{const base=levels[levels.length-1];setLevels([...levels,{...base,id:`level-${levels.length+1}`,width:Math.max(16,Math.round(base.width*.84)),depth:Math.max(16,Math.round(base.depth*.84)),roof:"flat",patio:false,x:0,z:0,rotation:0}]);setSelectedLevel(levels.length);}} className="shrink-0 rounded-xl bg-white/10 px-3 py-2 text-xs">+ Stack level</button>}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <label className="text-xs text-white/70">Width<input className="mt-2 w-full" type="range" min="16" max="60" value={levels[selectedLevel].width} onChange={e=>setLevels(levels.map((l,i)=>i===selectedLevel?{...l,width:Number(e.target.value)}:l))}/></label>
@@ -83,10 +89,11 @@ export default function TempleBuilderPage() {
             <label className="text-xs text-white/70">Height<input className="mt-2 w-full" type="range" min="12" max="45" value={levels[selectedLevel].height} onChange={e=>setLevels(levels.map((l,i)=>i===selectedLevel?{...l,height:Number(e.target.value)}:l))}/></label>
             <label className="text-xs text-white/70">Material<select className="mt-1 w-full rounded-lg bg-white/10 p-2 text-white" value={levels[selectedLevel].material} onChange={e=>setLevels(levels.map((l,i)=>i===selectedLevel?{...l,material:e.target.value as BuilderMaterial}:l))}><option value="marble">White Marble</option><option value="sandstone">Sandstone</option><option value="limestone">Limestone</option><option value="obsidian">Obsidian</option></select></label>
             <label className="text-xs text-white/70">Roof<select className="mt-1 w-full rounded-lg bg-white/10 p-2 text-white" value={levels[selectedLevel].roof} onChange={e=>setLevels(levels.map((l,i)=>i===selectedLevel?{...l,roof:e.target.value as RoofStyle}:l))}><option value="flat">Flat</option><option value="pyramid">Pyramid</option><option value="dome">Dome</option><option value="cone">Cone</option><option value="steeple">Steeple</option><option value="none">No roof</option></select></label>
-            <label className="flex items-center gap-2 text-xs text-white/70"><input type="checkbox" checked={levels[selectedLevel].patio} onChange={e=>setLevels(levels.map((l,i)=>i===selectedLevel?{...l,patio:e.target.checked}:l))}/> Patio / terrace</label>
+            <label className="text-xs text-white/70">Rotate<input className="mt-2 w-full" type="range" min="-180" max="180" step="5" value={levels[selectedLevel].rotation} onChange={e=>setLevels(levels.map((l,i)=>i===selectedLevel?{...l,rotation:Number(e.target.value)}:l))}/></label>
+            <div className="col-span-2 rounded-xl bg-white/5 p-3 text-xs text-white/60">Drag the selected upper level directly on the building to reposition it. It snaps to the roof grid.</div>
           </div>
           <div className="mt-3 rounded-xl bg-white/5 p-3 text-xs text-white/60">
-            Doors: {selectedLevel===0 || levels[selectedLevel].patio ? "allowed on this level" : "upper-level doors require a patio or terrace"}
+            Doors: {selectedLevel===0 || levels[selectedLevel].patio ? "allowed on this level" : "upper-level doors require an exposed roof/patio"}
           </div>
         </div>
       )}
