@@ -2,14 +2,15 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import type { BuildingLevel, RoofStyle, WallFace } from "@/app/page";
+import type { BuildingLevel, RoofStyle, WallFace, SitePiece } from "@/app/page";
 
 const COLORS: Record<BuilderMaterial, number> = {
   marble: 0xd9d4cc, sandstone: 0xb98b5b, limestone: 0xc6b898, obsidian: 0x25262b,
 };
 
-export default function Temple3DPreview({ levels, selectedLevel, onSelectLevel, onSelectFace, onMoveLevel, onPatioChange, onMoveWindow }: {
+export default function Temple3DPreview({ levels, sitePieces, selectedLevel, onSelectLevel, onSelectFace, onMoveLevel, onPatioChange, onMoveWindow }: {
   levels: BuildingLevel[];
+  sitePieces: SitePiece[];
   selectedLevel: number;
   onSelectLevel?: (index: number) => void;
   onSelectFace?: (index: number, face: WallFace) => void;
@@ -148,8 +149,20 @@ export default function Temple3DPreview({ levels, selectedLevel, onSelectLevel, 
         if(exposed!==level.patio) queueMicrotask(()=>onPatioChange?.(index,exposed));
       }
     });
+    const siteMat=(m:SitePiece["material"])=>new THREE.MeshStandardMaterial({color:COLORS[m],roughness:.78});
+    sitePieces.forEach(piece=>{
+      const pg=new THREE.Group();pg.position.set(piece.x,0,piece.z);pg.rotation.y=THREE.MathUtils.degToRad(piece.rotation);group.add(pg);
+      const addSite=(geo:THREE.BufferGeometry,x:number,y:number,z:number)=>{const mesh=new THREE.Mesh(geo,siteMat(piece.material));mesh.position.set(x,y,z);pg.add(mesh);};
+      if(piece.type==="wall") addSite(new THREE.BoxGeometry(piece.width,piece.height,.28),0,piece.height/2,0);
+      if(piece.type==="pillar") addSite(new THREE.BoxGeometry(.55,piece.height,.55),0,piece.height/2,0);
+      if(piece.type==="columns"){for(const x of [-.7,.7])addSite(new THREE.CylinderGeometry(.18,.22,piece.height,12),x,piece.height/2,0);}
+      if(piece.type==="corner"){addSite(new THREE.BoxGeometry(piece.width,piece.height,.28),0,piece.height/2,0);addSite(new THREE.BoxGeometry(.28,piece.height,piece.width),-piece.width/2+.14,piece.height/2,piece.width/2-.14);}
+      if(piece.type==="balustrade"){addSite(new THREE.BoxGeometry(piece.width,.18,.32),0,.18,0);addSite(new THREE.BoxGeometry(piece.width,.16,.32),0,piece.height,0);for(let x=-piece.width/2+.25;x<piece.width/2;x+=.45)addSite(new THREE.BoxGeometry(.12,piece.height-.2,.12),x,piece.height/2,0);}
+      if(piece.type==="gate"||piece.type==="archway"){const side=.48,gap=piece.width*.5;addSite(new THREE.BoxGeometry(side,piece.height,.45),-gap/2-side/2,piece.height/2,0);addSite(new THREE.BoxGeometry(side,piece.height,.45),gap/2+side/2,piece.height/2,0);addSite(new THREE.BoxGeometry(piece.width+side*2,.42,.45),0,piece.height-.2,0);if(piece.type==="gate"){const gm=new THREE.MeshStandardMaterial({color:0x4b3527,roughness:.65,metalness:.18});for(const x of [-.45,0,.45]){const bar=new THREE.Mesh(new THREE.BoxGeometry(.08,piece.height*.72,.12),gm);bar.position.set(x,piece.height*.36,.02);pg.add(bar);}}}
+      if(piece.type==="tower"){const r=piece.width/2,s=piece.towerShape;let geo:THREE.BufferGeometry;if(s==="square")geo=new THREE.BoxGeometry(piece.width,piece.height,piece.width);else if(s==="star"){const sh=new THREE.Shape();for(let i=0;i<10;i++){const rr=i%2===0?r:r*.48,a=-Math.PI/2+i*Math.PI/5;i?sh.lineTo(Math.cos(a)*rr,Math.sin(a)*rr):sh.moveTo(Math.cos(a)*rr,Math.sin(a)*rr);}sh.closePath();geo=new THREE.ExtrudeGeometry(sh,{depth:piece.height,bevelEnabled:false});geo.rotateX(Math.PI/2);geo.translate(0,piece.height,0);}else geo=new THREE.CylinderGeometry(r,r,piece.height,s==="octagon"?8:s==="hexagon"?6:s==="spire"?16:24);addSite(geo,0,s==="star"?0:piece.height/2,0);if(s==="spire")addSite(new THREE.ConeGeometry(r*1.05,piece.height*.55,16),0,piece.height*1.275,0);}
+    });
     const o=orbitRef.current;camera.position.set(Math.sin(o.theta)*Math.sin(o.phi)*o.radius,Math.cos(o.phi)*o.radius,Math.cos(o.theta)*Math.sin(o.phi)*o.radius);camera.lookAt(0,targetYRef.current,0);renderer.render(scene,camera);
-  },[levels,selectedLevel]);
+  },[levels,sitePieces,selectedLevel]);
 
   return <div ref={hostRef} className="absolute inset-0"><div className="pointer-events-none absolute bottom-[128px] left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-2 text-xs text-white/70">Drag to look around • pinch to zoom</div></div>;
 }
