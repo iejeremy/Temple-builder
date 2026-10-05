@@ -94,8 +94,14 @@ export default function Temple3DPreview({ shape, material, width, depth, height,
           const parts=masses(level);
           for(const [rw,rd,x,z] of parts){box(rw+.12,.18,rd+.12,x,baseY+.09,z);box(rw,h,rd,x,baseY+h/2,z);}
           if(level===count-1){
+            // Complex footprints keep the same footprint at the roof line instead of
+            // receiving one large rectangular slab over the whole bounding box.
             if(parts.length===1) addRoof(parts[0][0],parts[0][1],parts[0][2],parts[0][3],baseY+h);
-            else { const shrink=Math.pow(.84,level); addRoof(w*shrink,d*shrink,0,0,baseY+h); }
+            else if(roof==="flat"){
+              for(const [rw,rd,x,z] of parts) addRoof(rw,rd,x,z,baseY+h);
+            } else {
+              for(const [rw,rd,x,z] of parts) addRoof(rw,rd,x,z,baseY+h);
+            }
           }
         }
       }
