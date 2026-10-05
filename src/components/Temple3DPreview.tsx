@@ -170,7 +170,10 @@ export default function Temple3DPreview({ levels, sitePieces, selectedLevel, sel
           addSite(outer,0,piece.height/2,0);
           const innerMaterial=siteMat(piece.material,piece.id===selectedPieceId);
           innerMaterial.side=THREE.BackSide;
-          const inner=new THREE.Mesh(new THREE.CylinderGeometry(Math.max(.4,r-.28),Math.max(.4,r-.28),piece.height+.02,40,1,true),innerMaterial);
+          const inner=new THREE.Mesh<THREE.CylinderGeometry, THREE.MeshStandardMaterial>(
+            new THREE.CylinderGeometry(Math.max(.4,r-.28),Math.max(.4,r-.28),piece.height+.02,40,1,true),
+            innerMaterial
+          );
           inner.position.y=piece.height/2;pg.add(inner);
         }else{
           const pts:THREE.Vector3[]=[];
