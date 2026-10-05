@@ -175,7 +175,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
     const statueColor=(f:Statue["finish"])=>f==="bronze"?0x8a6038:f==="gold"?0xc9a84f:f==="obsidian"?0x25252b:0xd9d4cc;
     for(const statue of statues){
       const sg=new THREE.Group();sg.userData.statueId=statue.id;sg.position.set(statue.x,0,statue.z);sg.rotation.y=THREE.MathUtils.degToRad(statue.rotation);sg.scale.setScalar(statue.scale);group.add(sg);statueGroupsRef.current.push(sg);
-      const sm=new THREE.MeshStandardMaterial({color:statueColor(statue.finish),roughness:statue.finish==="gold"||statue.finish==="bronze"?.42:.72,metalness:statue.finish==="gold"?.65:statue.finish==="bronze"?.45:.05,emissive:statue.id===selectedStatueId?0x241d08:0,emissiveIntensity:.22});
+      const sm=new THREE.MeshStandardMaterial({color:statueColor(statue.finish),roughness:(statue.finish==="gold"||statue.finish==="bronze")?.42:.72,metalness:statue.finish==="gold"?.65:statue.finish==="bronze"?.45:.05,emissive:statue.id===selectedStatueId?0x241d08:0,emissiveIntensity:.22});
       const mesh=(g:THREE.BufferGeometry,x:number,y:number,z:number)=>{const m=new THREE.Mesh(g,sm.clone());m.position.set(x,y,z);sg.add(m);return m;};
       mesh(new THREE.CylinderGeometry(.42,.5,.22,18),0,.11,0);
       if(statue.kind==="lion"){
