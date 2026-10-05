@@ -156,35 +156,26 @@ export default function TempleBuilderPage() {
           </div>
         )}
         {panel === "walls" && wallStep === "main" && (
-          <div className="border-t border-white/10 px-3 py-3">
-            <div className="mb-2 text-sm font-semibold">Choose perimeter</div>
-            <div className="flex gap-2 overflow-x-auto">
-              {([["rectangle","Classic"],["circle","Circle"],["octagon","Octagon"],["star","Star"]] as [PerimeterStyle,string][]).map(([style,name])=><button key={style} onClick={()=>{setPerimeter({style,material:"marble",margin:3,height:2.5,thickness:.28,towerShape:"round",towers:false,gate:false,arches:false,columns:false});setWallStep("features");}} className="min-w-[105px] rounded-xl bg-white/10 px-4 py-3 text-sm">{name}</button>)}
-            </div>
-            <div className="mt-2 text-xs text-white/45">One complete wall perimeter is placed around the building.</div>
+          <div className="flex gap-2 overflow-x-auto border-t border-white/10 px-3 py-3">
+            {([["rectangle","Classic"],["circle","Circle"],["octagon","Octagon"],["star","Star"]] as [PerimeterStyle,string][]).map(([style,name])=><button key={style} onClick={()=>{setPerimeter({style,material:"marble",margin:3,height:2.5,thickness:.28,towerShape:"round",towers:false,gate:false,arches:false,columns:false});setWallStep("features");}} className="min-w-[112px] rounded-2xl border border-white/10 bg-white/5 p-3 text-left"><div className="mb-2 h-9 rounded-md border-2 border-amber-100/60 bg-amber-100/10"/><div className="text-sm font-medium">{name}</div></button>)}
           </div>
         )}
         {panel === "walls" && perimeter && wallStep === "features" && (
-          <div className="border-t border-white/10 px-3 py-3">
-            <div className="mb-2 flex items-center justify-between"><span className="text-sm font-semibold">Perimeter</span><button onClick={()=>setPanel(null)} className="text-xs text-white/60">Done</button></div>
-            <div className="flex gap-2 overflow-x-auto">
-              {([["towers","Towers"],["gate","Gate"],["arches","Arches"],["columns","Columns"]] as [PerimeterFeature,string][]).map(([key,name])=><button key={key} onClick={()=>setPerimeter(p=>p?{...p,[key]:!p[key]}:p)} className={`min-w-[95px] rounded-xl px-3 py-3 text-sm ${perimeter[key]?"bg-amber-200 text-black":"bg-white/10"}`}>{name}</button>)}
-              <button onClick={()=>setWallStep("options")} className="min-w-[95px] rounded-xl bg-white/10 px-3 py-3 text-sm">Options</button>
-            </div>
-            <div className="mt-2 text-xs text-white/45">Tap the perimeter anytime to return here.</div>
+          <div className="flex gap-2 overflow-x-auto border-t border-white/10 px-3 py-3">
+            {([["towers","Towers"],["gate","Gate"],["arches","Arches"],["columns","Columns"]] as [PerimeterFeature,string][]).map(([key,name])=><button key={key} onClick={()=>setPerimeter(p=>p?{...p,[key]:!p[key]}:p)} className={`min-w-[104px] rounded-2xl border p-3 text-left ${perimeter[key]?"border-amber-200 bg-amber-200/15":"border-white/10 bg-white/5"}`}><div className="mb-2 h-9 rounded-md border border-amber-100/40"/><div className="text-sm">{name}</div></button>)}
+            <button onClick={()=>setWallStep("options")} className="min-w-[104px] rounded-2xl border border-white/10 bg-white/5 p-3 text-left"><div className="mb-2 h-9 rounded-md border border-amber-100/40"/><div className="text-sm">Options</div></button>
+            <button onClick={()=>setPanel(null)} className="min-w-[82px] rounded-2xl border border-white/10 bg-white/5 p-3 text-sm">Done</button>
           </div>
         )}
         {panel === "walls" && perimeter && wallStep === "options" && (
-          <div className="border-t border-white/10 px-3 py-3">
-            <div className="mb-2 flex items-center justify-between"><button onClick={()=>setWallStep("features")} className="text-xs text-white/60">‹ Back</button><span className="text-sm font-semibold">Wall options</span><button onClick={()=>setPanel(null)} className="text-xs text-white/60">Done</button></div>
-            <div className="mb-3 flex gap-2 overflow-x-auto">{(["marble","sandstone","limestone","obsidian"] as BuilderMaterial[]).map(m=><button key={m} onClick={()=>setPerimeter(p=>p?{...p,material:m}:p)} className={`shrink-0 rounded-xl px-3 py-2 text-xs capitalize ${perimeter.material===m?"bg-amber-200 text-black":"bg-white/10"}`}>{m}</button>)}</div>
-            {perimeter.towers && <div className="mb-3 flex gap-2 overflow-x-auto">{(["round","square","octagon","hexagon","star","spire"] as TowerShape[]).map(t=><button key={t} onClick={()=>setPerimeter(p=>p?{...p,towerShape:t}:p)} className={`shrink-0 rounded-xl px-3 py-2 text-xs capitalize ${perimeter.towerShape===t?"bg-white/20":"bg-white/5"}`}>{t}</button>)}</div>}
-            <div className="grid grid-cols-2 gap-3">
-              <label className="text-xs text-white/60">Distance<input type="range" min="1" max="8" step=".25" value={perimeter.margin} onChange={e=>setPerimeter(p=>p?{...p,margin:Number(e.target.value)}:p)} className="mt-1 w-full"/></label>
-              <label className="text-xs text-white/60">Height<input type="range" min="1" max="8" step=".25" value={perimeter.height} onChange={e=>setPerimeter(p=>p?{...p,height:Number(e.target.value)}:p)} className="mt-1 w-full"/></label>
-              <label className="col-span-2 text-xs text-white/60">Thickness<input type="range" min=".15" max=".8" step=".05" value={perimeter.thickness} onChange={e=>setPerimeter(p=>p?{...p,thickness:Number(e.target.value)}:p)} className="mt-1 w-full"/></label>
-            </div>
-            <button onClick={()=>{setPerimeter(null);setWallStep("main");}} className="mt-3 rounded-xl bg-red-500/20 px-4 py-2 text-xs text-red-200">Remove perimeter</button>
+          <div className="flex gap-2 overflow-x-auto border-t border-white/10 px-3 py-3">
+            <button onClick={()=>setWallStep("features")} className="min-w-[74px] rounded-2xl bg-white/5 p-3 text-sm">‹ Back</button>
+            {(["marble","sandstone","limestone","obsidian"] as BuilderMaterial[]).map(m=><button key={m} onClick={()=>setPerimeter(p=>p?{...p,material:m}:p)} className={`min-w-[100px] rounded-2xl border p-3 text-sm capitalize ${perimeter.material===m?"border-amber-200 bg-amber-200/15":"border-white/10 bg-white/5"}`}>{m}</button>)}
+            {perimeter.towers && (["round","square","octagon","hexagon","star","spire"] as TowerShape[]).map(t=><button key={t} onClick={()=>setPerimeter(p=>p?{...p,towerShape:t}:p)} className={`min-w-[100px] rounded-2xl border p-3 text-sm capitalize ${perimeter.towerShape===t?"border-amber-200 bg-amber-200/15":"border-white/10 bg-white/5"}`}>{t} tower</button>)}
+            <label className="min-w-[145px] rounded-2xl border border-white/10 bg-white/5 p-3 text-xs text-white/70">Distance<input type="range" min="1" max="8" step=".25" value={perimeter.margin} onChange={e=>setPerimeter(p=>p?{...p,margin:Number(e.target.value)}:p)} className="mt-2 w-full"/></label>
+            <label className="min-w-[145px] rounded-2xl border border-white/10 bg-white/5 p-3 text-xs text-white/70">Height<input type="range" min="1" max="8" step=".25" value={perimeter.height} onChange={e=>setPerimeter(p=>p?{...p,height:Number(e.target.value)}:p)} className="mt-2 w-full"/></label>
+            <label className="min-w-[145px] rounded-2xl border border-white/10 bg-white/5 p-3 text-xs text-white/70">Thickness<input type="range" min=".15" max=".8" step=".05" value={perimeter.thickness} onChange={e=>setPerimeter(p=>p?{...p,thickness:Number(e.target.value)}:p)} className="mt-2 w-full"/></label>
+            <button onClick={()=>{setPerimeter(null);setWallStep("main");}} className="min-w-[100px] rounded-2xl bg-red-500/15 p-3 text-sm text-red-200">Remove</button>
           </div>
         )}
         {panel && panel !== "buildings" && panel !== "walls" && panel !== "edit" && (
