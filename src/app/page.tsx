@@ -8,7 +8,7 @@ const TempleWorld = dynamic(() => import("@/components/Temple3DPreview"), {
   loading: () => <div className="flex h-[100dvh] items-center justify-center bg-[#b9c4cb] text-black/50">Opening building site…</div>,
 });
 
-export type BuildingShape = "rectangle" | "square" | "wide" | "l-shape" | "t-shape" | "u-shape" | "cross" | "octagon" | "rotunda" | "courtyard";
+export type BuildingShape = "rectangle" | "square" | "wide" | "l-shape" | "t-shape" | "u-shape" | "cross" | "octagon" | "rotunda" | "courtyard" | "star" | "six-star" | "circle" | "triangle" | "hexagon" | "diamond" | "oval" | "horseshoe" | "x-shape" | "ring";
 export type BuilderMaterial = "marble" | "sandstone" | "limestone" | "obsidian";
 export type RoofStyle = "flat" | "pyramid" | "dome" | "cone" | "steeple" | "none";
 export type WallFace = "front" | "back" | "left" | "right";
@@ -57,8 +57,12 @@ export default function TempleBuilderPage() {
     if (next === "octagon") { setWidth(32); setDepth(32); }
     if (next === "rotunda") { setWidth(32); setDepth(32); }
     if (next === "courtyard") { setWidth(46); setDepth(40); }
+    if (next === "star" || next === "six-star" || next === "circle" || next === "hexagon" || next === "ring") { setWidth(36); setDepth(36); }
+    if (next === "triangle" || next === "diamond") { setWidth(36); setDepth(34); }
+    if (next === "oval") { setWidth(42); setDepth(30); }
+    if (next === "horseshoe" || next === "x-shape") { setWidth(40); setDepth(38); }
     setHeight(22);
-    setLevels([{ id: "level-1", shape: next, material, width: next === "wide" ? 46 : next === "courtyard" ? 46 : next === "l-shape" ? 38 : next === "t-shape" || next === "cross" ? 40 : next === "u-shape" ? 42 : next === "square" || next === "octagon" || next === "rotunda" ? 28 : 34, depth: next === "wide" ? 24 : next === "courtyard" ? 40 : next === "l-shape" || next === "t-shape" ? 34 : next === "u-shape" ? 36 : next === "cross" ? 40 : next === "square" || next === "octagon" || next === "rotunda" ? 28 : 26, height: 22, roof: "flat", patio: false, x: 0, z: 0, rotation: 0, windows: [], doors: [] }]);
+    setLevels([{ id: "level-1", shape: next, material, width: next === "wide" ? 46 : next === "courtyard" ? 46 : next === "oval" ? 42 : next === "u-shape" ? 42 : next === "horseshoe" || next === "x-shape" || next === "t-shape" || next === "cross" ? 40 : next === "l-shape" ? 38 : next === "star" || next === "six-star" || next === "circle" || next === "triangle" || next === "hexagon" || next === "diamond" || next === "ring" ? 36 : next === "square" || next === "octagon" || next === "rotunda" ? 28 : 34, depth: next === "wide" ? 24 : next === "courtyard" ? 40 : next === "horseshoe" || next === "x-shape" ? 38 : next === "u-shape" || next === "star" || next === "six-star" || next === "circle" || next === "hexagon" || next === "ring" ? 36 : next === "l-shape" || next === "t-shape" || next === "triangle" || next === "diamond" ? 34 : next === "oval" ? 30 : next === "cross" ? 40 : next === "square" || next === "octagon" || next === "rotunda" ? 28 : 26, height: 22, roof: "flat", patio: false, x: 0, z: 0, rotation: 0, windows: [], doors: [] }]);
     setSelectedLevel(0);
     setPanel(null);
   };
@@ -136,7 +140,7 @@ export default function TempleBuilderPage() {
         </div>
         {panel === "buildings" && (
           <div className="flex gap-2 overflow-x-auto border-t border-white/10 px-3 py-3">
-            {[["rectangle","Rectangle"],["square","Square"],["wide","Wide Hall"],["l-shape","L Shape"],["t-shape","T Shape"],["u-shape","U Shape"],["cross","Cross"],["octagon","Octagon"],["rotunda","Rotunda"],["courtyard","Courtyard"]].map(([id,name])=>(
+            {[["star","5-Point Star"],["circle","Circle"],["six-star","6-Point Star"],["rectangle","Rectangle"],["square","Square"],["wide","Wide Hall"],["l-shape","L Shape"],["t-shape","T Shape"],["u-shape","U Shape"],["cross","Cross"],["octagon","Octagon"],["rotunda","Rotunda"],["courtyard","Courtyard"],["triangle","Triangle"],["hexagon","Hexagon"],["diamond","Diamond"],["oval","Oval"],["horseshoe","Horseshoe"],["x-shape","X Shape"],["ring","Ring"]].map(([id,name])=>(
               <button key={id} onClick={()=>chooseShape(id as BuildingShape)} className="min-w-[118px] rounded-2xl border border-white/10 bg-white/5 p-3 text-left">
                 <div className="mb-2 h-10 rounded-md border-2 border-amber-100/60 bg-amber-100/10"/>
                 <div className="text-sm font-medium">{name}</div>
