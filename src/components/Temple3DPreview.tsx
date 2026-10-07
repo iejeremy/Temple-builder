@@ -176,14 +176,14 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
       }
       // Architectural detail system: references supplied for arches, classical/Gothic columns,
       // pediments, stairs and ornamental trim are rendered as procedural 3D pieces.
-      const detailMat=()=>new THREE.MeshStandardMaterial({color:color,roughness:.7,metalness:(level.material==="bronze"||level.material==="gold")?.45:.03});
+      const detailMat=()=>new THREE.MeshStandardMaterial({color:color,roughness:.7,metalness:(level.material==="bronze"||level.material==="gold") ? .45 : .03});
       const facePlace=(face:WallFace,u:number,y:number,out:number)=>{
         if(face==="front"||face==="back") return {x:u*(w*.38),y,z:face==="front"?d/2+out:-d/2-out,rot:face==="back"?Math.PI:0};
         return {x:face==="right"?w/2+out:-w/2-out,y,z:u*(d*.38),rot:face==="right"?Math.PI/2:-Math.PI/2};
       };
       for(const col of level.columns||[]){
         const pos=facePlace(col.face,col.u,baseY+h*.48,.13),ch=h*.9;
-        const cg=col.style==="square"?new THREE.BoxGeometry(.28,ch,.28):new THREE.CylinderGeometry((col.style==="corinthian"||col.style==="composite")?.18:.14,.17,ch,col.style==="fluted"?20:14);
+        const cg=col.style==="square"?new THREE.BoxGeometry(.28,ch,.28):new THREE.CylinderGeometry((col.style==="corinthian"||col.style==="composite") ? .18 : .14,.17,ch,col.style==="fluted"?20:14);
         const cm=new THREE.Mesh(cg,detailMat());cm.position.set(pos.x,pos.y,pos.z);cm.rotation.y=pos.rot;lg.add(cm);
         const cap=new THREE.Mesh(new THREE.BoxGeometry(.42,.16,.42),detailMat());cap.position.set(pos.x,baseY+h*.93,pos.z);cap.rotation.y=pos.rot;lg.add(cap);
         const foot=new THREE.Mesh(new THREE.CylinderGeometry(.22,.25,.12,16),detailMat());foot.position.set(pos.x,baseY+.08,pos.z);lg.add(foot);
