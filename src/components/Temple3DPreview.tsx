@@ -4,9 +4,7 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import type { BuildingLevel, RoofStyle, WallFace, Perimeter, BuilderMaterial, Statue } from "@/app/page";
 
-const COLORS: Record<BuilderMaterial, number> = {
-  marble: 0xd9d4cc, sandstone: 0xb98b5b, limestone: 0xc6b898, obsidian: 0x25262b,
-};
+const COLORS: Record<BuilderMaterial, number> = { marble:0xd9d4cc,sandstone:0xb98b5b,limestone:0xc6b898,obsidian:0x25262b,granite:0x77777b,travertine:0xc8ad87,brick:0x8b4938,stone:0x77736b,concrete:0x92908a,stucco:0xd8ccb8,plaster:0xe0d9ca,timber:0x765137,bronze:0x7f5d3f,gold:0xb8912f };
 
 export default function Temple3DPreview({ levels, perimeter, statues, selectedStatueId, selectedLevel, onSelectLevel, onSelectFace, onMoveLevel, onPatioChange, onMoveWindow, onMoveDoor, onSelectPerimeter, onSelectStatue, onMoveStatue }: {
   levels: BuildingLevel[];
@@ -175,6 +173,49 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
           const colMat=new THREE.MeshStandardMaterial({color:0xd9d4cc,roughness:.75});
           for(const side of [-1,1]){const col=new THREE.Mesh(new THREE.CylinderGeometry(.08,.1,dh,10),colMat.clone());if(door.face==="front"||door.face==="back")col.position.set(mesh.position.x+side*(dw*.72),y,mesh.position.z+(door.face==="front"?.08:-.08));else col.position.set(mesh.position.x+(door.face==="right"?.08:-.08),y,mesh.position.z+side*(dw*.72));lg.add(col);}
         }
+      }
+      // Architectural detail system: references supplied for arches, classical/Gothic columns,
+      // pediments, stairs and ornamental trim are rendered as procedural 3D pieces.
+      const detailMat=()=>new THREE.MeshStandardMaterial({color:color,roughness:.7,metalness:level.material==="bronze"||level.material==="gold"?.45:.03});
+      const facePlace=(face:WallFace,u:number,y:number,out:number)=>{
+        if(face==="front"||face==="back") return {x:u*(w*.38),y,z:face==="front"?d/2+out:-d/2-out,rot:face==="back"?Math.PI:0};
+        return {x:face==="right"?w/2+out:-w/2-out,y,z:u*(d*.38),rot:face==="right"?Math.PI/2:-Math.PI/2};
+      };
+      for(const col of level.columns||[]){
+        const pos=facePlace(col.face,col.u,baseY+h*.48,.13),ch=h*.9;
+        const cg=col.style==="square"?new THREE.BoxGeometry(.28,ch,.28):new THREE.CylinderGeometry(col.style==="corinthian"||col.style==="composite"?.18:.14,.17,ch,col.style==="fluted"?20:14);
+        const cm=new THREE.Mesh(cg,detailMat());cm.position.set(pos.x,pos.y,pos.z);cm.rotation.y=pos.rot;lg.add(cm);
+        const cap=new THREE.Mesh(new THREE.BoxGeometry(.42,.16,.42),detailMat());cap.position.set(pos.x,baseY+h*.93,pos.z);cap.rotation.y=pos.rot;lg.add(cap);
+        const foot=new THREE.Mesh(new THREE.CylinderGeometry(.22,.25,.12,16),detailMat());foot.position.set(pos.x,baseY+.08,pos.z);lg.add(foot);
+        if(col.style==="twisted") cm.rotation.y+=Math.PI/4;
+      }
+      for(const arch of level.arches||[]){
+        const pos=facePlace(arch.face,arch.u,baseY+h*.55,.15);
+        const pointed=["pointed","three-pointed","pointed-segmental","lancet","ogee","oriental","pointed-trefoil","pointed-cinquefoil"].includes(arch.style);
+        const wide=["segmental","three-centered","four-centered","tudor","venetian","florentine"].includes(arch.style);
+        const radius=wide?.8:.62;
+        const ag=new THREE.TorusGeometry(radius,.09,8,28,Math.PI);
+        const am=new THREE.Mesh(ag,detailMat());am.position.set(pos.x,pos.y,pos.z);am.rotation.z=Math.PI;am.rotation.y=pos.rot;
+        if(pointed) am.scale.set(1,.72,1);
+        if(arch.style==="horseshoe"||arch.style==="keyhole") am.scale.set(.85,1.12,1);
+        lg.add(am);
+        for(const side of [-1,1]){const leg=new THREE.Mesh(new THREE.BoxGeometry(.12,h*.48,.14),detailMat());const offset=side*radius;if(arch.face==="front"||arch.face==="back")leg.position.set(pos.x+offset,baseY+h*.31,pos.z);else leg.position.set(pos.x,baseY+h*.31,pos.z+offset);lg.add(leg);}
+      }
+      for(const trim of level.trims||[]){
+        const pos=facePlace(trim.face,0,trim.style==="base"?baseY+.12:trim.style==="crown"||trim.style==="dentils"||trim.style==="frieze"?baseY+h-.16:baseY+h*.72,.11);
+        const len=(trim.face==="front"||trim.face==="back")?w:d;
+        const tg=new THREE.BoxGeometry(len,trim.style==="frieze"?.28:.12,.12);
+        const tm=new THREE.Mesh(tg,detailMat());tm.position.set(pos.x,pos.y,pos.z);tm.rotation.y=pos.rot;lg.add(tm);
+        if(["dentils","greek-fret","acanthus","rosette"].includes(trim.style)){for(let k=-4;k<=4;k++){const deco=new THREE.Mesh(new THREE.BoxGeometry(.12,.12,.08),detailMat());const du=k*len/10;if(trim.face==="front"||trim.face==="back")deco.position.set(du,pos.y-.13,pos.z);else deco.position.set(pos.x,pos.y-.13,du);lg.add(deco);}}
+      }
+      for(const stair of level.stairs||[]){
+        const pos=facePlace(stair.face,stair.u,baseY,.22),sw=stair.style==="wide"||stair.style==="split"?1.8:1.15;
+        for(let k=0;k<5;k++){const step=new THREE.Mesh(new THREE.BoxGeometry(sw,.12,.34+k*.12),detailMat());const outward=.28+k*.13;step.position.set(pos.x,baseY+.06+k*.1,pos.z);if(stair.face==="front")step.position.z+=outward;else if(stair.face==="back")step.position.z-=outward;else if(stair.face==="right")step.position.x+=outward;else step.position.x-=outward;step.rotation.y=pos.rot;lg.add(step);}
+      }
+      for(const ped of level.pediments||[]){
+        const pos=facePlace(ped.face,ped.u,baseY+h*.9,.17),pw=1.55;
+        if(ped.style==="segmental"||ped.style==="broken-segmental"||ped.style==="swan-neck"){const pg=new THREE.TorusGeometry(pw/2,.1,8,24,Math.PI);const pm=new THREE.Mesh(pg,detailMat());pm.position.set(pos.x,pos.y,pos.z);pm.rotation.z=Math.PI;pm.rotation.y=pos.rot;lg.add(pm);}
+        else {for(const side of [-1,1]){const bar=new THREE.Mesh(new THREE.BoxGeometry(pw*.58,.11,.13),detailMat());bar.position.set(pos.x+(ped.face==="front"||ped.face==="back"?side*.34:0),pos.y+.22,pos.z+(ped.face==="left"||ped.face==="right"?side*.34:0));bar.rotation.y=pos.rot;bar.rotation.z=side*.5;lg.add(bar);}}
       }
       baseY+=h;
       if(index>0){
