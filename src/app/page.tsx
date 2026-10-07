@@ -54,7 +54,7 @@ export default function TempleBuilderPage() {
   const [selectedLevel, setSelectedLevel] = useState(0);
   const [selectedFace, setSelectedFace] = useState<WallFace | null>(null);
   const [detailCategory, setDetailCategory] = useState<"levels"|"windows"|"doors"|"trim"|"columns"|"arches"|"stairs"|"roof"|"material"|null>(null);
-  const [panel, setPanel] = useState<"walls" | "buildings" | "fountains" | "statues" | "stairs" | "more" | "edit" | null>("buildings");
+  const [panel, setPanel] = useState<"add" | "walls" | "buildings" | "fountains" | "statues" | "stairs" | "more" | "edit" | null>(null);
 
   const chooseShape = (next: BuildingShape) => {
     setShape(next);
@@ -75,7 +75,7 @@ export default function TempleBuilderPage() {
     setHeight(22);
     setLevels([{ id: "level-1", shape: next, material, width: next === "wide" ? 46 : next === "courtyard" ? 46 : next === "oval" ? 42 : next === "u-shape" ? 42 : next === "horseshoe" || next === "x-shape" || next === "t-shape" || next === "cross" ? 40 : next === "l-shape" ? 38 : next === "star" || next === "six-star" || next === "circle" || next === "triangle" || next === "hexagon" || next === "diamond" || next === "ring" ? 36 : next === "square" || next === "octagon" || next === "rotunda" ? 28 : 34, depth: next === "wide" ? 24 : next === "courtyard" ? 40 : next === "horseshoe" || next === "x-shape" ? 38 : next === "u-shape" || next === "star" || next === "six-star" || next === "circle" || next === "hexagon" || next === "ring" ? 36 : next === "l-shape" || next === "t-shape" || next === "triangle" || next === "diamond" ? 34 : next === "oval" ? 30 : next === "cross" ? 40 : next === "square" || next === "octagon" || next === "rotunda" ? 28 : 26, height: 22, roof: "flat", patio: false, x: 0, z: 0, rotation: 0, windows: [], doors: [] }]);
     setSelectedLevel(0);
-    setPanel(null);
+    setPanel("edit");
     setDetailCategory(null);
   };
 
@@ -107,14 +107,36 @@ export default function TempleBuilderPage() {
       )}
 
       <div className="absolute inset-x-0 bottom-0 z-30 rounded-t-[28px] border-t border-white/10 bg-[#111820]/95 pb-[max(10px,env(safe-area-inset-bottom))] shadow-2xl backdrop-blur">
-        <div className="flex gap-1 overflow-x-auto p-2">
-          {(["walls","buildings","fountains","statues","stairs","more"] as const).map((item) => (
-            <button key={item} onClick={()=>{setPanel(panel===item?null:item);if(item==="walls")setWallStep(perimeter?"features":"main");}}
-              className={`shrink-0 rounded-xl px-4 py-3 text-xs font-medium capitalize ${panel===item ? "bg-amber-200 text-black" : "text-white/65"}`}>
-              {item}
-            </button>
-          ))}
+        <div className="flex items-center gap-2 p-2">
+          {panel === null && (
+            <button onClick={()=>setPanel("add")} className="w-full rounded-2xl bg-amber-200 px-5 py-3 text-sm font-semibold text-black">＋ Add</button>
+          )}
+          {panel !== null && panel !== "edit" && (
+            <>
+              <button onClick={()=>setPanel(panel==="add"?null:"add")} className="shrink-0 rounded-xl bg-white/10 px-4 py-3 text-xs">{panel==="add"?"Done":"‹ Add"}</button>
+              <div className="min-w-0 flex-1 truncate text-sm font-semibold capitalize text-white/80">{panel==="add"?"Choose what to add":panel}</div>
+              <button onClick={()=>setPanel(null)} className="shrink-0 rounded-xl bg-white/10 px-4 py-3 text-xs">Close</button>
+            </>
+          )}
+          {panel === "edit" && (
+            <>
+              <div className="min-w-0 flex-1 truncate text-sm font-semibold text-white/80">Edit Building</div>
+              <button onClick={()=>{setDetailCategory(null);setPanel(null)}} className="shrink-0 rounded-xl bg-white/10 px-4 py-3 text-xs">Done</button>
+            </>
+          )}
         </div>
+        {panel === "add" && (
+          <div className="grid grid-cols-3 gap-2 border-t border-white/10 px-3 py-3">
+            {([
+              ["buildings","Building","▣"],["walls","Walls","⬡"],["fountains","Fountain","◉"],
+              ["statues","Statue","♟"],["stairs","Stairs","▤"],["more","More","＋"]
+            ] as const).map(([id,name,icon])=>(
+              <button key={id} onClick={()=>{setPanel(id);if(id==="walls")setWallStep(perimeter?"features":"main");}} className="rounded-2xl border border-white/10 bg-white/5 p-3 text-center">
+                <div className="text-xl text-amber-200">{icon}</div><div className="mt-1 text-xs font-medium">{name}</div>
+              </button>
+            ))}
+          </div>
+        )}
         {panel === "edit" && shape && levels[selectedLevel] && (
           <div className="border-t border-white/10">
             {!detailCategory && <div className="flex gap-2 overflow-x-auto px-3 py-3">
