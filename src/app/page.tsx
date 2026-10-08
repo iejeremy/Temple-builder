@@ -73,6 +73,36 @@ export default function TempleBuilderPage() {
   const [detailCategory, setDetailCategory] = useState<"levels"|"windows"|"doors"|"trim"|"columns"|"arches"|"stairs"|"pediments"|"roof"|"material"|null>(null);
   const [panel, setPanel] = useState<"add" | "walls" | "buildings" | "fountains" | "statues" | "stairs" | "more" | "edit" | null>(null);
 
+
+  const addTemplate = (kind: number) => {
+    const make = (shape:BuildingShape, material:BuilderMaterial, width:number, depth:number, height:number, x:number, z:number, elevation=0, roof:RoofStyle="flat"):BuildingLevel => ({
+      id:`template-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,shape,material,width,depth,height,x,z,elevation,roof,rotation:0,patio:false,
+      windows:[],doors:[],arches:[],columns:[],trims:[],stairs:[],pediments:[]
+    });
+    const front=(level:BuildingLevel,style:DoorStyle="temple")=>{level.doors.push({id:`door-${level.id}`,face:"front",u:0,width:1.8,height:2.3,style});};
+    const stairs=(level:BuildingLevel)=>{level.stairs.push({id:`stairs-${level.id}`,face:"front",u:0,style:"wide"});};
+    const pillars=(level:BuildingLevel,style:ColumnStyle)=>{for(const face of ["front","back"] as WallFace[])for(const u of [-.7,-.35,.35,.7])level.columns.push({id:`column-${level.id}-${face}-${u}`,face,u,style});};
+    let parts:BuildingLevel[]=[];
+    if(kind===0){ // Mayan stepped pyramid and summit shrine
+      parts=[make("square","limestone",62,62,12,0,0),make("square","limestone",48,48,9,0,0,12),make("square","limestone",34,34,8,0,0,21),make("rectangle","stone",22,19,17,0,0,29,"flat")];front(parts[3],"carved-stone");stairs(parts[0]);
+    }else if(kind===1){ // Egyptian entrance, court and sanctuary
+      parts=[make("courtyard","sandstone",60,48,13,0,0),make("wide","sandstone",50,22,18,0,-5),make("rectangle","sandstone",24,20,22,0,-9),make("square","sandstone",16,18,30,-4,7),make("square","sandstone",16,18,30,4,7)];pillars(parts[1],"square");front(parts[2]);
+    }else if(kind===2){ // Hindu mandapa and tiered shikhara
+      parts=[make("wide","sandstone",40,25,17,0,5),make("square","stone",25,25,26,0,-3,0,"tiered"),make("square","stone",19,19,14,0,-3,26,"tiered"),make("octagon","gold",8,8,7,0,-3,40,"dome")];front(parts[0]);pillars(parts[0],"twisted");
+    }else if(kind===3){ // Greek colonnaded marble temple
+      parts=[make("rectangle","marble",49,28,23,0,0,0,"pyramid")];front(parts[0],"portico");pillars(parts[0],"corinthian");stairs(parts[0]);parts[0].pediments.push({id:"greek-pediment",face:"front",u:0,style:"triangular"});
+    }else if(kind===4){ // Gothic nave, transept and twin towers
+      parts=[make("wide","stone",62,25,31,0,0,0,"steeple"),make("cross","stone",32,32,30,0,-2,0,"steeple"),make("square","stone",17,17,44,-5,5,0,"steeple"),make("square","stone",17,17,44,5,5,0,"steeple")];front(parts[0],"grand-arch");for(const p of parts.slice(0,2))pillars(p,"gothic");parts[0].windows.push({id:"rose-window",face:"front",u:0,v:.75,width:2,height:2,style:"rose"});
+    }else{ // Echoes original: rotunda, four wings and court
+      parts=[make("rotunda","marble",32,32,29,0,0,0,"dome"),make("wide","marble",40,19,18,0,5),make("wide","marble",40,19,18,0,-5),make("rectangle","marble",19,37,18,5,0),make("rectangle","marble",19,37,18,-5,0),make("courtyard","travertine",44,38,9,0,10)];front(parts[1]);pillars(parts[1],"ionic");
+    }
+    // Existing work is never replaced: templates are added to the property.
+    setLevels(current=>[...current,...parts]);
+    setShape(parts[0].shape);
+    setSelectedLevel(levels.length);
+    setSelectedFace(null);setDetailCategory(null);setPanel("edit");
+  };
+
   const chooseShape = (next: BuildingShape) => {
     const dims: Record<BuildingShape,[number,number]> = {
       square:[28,28], rectangle:[34,26], wide:[46,24], "l-shape":[38,34], "t-shape":[40,34],
@@ -170,6 +200,17 @@ export default function TempleBuilderPage() {
             </>
           )}
         </div>
+        {panel === "buildings" && (
+          <div className="border-t border-white/10 px-3 py-3">
+            <div className="mb-2 text-xs text-white/70">Architectural templates · tap to add to your site</div>
+            <div className="grid grid-cols-2 gap-2">
+              {["Temple of the Sun · Maya","Eternal Courtyard · Egypt","Celestial Shrine · Hindu","Marble Pantheon · Greek","Cathedral of Echoes · Gothic","Temple of Unity · Echoes"].map((name,i)=>(
+                <button key={name} onClick={()=>addTemplate(i)} className="rounded-xl border border-amber-200/30 bg-white/10 p-3 text-left text-xs text-white">{name}<span className="mt-1 block text-[10px] text-amber-200">Add 3D template</span></button>
+              ))}
+            </div>
+            <button onClick={()=>setPanel("add")} className="mt-3 rounded-xl bg-white/10 px-4 py-2 text-xs">Back to Add</button>
+          </div>
+        )}
         {panel === "add" && (
           <div className="grid grid-cols-3 gap-2 border-t border-white/10 px-3 py-3">
             {([
