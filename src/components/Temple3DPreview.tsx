@@ -4,7 +4,23 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import type { BuildingLevel, RoofStyle, WallFace, Perimeter, BuilderMaterial, Statue } from "@/app/page";
 
-const COLORS: Record<BuilderMaterial, number> = { marble:0xd9d4cc,sandstone:0xb98b5b,limestone:0xc6b898,obsidian:0x25262b,granite:0x77777b,travertine:0xc8ad87,brick:0x8b4938,stone:0x77736b,concrete:0x92908a,stucco:0xd8ccb8,plaster:0xe0d9ca,timber:0x765137,bronze:0x7f5d3f,gold:0xb8912f };
+const COLORS: Record<BuilderMaterial, number> = { marble:0xe7e2da,sandstone:0xb98b5b,limestone:0xcbbd9d,obsidian:0x17191d,granite:0x62636a,travertine:0xc7a77d,brick:0x884838,stone:0x77736b,concrete:0x92908a,stucco:0xd8ccb8,plaster:0xe0d9ca,timber:0x70472f,bronze:0x8a5b32,gold:0xc39a36 };
+
+const MATERIAL_PROPS: Record<BuilderMaterial,{roughness:number;metalness:number}> = {
+  marble:{roughness:.34,metalness:0}, sandstone:{roughness:.92,metalness:0}, limestone:{roughness:.82,metalness:0},
+  obsidian:{roughness:.22,metalness:.03}, granite:{roughness:.62,metalness:0}, travertine:{roughness:.86,metalness:0},
+  brick:{roughness:.94,metalness:0}, stone:{roughness:.9,metalness:0}, concrete:{roughness:.96,metalness:0},
+  stucco:{roughness:.98,metalness:0}, plaster:{roughness:.84,metalness:0}, timber:{roughness:.72,metalness:0},
+  bronze:{roughness:.3,metalness:.86}, gold:{roughness:.24,metalness:.95}
+};
+const makeMaterial=(kind:BuilderMaterial,color=COLORS[kind],selected=false)=>{
+  const p=MATERIAL_PROPS[kind];
+  return new THREE.MeshStandardMaterial({
+    color:selected?new THREE.Color(color).offsetHSL(0,0,.06):color,
+    roughness:p.roughness, metalness:p.metalness,
+    emissive:selected?0x211b08:0x000000, emissiveIntensity:selected?.1:0
+  });
+};
 
 export default function Temple3DPreview({ levels, perimeter, statues, selectedStatueId, selectedLevel, onSelectLevel, onSelectFace, onMoveLevel, onPatioChange, onMoveWindow, onMoveDoor, onMoveArch, onMoveDetail, onResizePerimeter, onSelectDetail, onSelectPerimeter, onSelectStatue, onMoveStatue }: {
   levels: BuildingLevel[];
@@ -52,7 +68,12 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
     const host=hostRef.current; if(!host) return;
     const scene=new THREE.Scene(); scene.background=new THREE.Color(0xb9c4cb); scene.fog=new THREE.Fog(0xb9c4cb,24,44);
     const camera=new THREE.PerspectiveCamera(42,1,.1,100);
-    const renderer=new THREE.WebGLRenderer({antialias:false,alpha:false,powerPreference:"default"}); renderer.setPixelRatio(1); host.appendChild(renderer.domElement);
+    const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:"high-performance"});
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+    renderer.outputColorSpace=THREE.SRGBColorSpace;
+    renderer.toneMapping=THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure=1.05;
+    host.appendChild(renderer.domElement);
     scene.add(new THREE.HemisphereLight(0xffffff,0x6f6b5e,2));
     const sun=new THREE.DirectionalLight(0xffffff,2.2); sun.position.set(8,12,7); scene.add(sun);
     const ground=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.MeshStandardMaterial({color:0x878777,roughness:1}));
@@ -89,7 +110,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
     let baseY=0;
 
     const addRoof=(parent:THREE.Group,roof:RoofStyle,rw:number,rd:number,x:number,z:number,top:number,color:number)=>{
-      const roofMat=()=>new THREE.MeshStandardMaterial({color,roughness:.7});
+      const roofMat=()=>new THREE.MeshStandardMaterial({color,roughness:.58,metalness:0});
       const add=(g:THREE.BufferGeometry,px:number,py:number,pz:number)=>{const m=new THREE.Mesh(g,roofMat());m.position.set(px,py,pz);parent.add(m);};
       if(roof==="none")return;
       if(roof==="flat"){add(new THREE.BoxGeometry(rw+.22,.18,rd+.22),x,top+.09,z);return;}
@@ -103,7 +124,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
       const lg=new THREE.Group();lg.userData.levelIndex=index;lg.position.set(level.x||0,0,level.z||0);lg.rotation.y=THREE.MathUtils.degToRad(level.rotation||0);group.add(lg);levelGroupsRef.current.push(lg);
       const w=level.width/7,d=level.depth/7,h=level.height/7,color=COLORS[level.material];
       const selected=index===selectedLevel;
-      const mat=()=>new THREE.MeshStandardMaterial({color:selected?new THREE.Color(color).offsetHSL(0,0,.08):color,roughness:.78,emissive:selected?0x2b2410:0x000000,emissiveIntensity:selected?.16:0});
+      const mat=()=>makeMaterial(level.material,color,selected);
       const add=(g:THREE.BufferGeometry,x:number,y:number,z:number)=>{const m=new THREE.Mesh(g,mat());m.position.set(x,y,z);lg.add(m);};
       const box=(rw:number,rh:number,rd:number,x:number,y:number,z:number)=>add(new THREE.BoxGeometry(rw,rh,rd),x,y,z);
       const parts:Array<[number,number,number,number]>=level.shape==="l-shape"?[[w*.42,d,-w*.29,0],[w*.72,d*.42,w*.14,d*.29]]:level.shape==="t-shape"?[[w,d*.38,0,d*.30],[w*.36,d*.76,0,-d*.12]]:level.shape==="u-shape"?[[w*.28,d,-w*.36,0],[w*.28,d,w*.36,0],[w*.72,d*.28,0,-d*.36]]:level.shape==="cross"?[[w*.34,d,0,0],[w,d*.34,0,0]]:level.shape==="x-shape"?[[w*.28,d,0,0],[w,d*.28,0,0]]:level.shape==="horseshoe"?[[w*.25,d,-w*.38,0],[w*.25,d,w*.38,0],[w*.75,d*.26,0,-d*.37]]:level.shape==="courtyard"?[[w,d*.24,0,-d*.38],[w,d*.24,0,d*.38],[w*.24,d*.58,-w*.38,0],[w*.24,d*.58,w*.38,0]]:[[w,d,0,0]];
@@ -184,7 +205,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
       }
       // Architectural detail system: references supplied for arches, classical/Gothic columns,
       // pediments, stairs and ornamental trim are rendered as procedural 3D pieces.
-      const detailMat=()=>new THREE.MeshStandardMaterial({color:color,roughness:.7,metalness:(level.material==="bronze"||level.material==="gold") ? .45 : .03});
+      const detailMat=()=>makeMaterial(level.material,color,false);
       const facePlace=(face:WallFace,u:number,y:number,out:number)=>{
         if(face==="front"||face==="back") return {x:u*(w*.38),y,z:face==="front"?d/2+out:-d/2-out,rot:face==="back"?Math.PI:0};
         return {x:face==="right"?w/2+out:-w/2-out,y,z:u*(d*.38),rot:face==="right"?Math.PI/2:-Math.PI/2};
@@ -249,7 +270,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
     perimeterGroupRef.current=null;
     if(perimeter && levels.length){
       const pg=new THREE.Group();pg.userData.perimeter=true;group.add(pg);perimeterGroupRef.current=pg;
-      const mat=new THREE.MeshStandardMaterial({color:COLORS[perimeter.material],roughness:.78});
+      const mat=makeMaterial(perimeter.material);
       const addWall=(len:number,x:number,z:number,rot:number)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(len,perimeter.height,perimeter.thickness),mat.clone());m.position.set(x,perimeter.height/2,z);m.rotation.y=rot;pg.add(m);};
       const maxW=Math.max(...levels.map(l=>l.width/7+Math.abs(l.x||0)*2))+perimeter.margin*2;
       const maxD=Math.max(...levels.map(l=>l.depth/7+Math.abs(l.z||0)*2))+perimeter.margin*2;
