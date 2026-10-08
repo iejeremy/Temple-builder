@@ -79,10 +79,16 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
     renderer.outputColorSpace=THREE.SRGBColorSpace;
     renderer.toneMapping=THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure=1.05;
+    renderer.shadowMap.enabled=true;
+    renderer.shadowMap.type=THREE.PCFSoftShadowMap;
     host.appendChild(renderer.domElement);
     scene.add(new THREE.HemisphereLight(0xffffff,0x6f6b5e,2));
-    const sun=new THREE.DirectionalLight(0xffffff,2.2); sun.position.set(8,12,7); scene.add(sun);
-    const ground=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.MeshStandardMaterial({color:0x878777,roughness:1}));
+    const sun=new THREE.DirectionalLight(0xfff4df,2.35); sun.position.set(8,12,7); sun.castShadow=true;
+    sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.near=.5;sun.shadow.camera.far=42;
+    sun.shadow.camera.left=-14;sun.shadow.camera.right=14;sun.shadow.camera.top=14;sun.shadow.camera.bottom=-14;
+    sun.shadow.bias=-.00035;scene.add(sun);
+    const fill=new THREE.DirectionalLight(0xbfd7ff,.55);fill.position.set(-7,6,-5);scene.add(fill);
+    const ground=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.MeshStandardMaterial({color:0x878777,roughness:1}));ground.receiveShadow=true;
     ground.rotation.x=-Math.PI/2; scene.add(ground);
     const grid=new THREE.GridHelper(40,24,0x66685e,0x7b7d70); grid.position.y=.01; scene.add(grid);
     const group=new THREE.Group(); scene.add(group);
@@ -115,6 +121,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
     levelGroupsRef.current=[];
     let baseY=0;
 
+    const enableShadows=(root:THREE.Object3D)=>root.traverse(o=>{if(o instanceof THREE.Mesh){o.castShadow=true;o.receiveShadow=true;}});
     const addRoof=(parent:THREE.Group,roof:RoofStyle,rw:number,rd:number,x:number,z:number,top:number,color:number)=>{
       const roofMat=()=>new THREE.MeshStandardMaterial({color,roughness:.58,metalness:0});
       const add=(g:THREE.BufferGeometry,px:number,py:number,pz:number)=>{const m=new THREE.Mesh(g,roofMat());m.position.set(px,py,pz);parent.add(m);};
@@ -286,6 +293,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
       if(perimeter.towers){const towerMat=mat.clone();points.forEach(([x,z])=>{const r=.38;let g:THREE.BufferGeometry;if(perimeter.towerShape==="square")g=new THREE.BoxGeometry(.8,perimeter.height*1.5,.8);else if(perimeter.towerShape==="star"){const sh=new THREE.Shape();for(let i=0;i<10;i++){const rr=i%2===0?r:r*.48,a=-Math.PI/2+i*Math.PI/5;i?sh.lineTo(Math.cos(a)*rr,Math.sin(a)*rr):sh.moveTo(Math.cos(a)*rr,Math.sin(a)*rr);}sh.closePath();g=new THREE.ExtrudeGeometry(sh,{depth:perimeter.height*1.5,bevelEnabled:false});g.rotateX(Math.PI/2);g.translate(0,perimeter.height*1.5,0);}else g=new THREE.CylinderGeometry(r,r,perimeter.height*1.5,perimeter.towerShape==="octagon"?8:perimeter.towerShape==="hexagon"?6:20);const t=new THREE.Mesh(g,towerMat.clone());t.position.set(x,perimeter.towerShape==="star"?0:perimeter.height*.75,z);pg.add(t);});}
       if(perimeter.columns||perimeter.arches){const frontZ=Math.max(...points.map(p=>p[1]));for(const x of [-1.1,1.1]){if(perimeter.columns){const col=new THREE.Mesh(new THREE.CylinderGeometry(.12,.15,perimeter.height*1.1,12),mat.clone());col.position.set(x,perimeter.height*.55,frontZ);pg.add(col);}}if(perimeter.arches){const arch=new THREE.Mesh(new THREE.TorusGeometry(.75,.12,8,20,Math.PI),mat.clone());arch.rotation.z=Math.PI;arch.position.set(0,perimeter.height*.78,frontZ);pg.add(arch);}}
     }
+    enableShadows(group);if(perimeterGroupRef.current)enableShadows(perimeterGroupRef.current);statueGroupsRef.current.forEach(enableShadows);
     const o=orbitRef.current;camera.position.set(Math.sin(o.theta)*Math.sin(o.phi)*o.radius,Math.cos(o.phi)*o.radius,Math.cos(o.theta)*Math.sin(o.phi)*o.radius);camera.lookAt(0,targetYRef.current,0);renderer.render(scene,camera);
   },[levels,perimeter,statues,selectedStatueId,selectedLevel]);
 
