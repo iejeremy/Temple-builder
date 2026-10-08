@@ -117,9 +117,17 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
 
   useEffect(()=>{
     const group=groupRef.current,scene=sceneRef.current,renderer=rendererRef.current,camera=cameraRef.current;if(!group||!scene||!renderer||!camera)return;
-    const totalWorldHeight=levels.reduce((sum,l)=>sum+l.height/7,0);
-    targetYRef.current=Math.max(1.4,totalWorldHeight*.52);
-    orbitRef.current.radius=Math.max(orbitRef.current.radius,Math.min(24,10+totalWorldHeight*.72));
+    // Frame the actual structures, not the sum of unrelated ground-floor wings.
+    const minX=Math.min(0,...levels.map(l=>l.x-l.width/14));
+    const maxX=Math.max(0,...levels.map(l=>l.x+l.width/14));
+    const minZ=Math.min(0,...levels.map(l=>l.z-l.depth/14));
+    const maxZ=Math.max(0,...levels.map(l=>l.z+l.depth/14));
+    const top=Math.max(2.8,...levels.map(l=>((l.elevation||0)+l.height)/7));
+    const centerX=(minX+maxX)/2,centerZ=(minZ+maxZ)/2;
+    targetYRef.current=top*.46;
+    const span=Math.max(maxX-minX,maxZ-minZ,top);
+    orbitRef.current.radius=Math.max(orbitRef.current.radius,Math.min(35,span*1.65+5));
+    const cameraFocusX=centerX,cameraFocusZ=centerZ;
     while(group.children.length){const o=group.children.pop()!;o.traverse(child=>{if(child instanceof THREE.Mesh){child.geometry.dispose();const m=child.material;if(Array.isArray(m))m.forEach(x=>x.dispose());else m.dispose();}});}
     levelGroupsRef.current=[];
     let baseY=0;
@@ -297,7 +305,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
       if(perimeter.columns||perimeter.arches){const frontZ=Math.max(...points.map(p=>p[1]));for(const x of [-1.1,1.1]){if(perimeter.columns){const col=new THREE.Mesh(new THREE.CylinderGeometry(.12,.15,perimeter.height*1.1,12),mat.clone());col.position.set(x,perimeter.height*.55,frontZ);pg.add(col);}}if(perimeter.arches){const arch=new THREE.Mesh(new THREE.TorusGeometry(.75,.12,8,20,Math.PI),mat.clone());arch.rotation.z=Math.PI;arch.position.set(0,perimeter.height*.78,frontZ);pg.add(arch);}}
     }
     enableShadows(group);if(perimeterGroupRef.current)enableShadows(perimeterGroupRef.current);statueGroupsRef.current.forEach(enableShadows);
-    const o=orbitRef.current;const focus=new THREE.Vector3(0,targetYRef.current,0);camera.position.set(focus.x+Math.sin(o.theta)*Math.sin(o.phi)*o.radius,focus.y+Math.cos(o.phi)*o.radius,focus.z+Math.cos(o.theta)*Math.sin(o.phi)*o.radius);camera.lookAt(focus);renderer.render(scene,camera);
+    const o=orbitRef.current;const focus=new THREE.Vector3(cameraFocusX,targetYRef.current,cameraFocusZ);camera.position.set(focus.x+Math.sin(o.theta)*Math.sin(o.phi)*o.radius,focus.y+Math.cos(o.phi)*o.radius,focus.z+Math.cos(o.theta)*Math.sin(o.phi)*o.radius);camera.lookAt(focus);renderer.render(scene,camera);
   },[levels,perimeter,statues,selectedStatueId,selectedLevel]);
 
   return <div ref={hostRef} className="absolute inset-0"><div className="pointer-events-none absolute bottom-[128px] left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-2 text-xs text-white/70">Drag to look around • pinch wall to resize • pinch empty space to zoom</div></div>;
