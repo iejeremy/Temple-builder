@@ -23,7 +23,7 @@ export type StairStyle = "straight"|"wide"|"curved"|"spiral"|"split"|"corner";
 export type PedimentStyle = "straight"|"triangular"|"segmental"|"broken-triangular"|"broken-segmental"|"swan-neck"|"stepped"|"ornate";
 export type ArchAttachment = { id:string; face:WallFace; u:number; style:ArchStyle; };
 export type ColumnAttachment = { id:string; face:WallFace; u:number; style:ColumnStyle; };
-export type TrimAttachment = { id:string; face:WallFace; style:TrimStyle; };
+export type TrimAttachment = { id:string; face:WallFace; u:number; style:TrimStyle; };
 export type StairAttachment = { id:string; face:WallFace; u:number; style:StairStyle; };
 export type PedimentAttachment = { id:string; face:WallFace; u:number; style:PedimentStyle; };
 export type PerimeterStyle = "rectangle"|"circle"|"octagon"|"star";
@@ -110,6 +110,15 @@ export default function TempleBuilderPage() {
         onMoveWindow={(levelIndex,id,u,v) => setLevels(current => current.map((l,i)=>i===levelIndex?{...l,windows:l.windows.map(win=>win.id===id?{...win,u,v}:win)}:l))}
         onMoveDoor={(levelIndex,id,u) => setLevels(current => current.map((l,i)=>i===levelIndex?{...l,doors:l.doors.map(door=>door.id===id?{...door,u}:door)}:l))}
         onMoveArch={(levelIndex,id,u) => setLevels(current => current.map((l,i)=>i===levelIndex?{...l,arches:l.arches.map(arch=>arch.id===id?{...arch,u}:arch)}:l))}
+        onMoveDetail={(levelIndex,category,id,u,v) => setLevels(current => current.map((l,i)=>{
+          if(i!==levelIndex) return l;
+          if(category==="windows") return {...l,windows:l.windows.map(x=>x.id===id?{...x,u,v:v??x.v}:x)};
+          if(category==="columns") return {...l,columns:l.columns.map(x=>x.id===id?{...x,u}:x)};
+          if(category==="stairs") return {...l,stairs:l.stairs.map(x=>x.id===id?{...x,u}:x)};
+          if(category==="pediments") return {...l,pediments:l.pediments.map(x=>x.id===id?{...x,u}:x)};
+          if(category==="trim") return {...l,trims:l.trims.map(x=>x.id===id?{...x,u}:x)};
+          return l;
+        }))}
         onResizePerimeter={(margin)=>setPerimeter(p=>p?{...p,margin}:p)}
         onSelectPerimeter={()=>{setPanel("walls");setWallStep("features");}}
         onSelectStatue={(id)=>{setSelectedStatueId(id);setPanel("statues");}}
