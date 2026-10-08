@@ -10,10 +10,12 @@ const hash=(x:number,y:number,seed:number)=>{
   n=Math.imul(n^(n>>>13),1274126177);
   return ((n^(n>>>16))>>>0)/4294967295;
 };
-const tileNoise=(x:number,y:number,scale:number,seed:number)=>{
-  const u=x/scale,v=y/scale,x0=Math.floor(u),y0=Math.floor(v);
+const tileNoise=(x:number,y:number,cellSize:number,seed:number)=>{
+  // Repeat the lattice over the 256px tile so no seam appears at UV boundaries.
+  const cells=256/cellSize;
+  const u=x/cellSize,v=y/cellSize,x0=Math.floor(u),y0=Math.floor(v);
   const fx=u-x0,fy=v-y0,tx=fx*fx*(3-2*fx),ty=fy*fy*(3-2*fy);
-  const wrap=(a:number)=>((a%scale)+scale)%scale;
+  const wrap=(a:number)=>((a%cells)+cells)%cells;
   const a=hash(wrap(x0),wrap(y0),seed),b=hash(wrap(x0+1),wrap(y0),seed);
   const c=hash(wrap(x0),wrap(y0+1),seed),d=hash(wrap(x0+1),wrap(y0+1),seed);
   return (a+(b-a)*tx)*(1-ty)+(c+(d-c)*tx)*ty;
@@ -35,7 +37,7 @@ function create(kind:BuilderMaterial){
   for(let y=0;y<size;y++)for(let x=0;x<size;x++){
     const i=(y*size+x)*4;
     const coarse=tileNoise(x,y,8,2),fine=tileNoise(x,y,64,8),grain=tileNoise(x,y,128,12);
-    const wave=Math.sin((x+y*.38)/size*Math.PI*8+coarse*5);
+    const wave=Math.sin((x/size)*Math.PI*8+(y/size)*Math.PI*4+coarse*5);
     const vein=isMarble?Math.pow(Math.max(0,wave*.5+.5),19)*(.45+fine*.55):0;
     const pits=isTravertine&&grain>.72?(grain-.72)*2.8:0;
     const variation=(coarse-.5)*(isGranite?95:kind==="sandstone"?48:22)+(fine-.5)*20-vein*95-pits*95;
