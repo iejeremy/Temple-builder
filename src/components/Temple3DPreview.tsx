@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import type { BuildingLevel, RoofStyle, WallFace, Perimeter, BuilderMaterial, Statue } from "@/app/page";
+import { getProceduralMaps } from "./builderMaterialMaps";
 
 const COLORS: Record<BuilderMaterial, number> = { marble:0xe7e2da,sandstone:0xb98b5b,limestone:0xcbbd9d,obsidian:0x17191d,granite:0x62636a,travertine:0xc7a77d,brick:0x884838,stone:0x77736b,concrete:0x92908a,stucco:0xd8ccb8,plaster:0xe0d9ca,timber:0x70472f,bronze:0x8a5b32,gold:0xc39a36 };
 
@@ -15,8 +16,13 @@ const MATERIAL_PROPS: Record<BuilderMaterial,{roughness:number;metalness:number}
 };
 const makeMaterial=(kind:BuilderMaterial,color=COLORS[kind],selected=false)=>{
   const p=MATERIAL_PROPS[kind];
+  const maps=getProceduralMaps(kind);
   return new THREE.MeshStandardMaterial({
-    color:selected?new THREE.Color(color).offsetHSL(0,0,.06):color,
+    color:maps?0xffffff:(selected?new THREE.Color(color).offsetHSL(0,0,.06):color),
+    map:maps?.color||null,
+    roughnessMap:maps?.roughness||null,
+    bumpMap:maps?.bump||null,
+    bumpScale:maps?(kind==="marble"?.012:.045):0,
     roughness:p.roughness, metalness:p.metalness,
     emissive:selected?0x211b08:0x000000, emissiveIntensity:selected?.1:0
   });
