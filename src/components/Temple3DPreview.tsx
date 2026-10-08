@@ -99,6 +99,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
     };
 
     levels.forEach((level,index)=>{
+      baseY=(level.elevation||0)/7;
       const lg=new THREE.Group();lg.userData.levelIndex=index;lg.position.set(level.x||0,0,level.z||0);lg.rotation.y=THREE.MathUtils.degToRad(level.rotation||0);group.add(lg);levelGroupsRef.current.push(lg);
       const w=level.width/7,d=level.depth/7,h=level.height/7,color=COLORS[level.material];
       const selected=index===selectedLevel;
@@ -224,10 +225,9 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
         if(ped.style==="segmental"||ped.style==="broken-segmental"||ped.style==="swan-neck"){const pg=new THREE.TorusGeometry(pw/2,.1,8,24,Math.PI);const pm=new THREE.Mesh(pg,detailMat());pm.position.set(pos.x,pos.y,pos.z);pm.rotation.z=Math.PI;pm.rotation.y=pos.rot;pm.userData.levelIndex=index;pm.userData.detailCategory="pediments";pm.userData.detailId=ped.id;pm.userData.detailFace=ped.face;lg.add(pm);}
         else {for(const side of [-1,1]){const bar=new THREE.Mesh(new THREE.BoxGeometry(pw*.58,.11,.13),detailMat());bar.position.set(pos.x+(ped.face==="front"||ped.face==="back"?side*.34:0),pos.y+.22,pos.z+(ped.face==="left"||ped.face==="right"?side*.34:0));bar.rotation.y=pos.rot;bar.rotation.z=side*.5;bar.userData.levelIndex=index;bar.userData.detailCategory="pediments";bar.userData.detailId=ped.id;bar.userData.detailFace=ped.face;lg.add(bar);}}
       }
-      baseY+=h;
-      if(index>0){
-        const below=levels[index-1];
-        const exposed=Math.abs(level.x||0)>.15||Math.abs(level.z||0)>.15||level.width<below.width-4||level.depth<below.depth-4;
+      if((level.elevation||0)>0){
+        const below=levels.filter((candidate,i)=>i!==index && (candidate.elevation||0)<(level.elevation||0)).sort((a,b)=>(b.elevation||0)-(a.elevation||0))[0];
+        const exposed=!!below&&(Math.abs((level.x||0)-(below.x||0))>.15||Math.abs((level.z||0)-(below.z||0))>.15||level.width<below.width-4||level.depth<below.depth-4);
         if(exposed!==level.patio) queueMicrotask(()=>onPatioChange?.(index,exposed));
       }
     });
