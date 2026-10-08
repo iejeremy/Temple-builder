@@ -81,6 +81,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
     renderer.toneMappingExposure=1.05;
     renderer.shadowMap.enabled=true;
     renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+    renderer.domElement.style.imageRendering="auto";
     host.appendChild(renderer.domElement);
     scene.add(new THREE.HemisphereLight(0xffffff,0x6f6b5e,2));
     const sun=new THREE.DirectionalLight(0xfff4df,2.35); sun.position.set(8,12,7); sun.castShadow=true;
@@ -88,6 +89,8 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
     sun.shadow.camera.left=-14;sun.shadow.camera.right=14;sun.shadow.camera.top=14;sun.shadow.camera.bottom=-14;
     sun.shadow.bias=-.00035;scene.add(sun);
     const fill=new THREE.DirectionalLight(0xbfd7ff,.55);fill.position.set(-7,6,-5);scene.add(fill);
+    // Low-cost hemisphere bounce keeps recesses readable without flattening the sun shadows.
+    const bounce=new THREE.HemisphereLight(0xdde8f2,0x554b3e,.32);scene.add(bounce);
     const ground=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.MeshStandardMaterial({color:0x878777,roughness:1}));ground.receiveShadow=true;
     ground.rotation.x=-Math.PI/2; scene.add(ground);
     const grid=new THREE.GridHelper(40,24,0x66685e,0x7b7d70); grid.position.y=.01; scene.add(grid);
