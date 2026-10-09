@@ -250,7 +250,7 @@ export default function TempleBuilderPage() {
                 {levels[selectedLevel].stairs.map((stair,i)=>(
                   <div key={stair.id} className="flex shrink-0 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs">
                     <span>Stairs {i+1} · {stair.face}</span>
-                    <button className="rounded-lg bg-amber-200 px-3 py-2 font-semibold text-black" onClick={()=>setLevels(v=>v.map((l,j)=>j===selectedLevel?{...l,stairs:l.stairs.map(t=>t.id===stair.id?{...t,rotation:((t.rotation||0)+90)%360}:t)}:l))}>Rotate 90° ↻</button>
+                    <button className="rounded-lg bg-amber-200 px-3 py-2 font-semibold text-black" onClick={()=>setLevels(v=>v.map((l,j)=>j===selectedLevel?{...l,stairs:l.stairs.map(t=>t.id===stair.id?{...t,face:({front:"right",right:"back",back:"left",left:"front"} as Record<WallFace,WallFace>)[t.face],rotation:0}:t)}:l))}>Rotate 90° ↻</button>
                   </div>
                 ))}
               </div>
