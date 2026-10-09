@@ -267,7 +267,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
       }
       for(const stair of level.stairs||[]){
         const pos=facePlace(stair.face,stair.u,baseY,.22),sw=stair.style==="wide"||stair.style==="split"?1.8:1.15;
-        for(let k=0;k<5;k++){const step=new THREE.Mesh(new THREE.BoxGeometry(sw,.12,.34+k*.12),detailMat());const outward=.28+k*.13;step.position.set(pos.x,baseY+.06+k*.1,pos.z);if(stair.face==="front")step.position.z+=outward;else if(stair.face==="back")step.position.z-=outward;else if(stair.face==="right")step.position.x+=outward;else step.position.x-=outward;step.rotation.y=pos.rot;step.userData.levelIndex=index;step.userData.detailCategory="stairs";step.userData.detailId=stair.id;step.userData.detailFace=stair.face;lg.add(step);}
+        for(let k=0;k<5;k++){const step=new THREE.Mesh(new THREE.BoxGeometry(sw,.12,.34+k*.12),detailMat());const outward=.28+k*.13;const angle=pos.rot+THREE.MathUtils.degToRad(stair.rotation||0);step.position.set(pos.x+Math.sin(angle)*outward,baseY+.06+k*.1,pos.z+Math.cos(angle)*outward);step.rotation.y=angle;step.userData.levelIndex=index;step.userData.detailCategory="stairs";step.userData.detailId=stair.id;step.userData.detailFace=stair.face;lg.add(step);}
       }
       for(const ped of level.pediments||[]){
         const pos=facePlace(ped.face,ped.u,baseY+h*.9,.17),pw=1.55;
