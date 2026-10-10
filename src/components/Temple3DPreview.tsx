@@ -53,7 +53,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
   const sceneRef = useRef<THREE.Scene|null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer|null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera|null>(null);
-  const orbitRef = useRef({ theta: .72, phi: .72, radius: 13, lastX: 0, lastY: 0, dragging: false, pinch: 0 });
+  const orbitRef = useRef({ theta: .72, phi: 1.25, radius: 13, lastX: 0, lastY: 0, dragging: false, pinch: 0 });
   const targetYRef = useRef(1.4);
   const cameraPanRef = useRef({x:0,y:0,z:0,manual:false});
   const cameraFocusRef = useRef({x:0,z:0});
@@ -127,7 +127,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
     const maxZ=Math.max(0,...levels.map(l=>l.z+l.depth/14));
     const top=Math.max(2.8,...levels.map(l=>((l.elevation||0)+l.height)/7));
     const centerX=(minX+maxX)/2,centerZ=(minZ+maxZ)/2;
-    targetYRef.current=top*.5;
+    // Always aim at the vertical center of the complete building, not the ground or roof.\n    targetYRef.current=top*.5;
     const span=Math.max(maxX-minX,maxZ-minZ,top);
     if(!cameraPanRef.current.manual)orbitRef.current.radius=Math.max(orbitRef.current.radius,Math.min(35,span*1.65+5));
     cameraFocusRef.current={x:centerX,z:centerZ};
