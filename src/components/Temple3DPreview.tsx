@@ -129,7 +129,18 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
     const centerX=(minX+maxX)/2,centerZ=(minZ+maxZ)/2;
     // Always aim at the vertical center of the complete building, not the ground or roof.\n    targetYRef.current=top*.5;
     const span=Math.max(maxX-minX,maxZ-minZ,top);
-    if(!cameraPanRef.current.manual)orbitRef.current.radius=Math.max(orbitRef.current.radius,Math.min(35,span*1.65+5));
+    // Fit the complete temple inside the actual viewport, including narrow phone screens.
+    // Use both horizontal and vertical FOV; a fixed orbit distance clips wide or tall complexes.
+    const verticalFov=THREE.MathUtils.degToRad(camera.fov);
+    const horizontalFov=2*Math.atan(Math.tan(verticalFov/2)*camera.aspect);
+    const halfWidth=(maxX-minX)/2,halfDepth=(maxZ-minZ)/2,halfHeight=top/2;
+    const horizontalExtent=Math.hypot(halfWidth,halfDepth);
+    const fitDistance=Math.max(
+      (halfHeight+horizontalExtent*.16)/Math.tan(verticalFov/2),
+      horizontalExtent/Math.tan(horizontalFov/2)
+    )*1.35+2;
+    // Never force the camera closer when the user has deliberately zoomed out.
+    orbitRef.current.radius=Math.max(orbitRef.current.radius,fitDistance);
     cameraFocusRef.current={x:centerX,z:centerZ};
     const cameraFocusX=centerX,cameraFocusZ=centerZ;
     while(group.children.length){const o=group.children.pop()!;o.traverse(child=>{if(child instanceof THREE.Mesh){child.geometry.dispose();const m=child.material;if(Array.isArray(m))m.forEach(x=>x.dispose());else m.dispose();}});}
