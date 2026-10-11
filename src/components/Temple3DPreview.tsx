@@ -53,10 +53,11 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
   const sceneRef = useRef<THREE.Scene|null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer|null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera|null>(null);
-  const orbitRef = useRef({ theta: .72, phi: .72, radius: 13, lastX: 0, lastY: 0, dragging: false, pinch: 0 });
+  const orbitRef = useRef({ theta: .72, phi: 1.18, radius: 13, lastX: 0, lastY: 0, dragging: false, pinch: 0 });
   const targetYRef = useRef(1.4);
   const cameraPanRef = useRef({x:0,y:0,z:0,manual:false});
   const cameraFocusRef = useRef({x:0,z:0});
+  const cameraFitRef = useRef({initialized:false,lastSpan:0});
   const gestureRef = useRef({x:0,y:0,midX:0,midY:0});
   const levelGroupsRef = useRef<THREE.Group[]>([]);
   const raycasterRef = useRef(new THREE.Raycaster());
@@ -102,7 +103,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
 
     const render=()=>{
       const o=orbitRef.current;
-      const fx=cameraFocusRef.current.x,fz=cameraFocusRef.current.z;camera.position.set(fx+Math.sin(o.theta)*Math.sin(o.phi)*o.radius,Math.cos(o.phi)*o.radius,fz+Math.cos(o.theta)*Math.sin(o.phi)*o.radius);
+      const fx=cameraFocusRef.current.x,fz=cameraFocusRef.current.z;camera.position.set(fx+Math.sin(o.theta)*Math.sin(o.phi)*o.radius,targetYRef.current+Math.cos(o.phi)*o.radius,fz+Math.cos(o.theta)*Math.sin(o.phi)*o.radius);
       camera.lookAt(cameraFocusRef.current.x,targetYRef.current,cameraFocusRef.current.z); renderer.render(scene,camera);
     };
     const resize=()=>{const w=Math.max(1,host.clientWidth),h=Math.max(1,host.clientHeight);camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);render();};
@@ -127,7 +128,8 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
     const maxZ=Math.max(0,...levels.map(l=>l.z+l.depth/14));
     const top=Math.max(2.8,...levels.map(l=>((l.elevation||0)+l.height)/7));
     const centerX=(minX+maxX)/2,centerZ=(minZ+maxZ)/2;
-    // Always aim at the vertical center of the complete building, not the ground or roof.\n    targetYRef.current=Math.max(1.4,top*.52);
+    // Always aim at the vertical center of the complete building, not the ground or roof.
+    targetYRef.current=Math.max(1.4,top*.52);
     const span=Math.max(maxX-minX,maxZ-minZ,top);
     // Fit the complete temple inside the actual viewport, including narrow phone screens.
     // Use both horizontal and vertical FOV; a fixed orbit distance clips wide or tall complexes.
@@ -140,7 +142,10 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
       horizontalExtent/Math.tan(horizontalFov/2)
     )*1.35+2;
     // Never force the camera closer when the user has deliberately zoomed out.
-    orbitRef.current.radius=Math.max(orbitRef.current.radius,fitDistance);
+    const fit=cameraFitRef.current;
+    if(!fit.initialized || span>fit.lastSpan+0.05) orbitRef.current.radius=Math.max(orbitRef.current.radius,fitDistance);
+    fit.initialized=true;
+    fit.lastSpan=span;
     cameraFocusRef.current={x:centerX,z:centerZ};
     const cameraFocusX=centerX,cameraFocusZ=centerZ;
     while(group.children.length){const o=group.children.pop()!;o.traverse(child=>{if(child instanceof THREE.Mesh){child.geometry.dispose();const m=child.material;if(Array.isArray(m))m.forEach(x=>x.dispose());else m.dispose();}});}
@@ -320,7 +325,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
       if(perimeter.columns||perimeter.arches){const frontZ=Math.max(...points.map(p=>p[1]));for(const x of [-1.1,1.1]){if(perimeter.columns){const col=new THREE.Mesh(new THREE.CylinderGeometry(.12,.15,perimeter.height*1.1,12),mat.clone());col.position.set(x,perimeter.height*.55,frontZ);pg.add(col);}}if(perimeter.arches){const arch=new THREE.Mesh(new THREE.TorusGeometry(.75,.12,8,20,Math.PI),mat.clone());arch.rotation.z=Math.PI;arch.position.set(0,perimeter.height*.78,frontZ);pg.add(arch);}}
     }
     enableShadows(group);if(perimeterGroupRef.current)enableShadows(perimeterGroupRef.current);statueGroupsRef.current.forEach(enableShadows);
-    const o=orbitRef.current;const focus=new THREE.Vector3(cameraFocusX,targetYRef.current,cameraFocusZ);camera.position.set(focus.x+Math.sin(o.theta)*Math.sin(o.phi)*o.radius,Math.cos(o.phi)*o.radius,focus.z+Math.cos(o.theta)*Math.sin(o.phi)*o.radius);camera.lookAt(focus);renderer.render(scene,camera);
+    const o=orbitRef.current;const focus=new THREE.Vector3(cameraFocusX,targetYRef.current,cameraFocusZ);camera.position.set(focus.x+Math.sin(o.theta)*Math.sin(o.phi)*o.radius,focus.y+Math.cos(o.phi)*o.radius,focus.z+Math.cos(o.theta)*Math.sin(o.phi)*o.radius);camera.lookAt(focus);renderer.render(scene,camera);
   },[levels,perimeter,statues,selectedStatueId,selectedLevel]);
 
   return <div ref={hostRef} className="absolute inset-0"><div className="pointer-events-none absolute bottom-[128px] left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-2 text-xs text-white/70">Drag to look around • pinch wall to resize • pinch empty space to zoom</div></div>;
