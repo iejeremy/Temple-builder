@@ -314,16 +314,14 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
     // Frame the finished 3D building, including rotated geometry, roofs and attached details.
     group.updateMatrixWorld(true);
     const actualBounds=new THREE.Box3().setFromObject(group);
-    // Use the primary temple as the orbit anchor; side wings must not pull the view away.
-    const primaryBounds=levelGroupsRef.current[0]?new THREE.Box3().setFromObject(levelGroupsRef.current[0]):actualBounds;
     if(!actualBounds.isEmpty()){
-      const actualCenter=primaryBounds.getCenter(new THREE.Vector3());
+      const actualCenter=actualBounds.getCenter(new THREE.Vector3());
       const actualSize=actualBounds.getSize(new THREE.Vector3());
       cameraFocusRef.current={x:actualCenter.x,z:actualCenter.z};
       targetYRef.current=actualCenter.y;
       const vFov=THREE.MathUtils.degToRad(camera.fov);
       const hFov=2*Math.atan(Math.tan(vFov/2)*Math.max(.1,camera.aspect));
-      const radius=actualSize.length()*.5+actualCenter.distanceTo(actualBounds.getCenter(new THREE.Vector3()));
+      const radius=actualSize.length()*.5;
       // Reserve the lower screen for the editing carousel and avoid clipping on phones.
       const needed=Math.max(radius/Math.sin(vFov/2),radius/Math.sin(hFov/2))*1.28+2;
       const fit=cameraFitRef.current;
