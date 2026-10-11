@@ -131,23 +131,6 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
     // Always aim at the vertical center of the complete building, not the ground or roof.
     targetYRef.current=Math.max(1.4,top*.52);
     const span=Math.max(maxX-minX,maxZ-minZ,top);
-    // Fit the complete temple inside the actual viewport, including narrow phone screens.
-    // Use both horizontal and vertical FOV; a fixed orbit distance clips wide or tall complexes.
-    const verticalFov=THREE.MathUtils.degToRad(camera.fov);
-    const horizontalFov=2*Math.atan(Math.tan(verticalFov/2)*camera.aspect);
-    const halfWidth=(maxX-minX)/2,halfDepth=(maxZ-minZ)/2,halfHeight=top/2;
-    const horizontalExtent=Math.hypot(halfWidth,halfDepth);
-    const fitDistance=Math.max(
-      (halfHeight+horizontalExtent*.16)/Math.tan(verticalFov/2),
-      horizontalExtent/Math.tan(horizontalFov/2)
-    )*1.35+2;
-    // Never force the camera closer when the user has deliberately zoomed out.
-    const fit=cameraFitRef.current;
-    if(!fit.initialized || span>fit.lastSpan+0.05) orbitRef.current.radius=Math.max(orbitRef.current.radius,fitDistance);
-    fit.initialized=true;
-    fit.lastSpan=span;
-    cameraFocusRef.current={x:centerX,z:centerZ};
-    const cameraFocusX=centerX,cameraFocusZ=centerZ;
     while(group.children.length){const o=group.children.pop()!;o.traverse(child=>{if(child instanceof THREE.Mesh){child.geometry.dispose();const m=child.material;if(Array.isArray(m))m.forEach(x=>x.dispose());else m.dispose();}});}
     levelGroupsRef.current=[];
     let baseY=0;
@@ -325,7 +308,25 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
       if(perimeter.columns||perimeter.arches){const frontZ=Math.max(...points.map(p=>p[1]));for(const x of [-1.1,1.1]){if(perimeter.columns){const col=new THREE.Mesh(new THREE.CylinderGeometry(.12,.15,perimeter.height*1.1,12),mat.clone());col.position.set(x,perimeter.height*.55,frontZ);pg.add(col);}}if(perimeter.arches){const arch=new THREE.Mesh(new THREE.TorusGeometry(.75,.12,8,20,Math.PI),mat.clone());arch.rotation.z=Math.PI;arch.position.set(0,perimeter.height*.78,frontZ);pg.add(arch);}}
     }
     enableShadows(group);if(perimeterGroupRef.current)enableShadows(perimeterGroupRef.current);statueGroupsRef.current.forEach(enableShadows);
-    const o=orbitRef.current;const focus=new THREE.Vector3(cameraFocusX,targetYRef.current,cameraFocusZ);camera.position.set(focus.x+Math.sin(o.theta)*Math.sin(o.phi)*o.radius,focus.y+Math.cos(o.phi)*o.radius,focus.z+Math.cos(o.theta)*Math.sin(o.phi)*o.radius);camera.lookAt(focus);renderer.render(scene,camera);
+    // Frame the finished 3D building, including rotated geometry, roofs and attached details.
+    group.updateMatrixWorld(true);
+    const actualBounds=new THREE.Box3().setFromObject(group);
+    if(!actualBounds.isEmpty()){
+      const actualCenter=actualBounds.getCenter(new THREE.Vector3());
+      const actualSize=actualBounds.getSize(new THREE.Vector3());
+      cameraFocusRef.current={x:actualCenter.x,z:actualCenter.z};
+      targetYRef.current=actualCenter.y;
+      const vFov=THREE.MathUtils.degToRad(camera.fov);
+      const hFov=2*Math.atan(Math.tan(vFov/2)*Math.max(.1,camera.aspect));
+      const radius=actualSize.length()*.5;
+      const needed=Math.max(radius/Math.sin(vFov/2),radius/Math.sin(hFov/2))*1.12+1;
+      const fit=cameraFitRef.current;
+      if(!fit.initialized)orbitRef.current.radius=needed;
+      else if(radius>fit.lastSpan+.05)orbitRef.current.radius=Math.max(orbitRef.current.radius,needed);
+      fit.initialized=true;
+      fit.lastSpan=radius;
+    }
+    const o=orbitRef.current;const focus=new THREE.Vector3(cameraFocusRef.current.x,targetYRef.current,cameraFocusRef.current.z);camera.position.set(focus.x+Math.sin(o.theta)*Math.sin(o.phi)*o.radius,focus.y+Math.cos(o.phi)*o.radius,focus.z+Math.cos(o.theta)*Math.sin(o.phi)*o.radius);camera.lookAt(focus);renderer.render(scene,camera);
   },[levels,perimeter,statues,selectedStatueId,selectedLevel]);
 
   return <div ref={hostRef} className="absolute inset-0"><div className="pointer-events-none absolute bottom-[128px] left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-2 text-xs text-white/70">Drag to look around • pinch wall to resize • pinch empty space to zoom</div></div>;
