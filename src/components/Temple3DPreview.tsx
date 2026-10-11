@@ -104,9 +104,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
 
     const applyCamera=()=>{
       const o=orbitRef.current;
-      const w=Math.max(1,host.clientWidth),h=Math.max(1,host.clientHeight);
-      const uiReserve=Math.round(h*.18);
-      camera.setViewOffset(w,h,0,0,w,Math.max(1,h-uiReserve));
+      // Use the actual canvas projection; editing overlays must not skew the camera.
       const fx=cameraFocusRef.current.x,fz=cameraFocusRef.current.z,fy=targetYRef.current;
       camera.position.set(fx+Math.sin(o.theta)*Math.sin(o.phi)*o.radius,fy+Math.cos(o.phi)*o.radius,fz+Math.cos(o.theta)*Math.sin(o.phi)*o.radius);
       camera.lookAt(fx,fy,fz);
@@ -327,24 +325,24 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
       const hFov=2*Math.atan(Math.tan(vFov/2)*Math.max(.1,camera.aspect));
       const radius=actualSize.length()*.5;
       // Fit the complete model inside the mobile viewport, reserving room for controls.
-      const usableVFov=2*Math.atan(Math.tan(vFov/2)*.82);
-      const needed=Math.max(radius/Math.sin(usableVFov/2),radius/Math.sin(hFov/2))*1.22+1.5;
+      const needed=Math.max(radius/Math.sin(vFov/2),radius/Math.sin(hFov/2))*1.12+1.5;
       const fit=cameraFitRef.current;
       fit.fitRadius=needed;
       const grew=radius>fit.lastSpan+.08;
       const shrankALot=radius<fit.lastSpan*.72;
       const firstBuild=!fit.initialized||(fit.buildingCount===0&&levels.length>0);
-      if(firstBuild||!fit.userFramed){
+      if(firstBuild){
         orbitRef.current.theta=.72;
         orbitRef.current.phi=1.18;
         orbitRef.current.radius=needed;
-      }else if(grew)orbitRef.current.radius=Math.max(orbitRef.current.radius,needed);
+      }else if(!fit.userFramed)orbitRef.current.radius=needed;
+      else if(grew)orbitRef.current.radius=Math.max(orbitRef.current.radius,needed);
       else if(shrankALot&&orbitRef.current.radius>needed*1.35)orbitRef.current.radius=Math.max(needed,orbitRef.current.radius*.85);
       fit.initialized=true;
       fit.lastSpan=radius;
       fit.buildingCount=levels.length;
     }
-    const o=orbitRef.current;camera.setViewOffset(Math.max(1,renderer.domElement.clientWidth),Math.max(1,renderer.domElement.clientHeight),0,0,Math.max(1,renderer.domElement.clientWidth),Math.max(1,Math.round(renderer.domElement.clientHeight*.82)));const focus=new THREE.Vector3(cameraFocusRef.current.x,targetYRef.current,cameraFocusRef.current.z);camera.position.set(focus.x+Math.sin(o.theta)*Math.sin(o.phi)*o.radius,focus.y+Math.cos(o.phi)*o.radius,focus.z+Math.cos(o.theta)*Math.sin(o.phi)*o.radius);camera.lookAt(focus);renderer.render(scene,camera);
+    const o=orbitRef.current;camera.clearViewOffset();const focus=new THREE.Vector3(cameraFocusRef.current.x,targetYRef.current,cameraFocusRef.current.z);camera.position.set(focus.x+Math.sin(o.theta)*Math.sin(o.phi)*o.radius,focus.y+Math.cos(o.phi)*o.radius,focus.z+Math.cos(o.theta)*Math.sin(o.phi)*o.radius);camera.lookAt(focus);renderer.render(scene,camera);
   },[levels,perimeter,statues,selectedStatueId,selectedLevel]);
 
   return <div className="absolute inset-0"><div ref={hostRef} className="absolute inset-0" /><button type="button" onClick={()=>resetCameraRef.current()} className="absolute right-3 top-20 z-30 rounded-xl bg-black/70 px-3 py-2 text-xs font-semibold text-white shadow-lg">Center Temple</button><div className="pointer-events-none absolute bottom-[128px] left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-2 text-xs text-white/70">Drag to look around • pinch wall to resize • pinch empty space to zoom</div></div>;
