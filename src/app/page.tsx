@@ -75,28 +75,119 @@ export default function TempleBuilderPage() {
 
 
   const addTemplate = (kind: number) => {
-    const make = (shape:BuildingShape, material:BuilderMaterial, width:number, depth:number, height:number, x:number, z:number, elevation=0, roof:RoofStyle="flat"):BuildingLevel => ({
-      id:`template-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,shape,material,width,depth,height,x,z,elevation,roof,rotation:0,patio:false,
+    // Detailed architectural templates adapted from Temple-builder-improved.zip.
+    // Templates append to the site; no existing levels or user edits are deleted.
+    const uid=()=>`${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
+    const make=(shape:BuildingShape,material:BuilderMaterial,width:number,depth:number,height:number,x:number,z:number,elevation=0,roof:RoofStyle="flat"):BuildingLevel=>({
+      id:`template-${uid()}`,shape,material,width,depth,height,x,z,elevation,roof,rotation:0,patio:false,
       windows:[],doors:[],arches:[],columns:[],trims:[],stairs:[],pediments:[]
     });
-    const front=(level:BuildingLevel,style:DoorStyle="temple")=>{level.doors.push({id:`door-${level.id}`,face:"front",u:0,width:1.8,height:2.3,style});};
-    const stairs=(level:BuildingLevel)=>{level.stairs.push({id:`stairs-${level.id}`,face:"front",u:0,style:"wide"});};
-    const pillars=(level:BuildingLevel,style:ColumnStyle)=>{for(const face of ["front","back"] as WallFace[])for(const u of [-.7,-.35,.35,.7])level.columns.push({id:`column-${level.id}-${face}-${u}`,face,u,style});};
+    const door=(l:BuildingLevel,face:WallFace,style:DoorStyle,u=0,width=1.8,height=2.3)=>l.doors.push({id:`door-${uid()}`,face,u,width,height,style});
+    const window=(l:BuildingLevel,face:WallFace,style:WindowStyle,u:number,v=.55)=>l.windows.push({id:`win-${uid()}`,face,u,v,width:style==="double"?1.7:style==="narrow"?.7:1.1,height:style==="tall"||style==="arched"?1.8:1.2,style});
+    const columns=(l:BuildingLevel,style:ColumnStyle,faces:WallFace[]=["front","back"],us:number[]=[-.75,-.4,.4,.75])=>{for(const face of faces)for(const u of us)l.columns.push({id:`col-${uid()}`,face,u,style});};
+    const stairs=(l:BuildingLevel,face:WallFace="front",style:StairStyle="wide")=>l.stairs.push({id:`stair-${uid()}`,face,u:0,style});
+    const arch=(l:BuildingLevel,face:WallFace,style:ArchStyle)=>l.arches.push({id:`arch-${uid()}`,face,u:0,style});
+    const trim=(l:BuildingLevel,face:WallFace,style:TrimStyle)=>l.trims.push({id:`trim-${uid()}`,face,u:0,style});
+    const pediment=(l:BuildingLevel,face:WallFace,style:PedimentStyle)=>l.pediments.push({id:`ped-${uid()}`,face,u:0,style});
     let parts:BuildingLevel[]=[];
-    if(kind===0){ // Mayan stepped pyramid and summit shrine
-      parts=[make("square","limestone",62,62,12,0,0),make("square","limestone",48,48,9,0,0,12),make("square","limestone",34,34,8,0,0,21),make("rectangle","stone",22,19,17,0,0,29,"flat")];front(parts[3],"carved-stone");stairs(parts[0]);
-    }else if(kind===1){ // Egyptian entrance, court and sanctuary
-      parts=[make("courtyard","sandstone",60,48,13,0,0),make("wide","sandstone",50,22,18,0,-5),make("rectangle","sandstone",24,20,22,0,-9),make("square","sandstone",16,18,30,-4,7),make("square","sandstone",16,18,30,4,7)];pillars(parts[1],"square");front(parts[2]);
-    }else if(kind===2){ // Hindu mandapa and tiered shikhara
-      parts=[make("wide","sandstone",40,25,17,0,5),make("square","stone",25,25,26,0,-3,0,"tiered"),make("square","stone",19,19,14,0,-3,26,"tiered"),make("octagon","gold",8,8,7,0,-3,40,"dome")];front(parts[0]);pillars(parts[0],"twisted");
-    }else if(kind===3){ // Greek colonnaded marble temple
-      parts=[make("rectangle","marble",49,28,23,0,0,0,"pyramid")];front(parts[0],"portico");pillars(parts[0],"corinthian");stairs(parts[0]);parts[0].pediments.push({id:"greek-pediment",face:"front",u:0,style:"triangular"});
-    }else if(kind===4){ // Gothic nave, transept and twin towers
-      parts=[make("wide","stone",62,25,31,0,0,0,"steeple"),make("cross","stone",32,32,30,0,-2,0,"steeple"),make("square","stone",17,17,44,-5,5,0,"steeple"),make("square","stone",17,17,44,5,5,0,"steeple")];front(parts[0],"grand-arch");for(const p of parts.slice(0,2))pillars(p,"gothic");parts[0].windows.push({id:"rose-window",face:"front",u:0,v:.75,width:2,height:2,style:"rose"});
-    }else{ // Echoes original: rotunda, four wings and court
-      parts=[make("rotunda","marble",32,32,29,0,0,0,"dome"),make("wide","marble",40,19,18,0,5),make("wide","marble",40,19,18,0,-5),make("rectangle","marble",19,37,18,5,0),make("rectangle","marble",19,37,18,-5,0),make("courtyard","travertine",44,38,9,0,10)];front(parts[1]);pillars(parts[1],"ionic");
+    if(kind===0){
+      // Temple of the Sun · Maya: four stepped tiers, four stairways and summit shrine.
+      const base=make("square","limestone",68,68,11,0,0);
+      const mid=make("square","limestone",52,52,10,0,0,11);
+      const upper=make("square","limestone",36,36,9,0,0,21);
+      const shrine=make("rectangle","stone",20,16,16,0,0,30);
+      for(const face of ["front","back","left","right"] as WallFace[])stairs(base,face);
+      stairs(mid,"front","straight");
+      door(shrine,"front","carved-stone",0,1.6,2.4);
+      for(const face of ["back","left","right"] as WallFace[])window(shrine,face,"narrow",0);
+      window(shrine,"front","narrow",-.55,.6);window(shrine,"front","narrow",.55,.6);
+      columns(shrine,"square",["front"],[-.7,.7]);trim(shrine,"front","frieze");trim(shrine,"back","frieze");
+      parts=[base,mid,upper,shrine];
+    }else if(kind===1){
+      // Eternal Courtyard · Egypt: court, hypostyle hall, sanctuary and twin pylons.
+      const court=make("courtyard","sandstone",64,50,12,0,2);
+      const hall=make("wide","sandstone",52,24,20,0,-6);
+      const sanctuary=make("rectangle","sandstone",22,18,24,0,-12);
+      const left=make("square","sandstone",14,16,36,-8,8,0,"pyramid");
+      const right=make("square","sandstone",14,16,36,8,8,0,"pyramid");
+      columns(hall,"square",["front","back"],[-.8,-.5,-.2,.2,.5,.8]);
+      columns(hall,"square",["left","right"],[-.5,0,.5]);
+      door(hall,"front","temple",0,2.2,2.8);arch(hall,"front","round");stairs(hall);
+      door(sanctuary,"front","carved-stone",0,1.4,2.2);
+      window(sanctuary,"left","narrow",0,.7);window(sanctuary,"right","narrow",0,.7);
+      trim(sanctuary,"front","frieze");
+      for(const t of [left,right]){door(t,"front","stone-arch",0,1.2,2);window(t,"front","tall",0,.7);}
+      trim(court,"front","base");trim(court,"back","base");
+      parts=[court,hall,sanctuary,left,right];
+    }else if(kind===2){
+      // Celestial Shrine · Hindu: mandapa, rising shikhara and golden finial.
+      const hall=make("wide","sandstone",42,28,16,0,6);
+      const tower1=make("square","stone",26,26,22,0,-4,0,"tiered");
+      const tower2=make("square","stone",18,18,16,0,-4,22,"tiered");
+      const tower3=make("octagon","stone",12,12,10,0,-4,38,"tiered");
+      const finial=make("octagon","gold",7,7,6,0,-4,48,"dome");
+      columns(hall,"twisted",["front","back"],[-.7,-.35,.35,.7]);
+      columns(hall,"twisted",["left","right"],[-.4,.4]);
+      door(hall,"front","carved-stone",0,1.7,2.4);arch(hall,"front","trefoil");stairs(hall);
+      for(const face of ["left","right"] as WallFace[]){window(hall,face,"ornate",-.3);window(hall,face,"ornate",.3);}
+      trim(hall,"front","acanthus");trim(hall,"back","acanthus");
+      for(const face of ["front","back","left","right"] as WallFace[])window(tower1,face,"narrow",0);
+      trim(tower1,"front","frieze");window(tower2,"front","narrow",0);
+      parts=[hall,tower1,tower2,tower3,finial];
+    }else if(kind===3){
+      // Marble Pantheon · Greek: full colonnade, portico, pediments and ornament.
+      const temple=make("rectangle","marble",52,28,22,0,0,0,"pyramid");
+      columns(temple,"corinthian",["front","back"],[-.85,-.55,-.25,.25,.55,.85]);
+      columns(temple,"corinthian",["left","right"],[-.7,-.35,0,.35,.7]);
+      door(temple,"front","portico",0,2,2.6);stairs(temple);stairs(temple,"back","straight");
+      pediment(temple,"front","triangular");pediment(temple,"back","triangular");
+      for(const face of ["left","right"] as WallFace[]){window(temple,face,"classic",-.4);window(temple,face,"classic",.4);}
+      trim(temple,"front","dentils");trim(temple,"back","dentils");trim(temple,"front","greek-fret");
+      trim(temple,"left","base");trim(temple,"right","base");
+      parts=[temple];
+    }else if(kind===4){
+      // Cathedral of Echoes · Gothic: nave, crossing and twin towers.
+      const nave=make("wide","stone",66,26,32,0,0,0,"steeple");
+      const crossing=make("cross","stone",34,34,30,0,-3,0,"steeple");
+      const left=make("square","stone",16,16,48,-7,7,0,"steeple");
+      const right=make("square","stone",16,16,48,7,7,0,"steeple");
+      door(nave,"front","grand-arch",0,2.2,3);arch(nave,"front","pointed");
+      window(nave,"front","rose",0,.78);window(nave,"front","tall",-.55,.45);window(nave,"front","tall",.55,.45);
+      stairs(nave);columns(nave,"gothic",["front","back"],[-.7,-.35,.35,.7]);
+      for(const face of ["left","right"] as WallFace[])for(const u of [-.5,0,.5])window(nave,face,"tall",u,.6);
+      trim(nave,"front","crown");
+      columns(crossing,"gothic",["front","back","left","right"],[-.5,.5]);
+      for(const face of ["left","right"] as WallFace[]){door(crossing,face,"stone-arch",0,1.5,2.3);window(crossing,face,"arched",0,.65);}
+      for(const tower of [left,right]){
+        window(tower,"front","narrow",0,.35);window(tower,"front","narrow",0,.65);
+        for(const face of ["back","left","right"] as WallFace[])window(tower,face,"narrow",0);
+        arch(tower,"front","pointed");trim(tower,"front","crown");
+      }
+      parts=[nave,crossing,left,right];
+    }else{
+      // Temple of Unity · Echoes: central domed rotunda, four wings and courtyard.
+      const rotunda=make("rotunda","marble",34,34,30,0,0,0,"dome");
+      const north=make("wide","marble",42,18,17,0,7);
+      const south=make("wide","marble",42,18,17,0,-7);
+      const east=make("rectangle","marble",18,38,17,7,0);
+      const west=make("rectangle","marble",18,38,17,-7,0);
+      const court=make("courtyard","travertine",48,42,8,0,14);
+      columns(rotunda,"ionic",["front","back"],[-.6,-.2,.2,.6]);
+      columns(rotunda,"ionic",["left","right"],[-.4,.4]);
+      door(rotunda,"front","temple",0,2,2.6);arch(rotunda,"front","round");
+      for(const face of ["back","left","right"] as WallFace[])window(rotunda,face,"arched",0);
+      trim(rotunda,"front","dentils");
+      columns(north,"ionic",["front"],[-.7,-.35,.35,.7]);
+      door(north,"front","portico",0,1.9,2.4);stairs(north);pediment(north,"front","triangular");
+      for(const face of ["left","right"] as WallFace[]){window(north,face,"classic",-.3);window(north,face,"classic",.3);}
+      door(south,"back","double",0,1.6,2.2);window(south,"left","classic",0);window(south,"right","classic",0);
+      for(const wing of [east,west]){
+        window(wing,"front","classic",-.3);window(wing,"front","classic",.3);
+        window(wing,"back","classic",0);trim(wing,"front","base");door(wing,"front","single");
+      }
+      trim(court,"front","base");trim(court,"back","base");stairs(court,"front","straight");
+      parts=[rotunda,north,south,east,west,court];
     }
-    // Existing work is never replaced: templates are added to the property.
     setLevels(current=>[...current,...parts]);
     setShape(parts[0].shape);
     setSelectedLevel(levels.length);
