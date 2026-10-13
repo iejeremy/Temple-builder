@@ -181,22 +181,24 @@ export default function TempleBuilderPage() {
         </div>
       )}
 
-      <div className="absolute inset-x-0 bottom-0 z-30 rounded-t-[28px] border-t border-white/10 bg-[#111820]/95 pb-[max(10px,env(safe-area-inset-bottom))] shadow-2xl backdrop-blur">
-        <div className="flex items-center gap-2 p-2">
+      {/* Improved bottom menu from supplied design; existing builder actions remain intact. */}
+      <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[24px] border-t border-white/10 bg-[#0c1118]/96 pb-[max(8px,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+        <div className="flex justify-center pb-1 pt-2.5"><div className="h-1 w-10 rounded-full bg-white/20" /></div>
+        <div className="flex items-center gap-2 px-3 pb-2">
           {panel === null && (
-            <button onClick={()=>setPanel("add")} className="w-full rounded-2xl bg-amber-200 px-5 py-3 text-sm font-semibold text-black">＋ Add</button>
+            <button onClick={()=>setPanel("add")} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-amber-200 to-amber-300 px-5 py-3.5 text-sm font-bold text-black shadow-lg shadow-amber-900/20 active:scale-[0.98]"><span className="text-lg leading-none">+</span> Add to site</button>
           )}
           {panel !== null && panel !== "edit" && (
             <>
-              <button onClick={()=>setPanel(panel==="add"?null:"add")} className="shrink-0 rounded-xl bg-white/10 px-4 py-3 text-xs">{panel==="add"?"Done":"‹ Add"}</button>
-              <div className="min-w-0 flex-1 truncate text-sm font-semibold capitalize text-white/80">{panel==="add"?"Choose what to add":panel}</div>
-              <button onClick={()=>setPanel(null)} className="shrink-0 rounded-xl bg-white/10 px-4 py-3 text-xs">Close</button>
+              <button onClick={()=>setPanel(panel==="add"?null:"add")} className="shrink-0 rounded-xl bg-white/10 px-3.5 py-2.5 text-xs font-medium text-white/80 active:bg-white/15">{panel==="add"?"Done":"‹ Back"}</button>
+              <div className="min-w-0 flex-1 text-center text-sm font-semibold tracking-wide text-white/90 capitalize">{panel==="add"?"Add":panel}</div>
+              <button onClick={()=>setPanel(null)} className="shrink-0 rounded-xl bg-white/10 px-3.5 py-2.5 text-xs font-medium text-white/80 active:bg-white/15">Close</button>
             </>
           )}
           {panel === "edit" && (
             <>
-              <div className="min-w-0 flex-1 truncate text-sm font-semibold text-white/80">Edit Building</div>
-              <button onClick={()=>{setDetailCategory(null);setPanel(null)}} className="shrink-0 rounded-xl bg-white/10 px-4 py-3 text-xs">Done</button>
+              <div className="min-w-0 flex-1 text-sm font-semibold text-white/90">Edit{levels[selectedLevel]?` · Level ${selectedLevel+1}`:""}</div>
+              <button onClick={()=>{setDetailCategory(null);setPanel(null)}} className="shrink-0 rounded-xl bg-amber-200/90 px-4 py-2.5 text-xs font-bold text-black active:bg-amber-200">Done</button>
             </>
           )}
         </div>
@@ -212,13 +214,19 @@ export default function TempleBuilderPage() {
           </div>
         )}
         {panel === "add" && (
-          <div className="grid grid-cols-3 gap-2 border-t border-white/10 px-3 py-3">
+          <div className="grid grid-cols-3 gap-2.5 px-3 pb-3">
             {([
-              ["buildings","Building","▣"],["walls","Walls","⬡"],["fountains","Fountain","◉"],
-              ["statues","Statue","♟"],["stairs","Stairs","▤"],["more","More","＋"]
-            ] as const).map(([id,name,icon])=>(
-              <button key={id} onClick={()=>{setPanel(id);if(id==="walls")setWallStep(perimeter?"features":"main");}} className="rounded-2xl border border-white/10 bg-white/5 p-3 text-center">
-                <div className="text-xl text-amber-200">{icon}</div><div className="mt-1 text-xs font-medium">{name}</div>
+              ["buildings","Building","▣","Templates & shapes"],
+              ["walls","Walls","⬡","Courtyard walls"],
+              ["statues","Statue","♟","Guardians & figures"],
+              ["fountains","Fountain","◉","Coming soon"],
+              ["stairs","Stairs","▤","Coming soon"],
+              ["more","More","＋","Coming soon"]
+            ] as const).map(([id,name,icon,sub])=>(
+              <button key={id} onClick={()=>{setPanel(id);if(id==="walls")setWallStep(perimeter?"features":"main");}} className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.06] px-2 py-4 text-center transition active:bg-white/10">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-200/15 text-lg text-amber-100">{icon}</span>
+                <span className="text-xs font-semibold text-white">{name}</span>
+                <span className="text-[10px] leading-tight text-white/45">{sub}</span>
               </button>
             ))}
           </div>
