@@ -148,7 +148,27 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
     renderCameraRef.current=render;
     const zoomLimits=()=>({min:Math.max(2,cameraFitRef.current.fitRadius*.18),max:Math.max(20,cameraFitRef.current.fitRadius*2.2)});
     const clampZoom=(radius:number)=>{const limits=zoomLimits();return Math.max(limits.min,Math.min(limits.max,radius));};
-    const resize=()=>{const w=Math.max(1,host.clientWidth),h=Math.max(1,host.clientHeight);camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);render();};
+    const resize=()=>{
+      const w=Math.max(1,host.clientWidth),h=Math.max(1,host.clientHeight);
+      camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);
+      // Fit the current temple in both portrait and landscape, including space for controls.
+      const bounds=lastBoundsRef.current;
+      if(!bounds.isEmpty()&&cameraFitRef.current.buildingCount>0){
+        const size=bounds.getSize(new THREE.Vector3());
+        const radius=size.length()*.5;
+        const vFov=THREE.MathUtils.degToRad(camera.fov);
+        const hFov=2*Math.atan(Math.tan(vFov/2)*Math.max(.1,w/(h*.75)));
+        const fitDistance=Math.max(radius/Math.sin(vFov/2),radius/Math.sin(hFov/2))*1.3+2;
+        cameraFitRef.current.fitRadius=fitDistance;
+        if(!cameraFitRef.current.userFramed){
+          orbitRef.current.radius=fitDistance;
+          cameraPanRef.current={x:0,y:0,z:0,manual:false};
+          const center=bounds.getCenter(new THREE.Vector3());
+          cameraFocusRef.current={x:center.x,z:center.z};targetYRef.current=center.y;
+        }
+      }
+      render();
+    };
     const canvas=renderer.domElement; canvas.style.touchAction="none";
     const pointers=new Map<number,{x:number,y:number}>();
     const distance=()=>{const pts=[...pointers.values()];return pts.length<2?0:Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y);};
@@ -164,9 +184,9 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
     const up=(e:PointerEvent)=>{movingLevelRef.current=null;movingStatueRef.current=null;movingSiteObjectRef.current=null;movingDoorRef.current=null;movingArchRef.current=null;movingDetailRef.current=null;resizingPerimeterRef.current=null;const start=pointerDownRef.current;pointerDownRef.current=null;if(start&&Math.hypot(e.clientX-start.x,e.clientY-start.y)<8&&pointers.size===1){const rect=canvas.getBoundingClientRect();const mouse=new THREE.Vector2(((e.clientX-rect.left)/rect.width)*2-1,-((e.clientY-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);const statueTap=raycasterRef.current.intersectObjects(statueGroupsRef.current,true);if(statueTap.length){let so:THREE.Object3D|null=statueTap[0].object;while(so&&so.userData.statueId===undefined)so=so.parent;if(so)liveRef.current.onSelectStatue?.(so.userData.statueId as string);}const siteTap=statueTap.length?[]:raycasterRef.current.intersectObjects(siteObjectGroupsRef.current,true);if(siteTap.length){let obj:THREE.Object3D|null=siteTap[0].object;while(obj&&!obj.userData.siteObjectId)obj=obj.parent;if(obj){const id=obj.userData.siteObjectId as string;if(obj.userData.siteObjectKind==="column")liveRef.current.onSelectSiteColumn?.(id);else liveRef.current.onSelectLandscape?.(id);}}const perimeterTap=(statueTap.length||siteTap.length)?[]:(perimeterGroupRef.current?raycasterRef.current.intersectObjects(perimeterGroupRef.current.children,true):[]);if(perimeterTap.length)liveRef.current.onSelectPerimeter?.();const hits=(statueTap.length||siteTap.length||perimeterTap.length)?[]:raycasterRef.current.intersectObjects(levelGroupsRef.current,true);if(hits.length){const tagged=hits.find(h=>h.object.userData.detailCategory);if(tagged){const d=tagged.object.userData;liveRef.current.onSelectDetail?.(d.levelIndex as number,(d.detailFace||null) as WallFace|null,d.detailCategory);}else{let obj:THREE.Object3D|null=hits[0].object;while(obj&&obj.userData.levelIndex===undefined)obj=obj.parent;if(obj&&obj.userData.levelIndex!==undefined){const idx=obj.userData.levelIndex as number;onSelectLevel?.(idx);const hit=hits[0];if(hit.face){const n=hit.face.normal.clone().transformDirection(hit.object.matrixWorld);const ax=Math.abs(n.x),az=Math.abs(n.z);const face:WallFace=ax>az?(n.x>0?"right":"left"):(n.z>0?"front":"back");onSelectFace?.(idx,face);}}}}}pointers.delete(e.pointerId);const o=orbitRef.current;o.pinch=0;if(pointers.size===1){const pt=[...pointers.values()][0];o.dragging=true;o.lastX=pt.x;o.lastY=pt.y;}else{o.dragging=false;}};
     const wheel=(e:WheelEvent)=>{e.preventDefault();const o=orbitRef.current;o.radius=clampZoom(o.radius+e.deltaY*.012);cameraFitRef.current.userFramed=true;render();};
     canvas.addEventListener("pointerdown",down);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",up);canvas.addEventListener("pointercancel",up);canvas.addEventListener("wheel",wheel,{passive:false});
-    window.addEventListener("resize",resize); resize();
+    window.addEventListener("resize",resize); const sizeObserver=new ResizeObserver(resize);sizeObserver.observe(host); resize();
     resetCameraRef.current=()=>{const o=orbitRef.current;o.theta=0;o.phi=1.28;o.radius=Math.max(3,cameraFitRef.current.fitRadius*1.3);cameraPanRef.current={x:0,y:0,z:0,manual:false};cameraFitRef.current.userFramed=false;const bounds=lastBoundsRef.current;if(!bounds.isEmpty()){const center=bounds.getCenter(new THREE.Vector3());cameraFocusRef.current={x:center.x,z:center.z};targetYRef.current=center.y;}resize();};
-    return()=>{window.removeEventListener("resize",resize);canvas.removeEventListener("pointerdown",down);canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerup",up);canvas.removeEventListener("pointercancel",up);canvas.removeEventListener("wheel",wheel);scene.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.dispose();const m=o.material;if(Array.isArray(m))m.forEach(x=>x.dispose());else m.dispose();}});renderer.dispose();canvas.remove();};
+    return()=>{sizeObserver.disconnect();window.removeEventListener("resize",resize);canvas.removeEventListener("pointerdown",down);canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerup",up);canvas.removeEventListener("pointercancel",up);canvas.removeEventListener("wheel",wheel);scene.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.dispose();const m=o.material;if(Array.isArray(m))m.forEach(x=>x.dispose());else m.dispose();}});renderer.dispose();canvas.remove();};
   },[]);
 
   useEffect(()=>{
