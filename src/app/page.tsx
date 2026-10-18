@@ -438,6 +438,24 @@ export default function TempleBuilderPage() {
             <button onClick={()=>setLandscapeItems(v=>v.filter(q=>q.id!==item.id))} className="text-red-200">Delete</button>
           </div>)}
         </div>}
+        {panel === "site-columns" && <div className="border-t border-amber-200/20 px-3 py-3">
+          <div className="mb-2 text-sm font-semibold text-amber-100">Greek colonnade generator</div>
+          <p className="mb-2 text-xs text-white/65">Create an evenly spaced row or a complete perimeter of independent, editable columns around your selected temple.</p>
+          <div className="grid grid-cols-2 gap-2">
+            {(["doric","ionic","corinthian","composite"] as ColumnStyle[]).map(style=><button key={style} onClick={()=>{
+              const building=levels[selectedLevel];if(!building)return;
+              const width=building.width/7,depth=building.depth/7,cx=building.x||0,cz=building.z||0;
+              const margin=1.15,halfW=width/2+margin,halfD=depth/2+margin;
+              const nx=Math.max(3,Math.min(12,Math.ceil(width/1.4)+1)),nz=Math.max(3,Math.min(12,Math.ceil(depth/1.4)+1));
+              const points:Array<[number,number]>=[];
+              for(let i=0;i<nx;i++){const x=-halfW+i*2*halfW/(nx-1);points.push([x,-halfD],[x,halfD]);}
+              for(let i=1;i<nz-1;i++){const z=-halfD+i*2*halfD/(nz-1);points.push([-halfW,z],[halfW,z]);}
+              const angle=building.rotation*Math.PI/180;
+              const batch=points.map(([x,z],i)=>({id:`colonnade-${Date.now()}-${i}`,style,material:building.material,x:cx+x*Math.cos(angle)-z*Math.sin(angle),z:cz+x*Math.sin(angle)+z*Math.cos(angle),height:Math.max(2,building.height/7*.9),radius:.18,rotation:building.rotation}));
+              setSiteColumns(v=>[...v,...batch]);setSelectedSiteColumnId(null);
+            }} className="rounded-xl border border-amber-200/25 bg-amber-200/10 px-3 py-3 text-left text-xs capitalize">+ {style} perimeter</button>)}
+          </div>
+        </div>}
         {panel === "site-columns" && (
           <div className="flex flex-wrap gap-2 border-t border-white/10 px-3 py-3">
             {(["doric","ionic","corinthian","composite","tuscan","fluted","square","twisted","gothic","roman-esque"] as ColumnStyle[]).map(style=><button key={style} className="rounded-xl bg-white/10 px-3 py-2 text-xs capitalize" onClick={()=>{const id=`site-column-${Date.now()}-${Math.random().toString(36).slice(2,5)}`;setSiteColumns(v=>[...v,{id,style,material:"marble",x:(levels[selectedLevel]?.x||0)+3,z:(levels[selectedLevel]?.z||0)+3,height:3.5,radius:.18,rotation:0}]);setSelectedSiteColumnId(id);}} >+ {style}</button>)}
