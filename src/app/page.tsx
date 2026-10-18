@@ -354,21 +354,6 @@ export default function TempleBuilderPage() {
             </>
           )}
         </div>
-        {panel === "buildings" && (
-          <div className="border-t border-white/10 px-3 py-3">
-            <div className="mb-2 text-xs text-white/70">Architectural templates · tap to add to your site</div>
-            <div className="grid grid-cols-2 gap-2">
-              {["Temple of the Sun · Maya","Eternal Courtyard · Egypt","Celestial Shrine · Hindu","Marble Pantheon · Greek","Cathedral of Echoes · Gothic","Temple of Unity · Echoes"].map((name,i)=>(
-                <button key={name} onClick={()=>addTemplate(i)} className="rounded-xl border border-amber-200/30 bg-white/10 p-3 text-left text-xs text-white">{name}<span className="mt-1 block text-[10px] text-amber-200">Add 3D template</span></button>
-              ))}
-            </div>
-            <div className="mt-3 rounded-xl border border-amber-200/20 bg-amber-200/5 p-3">
-              <div className="mb-2 text-xs font-semibold text-amber-100">Greek temple architectural orders</div>
-              <div className="grid grid-cols-3 gap-2">{(["doric","ionic","corinthian"] as ColumnStyle[]).map(order=><button key={order} onClick={()=>addTemplate(3,order)} className="rounded-lg bg-white/10 px-2 py-3 text-xs capitalize">+ {order}</button>)}</div>
-            </div>
-            <button onClick={()=>setPanel("add")} className="mt-3 rounded-xl bg-white/10 px-4 py-2 text-xs">Back to Add</button>
-          </div>
-        )}
         {panel === "add" && (
           <div className="grid grid-cols-3 gap-2.5 px-3 pb-3">
             {([
