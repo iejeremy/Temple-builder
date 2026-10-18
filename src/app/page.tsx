@@ -81,7 +81,7 @@ export default function TempleBuilderPage() {
   const [panel, setPanel] = useState<"add" | "walls" | "buildings" | "fountains" | "statues" | "site-columns" | "stairs" | "scenery" | "more" | "edit" | null>(null);
 
 
-  const addTemplate = (kind: number) => {
+  const addTemplate = (kind: number, greekOrder: ColumnStyle = "corinthian") => {
     // Detailed architectural templates adapted from Temple-builder-improved.zip.
     // Templates append to the site; no existing levels or user edits are deleted.
     const uid=()=>`${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
@@ -155,8 +155,8 @@ export default function TempleBuilderPage() {
     }else if(kind===3){
       // Marble Pantheon · Greek: full colonnade, portico, pediments and ornament.
       const temple=make("rectangle","marble",52,28,22,0,0,0,"pyramid");
-      columns(temple,"corinthian",["front","back"],[-.85,-.55,-.25,.25,.55,.85]);
-      columns(temple,"corinthian",["left","right"],[-.7,-.35,0,.35,.7]);
+      columns(temple,greekOrder,["front","back"],[-.85,-.55,-.25,.25,.55,.85]);
+      columns(temple,greekOrder,["left","right"],[-.7,-.35,0,.35,.7]);
       door(temple,"front","portico",0,2,2.6);stairs(temple);stairs(temple,"back","straight");
       pediment(temple,"front","triangular");pediment(temple,"back","triangular");
       for(const face of ["left","right"] as WallFace[]){window(temple,face,"classic",-.4);window(temple,face,"classic",.4);}
@@ -330,6 +330,10 @@ export default function TempleBuilderPage() {
               {["Temple of the Sun · Maya","Eternal Courtyard · Egypt","Celestial Shrine · Hindu","Marble Pantheon · Greek","Cathedral of Echoes · Gothic","Temple of Unity · Echoes"].map((name,i)=>(
                 <button key={name} onClick={()=>addTemplate(i)} className="rounded-xl border border-amber-200/30 bg-white/10 p-3 text-left text-xs text-white">{name}<span className="mt-1 block text-[10px] text-amber-200">Add 3D template</span></button>
               ))}
+            </div>
+            <div className="mt-3 rounded-xl border border-amber-200/20 bg-amber-200/5 p-3">
+              <div className="mb-2 text-xs font-semibold text-amber-100">Greek temple architectural orders</div>
+              <div className="grid grid-cols-3 gap-2">{(["doric","ionic","corinthian"] as ColumnStyle[]).map(order=><button key={order} onClick={()=>addTemplate(3,order)} className="rounded-lg bg-white/10 px-2 py-3 text-xs capitalize">+ {order}</button>)}</div>
             </div>
             <button onClick={()=>setPanel("add")} className="mt-3 rounded-xl bg-white/10 px-4 py-2 text-xs">Back to Add</button>
           </div>
