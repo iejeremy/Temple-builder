@@ -382,8 +382,8 @@ export default function TempleBuilderPage() {
               ["statues","Statue","♟","Guardians & figures"],
               ["site-columns","Columns","▥","Swipe styles"],
               ["scenery","Scenery","◈","Garden, desert & dusk"],
-              ["fountains","Fountain","◉","Coming soon"],
-              ["stairs","Stairs","▤","Coming soon"],
+              ["scenery","Fountain","◉","Place a fountain"],
+              ["edit","Stairs","▤","Add entrance stairs"],
               ["more","More","＋","Coming soon"]
             ] as const).map(([id,name,icon,sub])=>(
               <button key={id} onClick={()=>{setPanel(id);setActiveObject(null);if(id==="walls")setWallStep(perimeter?"features":"main");}} className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.06] px-1 py-2 text-center transition active:bg-white/10">
