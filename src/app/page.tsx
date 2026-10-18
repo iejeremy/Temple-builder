@@ -32,6 +32,7 @@ export type TowerShape = "round"|"square"|"octagon"|"hexagon"|"star"|"spire";
 export type Perimeter = { style:PerimeterStyle; material:BuilderMaterial; margin:number; height:number; thickness:number; towerShape:TowerShape; towers:boolean; gate:boolean; arches:boolean; columns:boolean; };
 export type StatueKind = "guardian"|"angel"|"lion";
 export type StatueFinish = "marble"|"bronze"|"gold"|"obsidian";
+export type SiteColumn = { id:string; style:ColumnStyle; material:BuilderMaterial; x:number; z:number; height:number; radius:number; rotation:number; };
 export type Statue = { id:string; kind:StatueKind; finish:StatueFinish; x:number; z:number; rotation:number; scale:number; };
 export type BuildingLevel = {
   id: string;
@@ -66,12 +67,14 @@ export default function TempleBuilderPage() {
   const [levels, setLevels] = useState<BuildingLevel[]>([]);
   const [perimeter, setPerimeter] = useState<Perimeter | null>(null);
   const [statues, setStatues] = useState<Statue[]>([]);
+  const [siteColumns,setSiteColumns] = useState<SiteColumn[]>([]);
+  const [selectedSiteColumnId,setSelectedSiteColumnId] = useState<string|null>(null);
   const [selectedStatueId, setSelectedStatueId] = useState<string | null>(null);
   const [wallStep, setWallStep] = useState<"main"|"features"|"options">("main");
   const [selectedLevel, setSelectedLevel] = useState(0);
   const [selectedFace, setSelectedFace] = useState<WallFace | null>(null);
   const [detailCategory, setDetailCategory] = useState<"levels"|"windows"|"doors"|"trim"|"columns"|"arches"|"stairs"|"pediments"|"roof"|"material"|null>(null);
-  const [panel, setPanel] = useState<"add" | "walls" | "buildings" | "fountains" | "statues" | "stairs" | "more" | "edit" | null>(null);
+  const [panel, setPanel] = useState<"add" | "walls" | "buildings" | "fountains" | "statues" | "site-columns" | "stairs" | "more" | "edit" | null>(null);
 
 
   const addTemplate = (kind: number) => {
@@ -251,7 +254,7 @@ export default function TempleBuilderPage() {
 
   return (
     <main className="relative h-[100dvh] overflow-hidden bg-[#b9c4cb] text-white">
-      <TempleWorld levels={levels} perimeter={perimeter} statues={statues} selectedStatueId={selectedStatueId} selectedLevel={selectedLevel}
+      <TempleWorld levels={levels} perimeter={perimeter} statues={statues} siteColumns={siteColumns} selectedStatueId={selectedStatueId} selectedLevel={selectedLevel}
         onSelectLevel={(index) => { setSelectedLevel(index); setSelectedFace(null); setDetailCategory(null); setPanel("edit"); }}
         onSelectFace={(index,face) => { setSelectedLevel(index); setSelectedFace(face); }}
         onSelectDetail={(index,face,category) => { setSelectedLevel(index); setSelectedFace(face); setDetailCategory(category); setPanel("edit"); }}
@@ -333,6 +336,7 @@ export default function TempleBuilderPage() {
               ["buildings","Building","▣","Templates & shapes"],
               ["walls","Walls","⬡","Courtyard walls"],
               ["statues","Statue","♟","Guardians & figures"],
+              ["site-columns","Columns","▥","Freestanding columns"],
               ["fountains","Fountain","◉","Coming soon"],
               ["stairs","Stairs","▤","Coming soon"],
               ["more","More","＋","Coming soon"]
@@ -419,6 +423,20 @@ export default function TempleBuilderPage() {
             <button onClick={()=>{setPerimeter(null);setWallStep("main");}} className="min-w-[100px] rounded-2xl bg-red-500/15 p-3 text-sm text-red-200">Remove</button>
           </div>
         )}
+        {panel === "site-columns" && (
+          <div className="flex flex-wrap gap-2 border-t border-white/10 px-3 py-3">
+            {(["doric","ionic","corinthian","composite","tuscan","fluted","square","twisted","gothic","roman-esque"] as ColumnStyle[]).map(style=><button key={style} className="rounded-xl bg-white/10 px-3 py-2 text-xs capitalize" onClick={()=>{const id=`site-column-${Date.now()}-${Math.random().toString(36).slice(2,5)}`;setSiteColumns(v=>[...v,{id,style,material:"marble",x:(levels[selectedLevel]?.x||0)+3,z:(levels[selectedLevel]?.z||0)+3,height:3.5,radius:.18,rotation:0}]);setSelectedSiteColumnId(id);}} >+ {style}</button>)}
+            {selectedSiteColumnId && siteColumns.filter(c=>c.id===selectedSiteColumnId).map(c=><div key={c.id} className="flex w-full flex-wrap items-center gap-2 rounded-xl bg-black/30 p-2 text-xs">
+              <span className="font-semibold">Selected: {c.style}</span>
+              {(["X","Z"] as const).map(axis=><label key={axis} className="flex items-center gap-1">{axis}<input aria-label={`${axis} position`} type="number" step="0.25" value={c[axis.toLowerCase() as "x"|"z"]} onChange={e=>setSiteColumns(v=>v.map(q=>q.id===c.id?{...q,[axis.toLowerCase()]:Number(e.target.value)}:q))} className="w-16 rounded bg-white/15 p-2"/></label>)}
+              <label>Height <input aria-label="Column height" type="number" min="1" max="15" step=".25" value={c.height} onChange={e=>setSiteColumns(v=>v.map(q=>q.id===c.id?{...q,height:Math.max(1,Math.min(15,Number(e.target.value)||1))}:q))} className="w-16 rounded bg-white/15 p-2"/></label>
+              <button className="rounded bg-white/15 p-2" onClick={()=>setSiteColumns(v=>[...v,{...c,id:`site-column-${Date.now()}`,x:c.x+.6}])}>Duplicate</button>
+              <button className="rounded bg-red-800/60 p-2" onClick={()=>{setSiteColumns(v=>v.filter(q=>q.id!==c.id));setSelectedSiteColumnId(null);}}>Delete</button>
+              <button className="rounded bg-white/15 p-2" onClick={()=>setSelectedSiteColumnId(null)}>Done</button>
+            </div>)}
+            {!selectedSiteColumnId&&siteColumns.length>0&&<div className="flex w-full flex-wrap gap-2">{siteColumns.map((c,i)=><button key={c.id} className="rounded bg-white/15 px-3 py-2 text-xs" onClick={()=>setSelectedSiteColumnId(c.id)}>Edit column {i+1}</button>)}</div>}
+          </div>
+        )}
         {panel === "statues" && (
           <div className="flex gap-2 overflow-x-auto border-t border-white/10 px-3 py-3">
             {!selectedStatueId && ([["guardian","Guardian"],["angel","Angel"],["lion","Lion"]] as [StatueKind,string][]).map(([kind,name])=><button key={kind} onClick={()=>{const id=`statue-${Date.now()}`;setStatues(v=>[...v,{id,kind,finish:"marble",x:3,z:3,rotation:0,scale:1}]);setSelectedStatueId(id);}} className="min-w-[112px] rounded-2xl border border-white/10 bg-white/5 p-3 text-left"><div className="mb-2 h-9 rounded-md border border-amber-100/40"/><div className="text-sm">{name}</div></button>)}
@@ -432,7 +450,7 @@ export default function TempleBuilderPage() {
             </>})()}
           </div>
         )}
-        {panel && panel !== "buildings" && panel !== "walls" && panel !== "statues" && panel !== "edit" && (
+        {panel && panel !== "buildings" && panel !== "walls" && panel !== "statues" && panel !== "site-columns" && panel !== "edit" && (
           <div className="border-t border-white/10 px-4 py-4 text-center text-sm text-white/55">
             {panel === "fountains" ? "Place fountains as separate site pieces." :
              panel === "stairs" ? "Place stairs and entrances." :
