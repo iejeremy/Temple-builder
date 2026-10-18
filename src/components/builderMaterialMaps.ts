@@ -4,7 +4,7 @@ import type { BuilderMaterial } from "@/app/page";
 /** Lightweight, deterministic, tileable procedural maps. These are placeholders
  * for scanned texture sets, not substitutes for photographic PBR assets. */
 const cached=new Map<string,{color:THREE.CanvasTexture;roughness:THREE.CanvasTexture;bump:THREE.CanvasTexture}>();
-const stoneKinds=new Set<BuilderMaterial>(["marble","sandstone","limestone","travertine","granite","stone","brick","concrete","stucco","plaster"]);
+const stoneKinds=new Set<BuilderMaterial>(["marble","sandstone","limestone","travertine","granite","stone","brick","concrete","stucco","plaster","timber","bronze","gold","obsidian"]);
 const hash=(x:number,y:number,seed:number)=>{
   let n=Math.imul(x,374761393)+Math.imul(y,668265263)+Math.imul(seed,1442695041);
   n=Math.imul(n^(n>>>13),1274126177);
@@ -27,11 +27,11 @@ function create(kind:BuilderMaterial){
   const ci=cc.getContext("2d")!.createImageData(size,size);
   const ri=rc.getContext("2d")!.createImageData(size,size);
   const bi=bc.getContext("2d")!.createImageData(size,size);
-  const isMarble=kind==="marble",isGranite=kind==="granite",isTravertine=kind==="travertine";
+  const isMarble=kind==="marble",isGranite=kind==="granite",isTravertine=kind==="travertine",isTimber=kind==="timber",isMetal=kind==="bronze"||kind==="gold";
   const base:Record<string,[number,number,number]>={
     marble:[238,235,228],sandstone:[191,150,105],limestone:[204,190,159],travertine:[202,172,132],
     granite:[110,110,114],stone:[126,122,113],brick:[152,84,64],concrete:[156,153,148],
-    stucco:[218,206,187],plaster:[227,218,201]
+    stucco:[218,206,187],plaster:[227,218,201],timber:[116,77,46],bronze:[151,99,54],gold:[205,164,73],obsidian:[32,34,40]
   };
   const rgb=base[kind]||[180,175,165];
   for(let y=0;y<size;y++)for(let x=0;x<size;x++){
@@ -40,10 +40,11 @@ function create(kind:BuilderMaterial){
     const wave=Math.sin((x/size)*Math.PI*8+(y/size)*Math.PI*4+coarse*5);
     const vein=isMarble?Math.pow(Math.max(0,wave*.5+.5),19)*(.45+fine*.55):0;
     const pits=isTravertine&&grain>.72?(grain-.72)*2.8:0;
-    const variation=(coarse-.5)*(isGranite?95:kind==="sandstone"?48:22)+(fine-.5)*20-vein*95-pits*95;
+    const woodGrain=isTimber?Math.sin(y*.21+coarse*4)*17+Math.sin(y*.055+fine*7)*12:0;
+    const variation=(coarse-.5)*(isGranite?95:kind==="sandstone"?48:22)+(fine-.5)*20-vein*95-pits*95+woodGrain;
     for(let c=0;c<3;c++)ci.data[i+c]=Math.max(0,Math.min(255,rgb[c]+variation));
     ci.data[i+3]=255;
-    const rough=(isMarble?110:kind==="granite"?175:235)+(fine-.5)*35;
+    const rough=(isMetal?65:kind==="obsidian"?52:isMarble?110:kind==="granite"?175:235)+(fine-.5)*35;
     for(let c=0;c<3;c++)ri.data[i+c]=Math.max(0,Math.min(255,rough));
     ri.data[i+3]=255;
     const height=Math.max(0,Math.min(255,128+(coarse-.5)*100+(fine-.5)*70-pits*95));
