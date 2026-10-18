@@ -78,6 +78,7 @@ export default function TempleBuilderPage() {
   const [detailCategory, setDetailCategory] = useState<"levels"|"windows"|"doors"|"trim"|"columns"|"arches"|"stairs"|"pediments"|"roof"|"material"|null>(null);
   const [landscapeItems,setLandscapeItems] = useState<LandscapeItem[]>([]);
   const [scenery,setScenery] = useState<"garden"|"desert"|"twilight">("garden");
+  const [cameraMode,setCameraMode]=useState<"orbit"|"pan">("orbit");
   const [panel, setPanel] = useState<"add" | "walls" | "buildings" | "fountains" | "statues" | "site-columns" | "stairs" | "scenery" | "more" | "edit" | null>(null);
 
 
@@ -289,7 +290,7 @@ export default function TempleBuilderPage() {
 
   return (
     <main className="relative h-[100dvh] overflow-hidden bg-[#b9c4cb] text-white">
-      <TempleWorld levels={levels} perimeter={perimeter} statues={statues} siteColumns={siteColumns} scenery={scenery} landscapeItems={landscapeItems} onSelectSiteColumn={(id:string)=>{setSelectedSiteColumnId(id);setPanel("site-columns");}} onMoveSiteColumn={(id:string,x:number,z:number)=>setSiteColumns(v=>v.map(c=>c.id===id?{...c,x,z}:c))} onSelectLandscape={(id:string)=>setPanel("scenery")} onMoveLandscape={(id:string,x:number,z:number)=>setLandscapeItems(v=>v.map(c=>c.id===id?{...c,x,z}:c))} selectedStatueId={selectedStatueId} selectedLevel={selectedLevel}
+      <TempleWorld cameraMode={cameraMode} levels={levels} perimeter={perimeter} statues={statues} siteColumns={siteColumns} scenery={scenery} landscapeItems={landscapeItems} onSelectSiteColumn={(id:string)=>{setSelectedSiteColumnId(id);setPanel("site-columns");}} onMoveSiteColumn={(id:string,x:number,z:number)=>setSiteColumns(v=>v.map(c=>c.id===id?{...c,x,z}:c))} onSelectLandscape={(id:string)=>setPanel("scenery")} onMoveLandscape={(id:string,x:number,z:number)=>setLandscapeItems(v=>v.map(c=>c.id===id?{...c,x,z}:c))} selectedStatueId={selectedStatueId} selectedLevel={selectedLevel}
         onSelectLevel={(index) => { setSelectedLevel(index); setSelectedFace(null); setDetailCategory(null); setPanel("edit"); }}
         onSelectFace={(index,face) => { setSelectedLevel(index); setSelectedFace(face); }}
         onSelectDetail={(index,face,category) => { setSelectedLevel(index); setSelectedFace(face); setDetailCategory(category); setPanel("edit"); }}
@@ -326,6 +327,10 @@ export default function TempleBuilderPage() {
         
       </div>
 
+      <div className="absolute right-3 top-24 z-20 flex gap-1 rounded-xl bg-black/65 p-1 text-xs text-white shadow-lg">
+        <button onClick={()=>setCameraMode("orbit")} className={`rounded-lg px-3 py-2 ${cameraMode==="orbit"?"bg-amber-200 text-black":"bg-white/10"}`}>Rotate</button>
+        <button onClick={()=>setCameraMode("pan")} className={`rounded-lg px-3 py-2 ${cameraMode==="pan"?"bg-amber-200 text-black":"bg-white/10"}`}>Move view</button>
+      </div>
       {!shape && (
         <div className="pointer-events-none absolute inset-x-5 top-[20%] z-10 rounded-3xl bg-black/40 p-5 text-center backdrop-blur-sm">
           <div className="text-xl font-semibold">Choose your starting building</div>
