@@ -260,7 +260,64 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
           if(level.roof==="flat"){const cap=new THREE.ExtrudeGeometry(s,{depth:.18,bevelEnabled:false});cap.rotateX(Math.PI/2);cap.translate(0,baseY+h+.18,0);add(cap,0,0,0);}else if(level.roof!=="none")addFootprintRoof(pts,baseY+h);
         }else{const body=new THREE.CylinderGeometry(r,r,h,sides);if(level.shape==="oval")body.scale(w/d,1,1);add(body,0,baseY+h/2,0);addFootprintRoof(pts,baseY+h);}
       }else{
-        for(const [rw,rd,x,z] of parts){box(rw+.12,.18,rd+.12,x,baseY+.09,z);box(rw,h,rd,x,baseY+h/2,z);}
+        for(const [rw,rd,x,z] of parts){
+          box(rw+.12,.18,rd+.12,x,baseY+.09,z);
+          // For single rectangular footprints, assemble wall panels around genuine openings.
+          // Compound footprints retain their original solid-body representation.
+          if(parts.length===1 && ["rectangle","square","wide"].includes(level.shape)){
+            const thickness=Math.min(.23,Math.max(.12,Math.min(rw,rd)*.045));
+            const buildWall=(face:WallFace)=>{
+              const span=face==="front"||face==="back"?rw:rd;
+              type Opening={left:number;right:number;bottom:number;top:number};
+              const openings:Opening[]=[];
+              for(const door of level.doors||[]){
+                if(door.face!==face)continue;
+                const center=(door.u||0)*span*.38,half=door.width/4.4;
+                openings.push({left:Math.max(-span/2,center-half),right:Math.min(span/2,center+half),bottom:0,top:Math.min(h,door.height/2.2)});
+              }
+              for(const win of level.windows||[]){
+                if(win.face!==face)continue;
+                const center=(win.u||0)*span*.38,cy=h*(win.v||.55),half=win.width/4.8,hh=win.height/4.8;
+                openings.push({left:Math.max(-span/2,center-half),right:Math.min(span/2,center+half),bottom:Math.max(0,cy-hh),top:Math.min(h,cy+hh)});
+              }
+              const cuts=[-span/2,span/2,...openings.flatMap(o=>[o.left,o.right])].sort((a,b)=>a-b);
+              const xs=cuts.filter((v,i)=>i===0||v-cuts[i-1]>.0001);
+              const makePanel=(a:number,b:number,low:number,high:number)=>{
+                if(b-a<.015||high-low<.015)return;
+                const m=new THREE.Mesh(new THREE.BoxGeometry(b-a,high-low,thickness),mat());
+                m.position.set((a+b)/2,baseY+(low+high)/2,face==="front"?rd/2-thickness/2:-rd/2+thickness/2);
+                if(face==="left"||face==="right"){
+                  m.position.set(face==="right"?rw/2-thickness/2:-rw/2+thickness/2,baseY+(low+high)/2,(a+b)/2);
+                  m.rotation.y=Math.PI/2;
+                }
+                lg.add(m);
+              };
+              for(let i=0;i<xs.length-1;i++){
+                const a=xs[i],b=xs[i+1],mid=(a+b)/2;
+                const blocked=openings.filter(o=>mid>o.left+.0001&&mid<o.right-.0001).sort((a,b)=>a.bottom-b.bottom);
+                let cursor=0;
+                for(const o of blocked){if(o.bottom>cursor)makePanel(a,b,cursor,o.bottom);cursor=Math.max(cursor,o.top);}
+                if(cursor<h)makePanel(a,b,cursor,h);
+              }
+              // Four return surfaces around each cut give the opening real wall depth.
+              const revealMat=new THREE.MeshStandardMaterial({color:new THREE.Color(color).multiplyScalar(.77),roughness:.86});
+              for(const o of openings){
+                for(const side of [o.left,o.right]){
+                  const jamb=new THREE.Mesh(new THREE.BoxGeometry(thickness*.95,o.top-o.bottom,.055),revealMat.clone());
+                  jamb.position.set(side,baseY+(o.top+o.bottom)/2,face==="front"?rd/2-thickness/2:-rd/2+thickness/2);
+                  if(face==="left"||face==="right"){jamb.position.set(face==="right"?rw/2-thickness/2:-rw/2+thickness/2,baseY+(o.top+o.bottom)/2,side);jamb.rotation.y=Math.PI/2;}
+                  lg.add(jamb);
+                }
+                const lintel=new THREE.Mesh(new THREE.BoxGeometry(o.right-o.left,.055,thickness),revealMat.clone());
+                lintel.position.set((o.left+o.right)/2,baseY+o.top,face==="front"?rd/2-thickness/2:-rd/2+thickness/2);
+                if(face==="left"||face==="right"){lintel.position.set(face==="right"?rw/2-thickness/2:-rw/2+thickness/2,baseY+o.top,(o.left+o.right)/2);lintel.rotation.y=Math.PI/2;}
+                lg.add(lintel);
+              }
+            };
+            for(const face of ["front","back","left","right"] as WallFace[])buildWall(face);
+            box(rw,h*.06,rd,x,baseY+h*.97,z);
+          }else box(rw,h,rd,x,baseY+h/2,z);
+        }
         for(const [rw,rd,x,z] of parts)addRoof(lg,level.roof,rw,rd,x,z,baseY+h,color);
       }
       // Low-poly masonry courses: staggered individual blocks with visible mortar gaps.
