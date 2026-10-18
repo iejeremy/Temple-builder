@@ -32,6 +32,8 @@ export type TowerShape = "round"|"square"|"octagon"|"hexagon"|"star"|"spire";
 export type Perimeter = { style:PerimeterStyle; material:BuilderMaterial; margin:number; height:number; thickness:number; towerShape:TowerShape; towers:boolean; gate:boolean; arches:boolean; columns:boolean; };
 export type StatueKind = "guardian"|"angel"|"lion";
 export type StatueFinish = "marble"|"bronze"|"gold"|"obsidian";
+export type LandscapeKind = "tree"|"garden"|"path"|"fountain"|"pond"|"rock";
+export type LandscapeItem = {id:string;kind:LandscapeKind;x:number;z:number;scale:number;rotation:number};
 export type SiteColumn = { id:string; style:ColumnStyle; material:BuilderMaterial; x:number; z:number; height:number; radius:number; rotation:number; };
 export type Statue = { id:string; kind:StatueKind; finish:StatueFinish; x:number; z:number; rotation:number; scale:number; };
 export type BuildingLevel = {
@@ -74,6 +76,7 @@ export default function TempleBuilderPage() {
   const [selectedLevel, setSelectedLevel] = useState(0);
   const [selectedFace, setSelectedFace] = useState<WallFace | null>(null);
   const [detailCategory, setDetailCategory] = useState<"levels"|"windows"|"doors"|"trim"|"columns"|"arches"|"stairs"|"pediments"|"roof"|"material"|null>(null);
+  const [landscapeItems,setLandscapeItems] = useState<LandscapeItem[]>([]);
   const [scenery,setScenery] = useState<"garden"|"desert"|"twilight">("garden");
   const [panel, setPanel] = useState<"add" | "walls" | "buildings" | "fountains" | "statues" | "site-columns" | "stairs" | "scenery" | "more" | "edit" | null>(null);
 
@@ -255,7 +258,7 @@ export default function TempleBuilderPage() {
 
   return (
     <main className="relative h-[100dvh] overflow-hidden bg-[#b9c4cb] text-white">
-      <TempleWorld levels={levels} perimeter={perimeter} statues={statues} siteColumns={siteColumns} scenery={scenery} selectedStatueId={selectedStatueId} selectedLevel={selectedLevel}
+      <TempleWorld levels={levels} perimeter={perimeter} statues={statues} siteColumns={siteColumns} scenery={scenery} landscapeItems={landscapeItems} selectedStatueId={selectedStatueId} selectedLevel={selectedLevel}
         onSelectLevel={(index) => { setSelectedLevel(index); setSelectedFace(null); setDetailCategory(null); setPanel("edit"); }}
         onSelectFace={(index,face) => { setSelectedLevel(index); setSelectedFace(face); }}
         onSelectDetail={(index,face,category) => { setSelectedLevel(index); setSelectedFace(face); setDetailCategory(category); setPanel("edit"); }}
@@ -426,6 +429,15 @@ export default function TempleBuilderPage() {
           </div>
         )}
         {panel === "scenery" && <div className="grid grid-cols-3 gap-2 border-t border-white/10 p-3">{([["garden","Garden","Green landscape"],["desert","Desert","Warm sandstone"],["twilight","Twilight","Evening light"]] as const).map(([id,name,sub])=><button key={id} aria-pressed={scenery===id} onClick={()=>setScenery(id)} className={`rounded-xl border p-3 text-left ${scenery===id?"border-amber-200 bg-amber-200/20":"border-white/10 bg-white/5"}`}><span className="block text-sm font-semibold">{name}</span><span className="text-[10px] text-white/60">{sub}</span></button>)}</div>}
+        {panel === "scenery" && <div className="flex flex-wrap gap-2 border-t border-white/10 p-3">
+          {(["tree","garden","path","fountain","pond","rock"] as LandscapeKind[]).map(kind=><button key={kind} className="rounded-lg bg-white/10 px-3 py-2 text-xs capitalize" onClick={()=>setLandscapeItems(v=>[...v,{id:`land-${Date.now()}-${v.length}`,kind,x:4,z:4,scale:1,rotation:0}])}>+ {kind}</button>)}
+          {landscapeItems.map(item=><div key={item.id} className="flex w-full flex-wrap items-center gap-2 rounded-xl bg-white/5 p-2 text-xs">
+            <span className="capitalize">{item.kind}</span>
+            {(["x","z","scale","rotation"] as const).map(axis=><label key={axis}>{axis}<input type="number" aria-label={`${item.kind} ${axis}`} step={axis==="rotation"?15:.25} value={item[axis]} onChange={e=>setLandscapeItems(v=>v.map(q=>q.id===item.id?{...q,[axis]:Number(e.target.value)}:q))} className="ml-1 w-14 rounded bg-white/15 p-1"/></label>)}
+            <button onClick={()=>setLandscapeItems(v=>[...v,{...item,id:`land-${Date.now()}`,x:item.x+1}])}>Duplicate</button>
+            <button onClick={()=>setLandscapeItems(v=>v.filter(q=>q.id!==item.id))} className="text-red-200">Delete</button>
+          </div>)}
+        </div>}
         {panel === "site-columns" && (
           <div className="flex flex-wrap gap-2 border-t border-white/10 px-3 py-3">
             {(["doric","ionic","corinthian","composite","tuscan","fluted","square","twisted","gothic","roman-esque"] as ColumnStyle[]).map(style=><button key={style} className="rounded-xl bg-white/10 px-3 py-2 text-xs capitalize" onClick={()=>{const id=`site-column-${Date.now()}-${Math.random().toString(36).slice(2,5)}`;setSiteColumns(v=>[...v,{id,style,material:"marble",x:(levels[selectedLevel]?.x||0)+3,z:(levels[selectedLevel]?.z||0)+3,height:3.5,radius:.18,rotation:0}]);setSelectedSiteColumnId(id);}} >+ {style}</button>)}
