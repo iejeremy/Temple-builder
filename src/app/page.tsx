@@ -89,6 +89,7 @@ export default function TempleBuilderPage() {
     const arch=(l:BuildingLevel,face:WallFace,style:ArchStyle)=>l.arches.push({id:`arch-${uid()}`,face,u:0,style});
     const trim=(l:BuildingLevel,face:WallFace,style:TrimStyle)=>l.trims.push({id:`trim-${uid()}`,face,u:0,style});
     const pediment=(l:BuildingLevel,face:WallFace,style:PedimentStyle)=>l.pediments.push({id:`ped-${uid()}`,face,u:0,style});
+    const decorate=(l:BuildingLevel,faces:WallFace[],style:TrimStyle)=>{for(const face of faces)trim(l,face,style);};
     let parts:BuildingLevel[]=[];
     if(kind===0){
       // Temple of the Sun · Maya: four stepped tiers, four stairways and summit shrine.
@@ -102,6 +103,10 @@ export default function TempleBuilderPage() {
       for(const face of ["back","left","right"] as WallFace[])window(shrine,face,"narrow",0);
       window(shrine,"front","narrow",-.55,.6);window(shrine,"front","narrow",.55,.6);
       columns(shrine,"square",["front"],[-.7,.7]);trim(shrine,"front","frieze");trim(shrine,"back","frieze");
+      decorate(base,["front","back","left","right"],"base");
+      decorate(mid,["front","back","left","right"],"greek-fret");
+      decorate(upper,["front","back","left","right"],"frieze");
+      pediment(shrine,"front","stepped");
       parts=[base,mid,upper,shrine];
     }else if(kind===1){
       // Eternal Courtyard · Egypt: court, hypostyle hall, sanctuary and twin pylons.
@@ -118,6 +123,9 @@ export default function TempleBuilderPage() {
       trim(sanctuary,"front","frieze");
       for(const t of [left,right]){door(t,"front","stone-arch",0,1.2,2);window(t,"front","tall",0,.7);}
       trim(court,"front","base");trim(court,"back","base");
+      decorate(hall,["front","back"],"crown");
+      decorate(sanctuary,["front","back","left","right"],"base");
+      for(const t of [left,right]){trim(t,"front","frieze");pediment(t,"front","stepped");}
       parts=[court,hall,sanctuary,left,right];
     }else if(kind===2){
       // Celestial Shrine · Hindu: mandapa, rising shikhara and golden finial.
@@ -133,6 +141,9 @@ export default function TempleBuilderPage() {
       trim(hall,"front","acanthus");trim(hall,"back","acanthus");
       for(const face of ["front","back","left","right"] as WallFace[])window(tower1,face,"narrow",0);
       trim(tower1,"front","frieze");window(tower2,"front","narrow",0);
+      decorate(tower1,["front","back","left","right"],"acanthus");
+      decorate(tower2,["front","back","left","right"],"rosette");
+      pediment(hall,"front","ornate");
       parts=[hall,tower1,tower2,tower3,finial];
     }else if(kind===3){
       // Marble Pantheon · Greek: full colonnade, portico, pediments and ornament.
@@ -144,6 +155,8 @@ export default function TempleBuilderPage() {
       for(const face of ["left","right"] as WallFace[]){window(temple,face,"classic",-.4);window(temple,face,"classic",.4);}
       trim(temple,"front","dentils");trim(temple,"back","dentils");trim(temple,"front","greek-fret");
       trim(temple,"left","base");trim(temple,"right","base");
+      decorate(temple,["front","back","left","right"],"crown");
+      for(const face of ["left","right"] as WallFace[])trim(temple,face,"dentils");
       parts=[temple];
     }else if(kind===4){
       // Cathedral of Echoes · Gothic: nave, crossing and twin towers.
@@ -163,6 +176,8 @@ export default function TempleBuilderPage() {
         for(const face of ["back","left","right"] as WallFace[])window(tower,face,"narrow",0);
         arch(tower,"front","pointed");trim(tower,"front","crown");
       }
+      pediment(nave,"front","ornate");
+      for(const tower of [left,right]){trim(tower,"front","dentils");pediment(tower,"front","triangular");}
       parts=[nave,crossing,left,right];
     }else{
       // Temple of Unity · Echoes: central domed rotunda, four wings and courtyard.
@@ -186,7 +201,15 @@ export default function TempleBuilderPage() {
         window(wing,"back","classic",0);trim(wing,"front","base");door(wing,"front","single");
       }
       trim(court,"front","base");trim(court,"back","base");stairs(court,"front","straight");
+      decorate(rotunda,["front","back","left","right"],"rosette");
+      decorate(north,["front","back"],"dentils");
       parts=[rotunda,north,south,east,west,court];
+    }
+    if(levels.length && parts.length){
+      const rightEdge=Math.max(...levels.map(l=>(l.x||0)+l.width/14));
+      const leftEdge=Math.min(...parts.map(l=>(l.x||0)-l.width/14));
+      const shift=rightEdge-leftEdge+3;
+      parts=parts.map(l=>({...l,x:l.x+shift}));
     }
     setLevels(current=>[...current,...parts]);
     setShape(parts[0].shape);
