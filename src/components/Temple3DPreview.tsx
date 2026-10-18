@@ -411,23 +411,30 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
       const add=(geo:THREE.BufferGeometry,x:number,y:number,z:number,color:number)=>{const m=new THREE.Mesh(geo,material(color));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;g.add(m);};
       if(item.kind==="tree"){
         add(new THREE.CylinderGeometry(.12,.19,1.6,8),0,.8,0,0x695039);
-        for(let i=0;i<3;i++)add(new THREE.ConeGeometry(.85-i*.17,1.55,9),0,1.55+i*.55,0,0x416b40);
+        for(let i=0;i<4;i++)add(new THREE.ConeGeometry(.93-i*.15,1.25,12),0,1.45+i*.48,0,i%2?0x416b40:0x537d4b);
+        for(let i=0;i<6;i++){const a=i*Math.PI/3;add(new THREE.SphereGeometry(.13,8,6),Math.cos(a)*.47,1.7+(i%3)*.38,Math.sin(a)*.47,0x8f7440);}
       }else if(item.kind==="garden"){
         add(new THREE.CylinderGeometry(1.15,1.2,.16,24),0,.08,0,0x776c56);
         add(new THREE.CylinderGeometry(1.05,1.05,.04,24),0,.18,0,0x394b2f);
-        for(let i=0;i<8;i++){const a=i*Math.PI/4;add(new THREE.SphereGeometry(.19,8,6),Math.cos(a)*.72,.34,Math.sin(a)*.72,i%2?0xd8b454:0x8f548f);}
+        for(let i=0;i<12;i++){const a=i*Math.PI/6;const x=Math.cos(a)*.76,z=Math.sin(a)*.76;add(new THREE.ConeGeometry(.11,.34,7),x,.36,z,0x4d7846);add(new THREE.SphereGeometry(.14,9,7),x,.56,z,i%3===0?0xd8b454:i%3===1?0x9b5a9c:0xc86d65);}
       }else if(item.kind==="path"){
-        for(let i=0;i<8;i++)add(new THREE.BoxGeometry(.78,.065,.46),0,.035,(i-3.5)*.53,0xb4a58c);
+        for(let i=0;i<8;i++){const z=(i-3.5)*.53;add(new THREE.BoxGeometry(.79,.08,.47),0,.04,z,i%3===0?0x9d8d76:0xb4a58c);add(new THREE.BoxGeometry(.07,.025,.44),-.29,.095,z,0xc4b69d);}
       }else if(item.kind==="fountain"){
         add(new THREE.CylinderGeometry(1.05,1.1,.32,32),0,.16,0,0xbbb6aa);
         add(new THREE.CylinderGeometry(.91,.91,.025,32),0,.335,0,0x5f9faf);
         add(new THREE.CylinderGeometry(.13,.2,.95,16),0,.8,0,0xc4c0b8);
         add(new THREE.SphereGeometry(.23,12,10),0,1.34,0,0x80c4d5);
+        for(let i=0;i<8;i++){const a=i*Math.PI/4;const m=new THREE.Mesh(new THREE.TorusGeometry(.035,.012,5,10),new THREE.MeshStandardMaterial({color:0x9cdae6,metalness:.25,roughness:.18}));m.position.set(Math.cos(a)*.75,.37,Math.sin(a)*.75);m.rotation.x=Math.PI/2;g.add(m);}
+        add(new THREE.TorusGeometry(1.02,.075,8,40),0,.33,0,0xe0d8c9);
       }else if(item.kind==="pond"){
         add(new THREE.CylinderGeometry(1.7,1.75,.10,32),0,.05,0,0x8c8779);
         add(new THREE.CylinderGeometry(1.58,1.58,.025,32),0,.115,0,0x4b8792);
+        for(let i=0;i<11;i++){const a=i*2.4,r=.45+(i%4)*.28;add(new THREE.CylinderGeometry(.11,.11,.015,10),Math.cos(a)*r,.14,Math.sin(a)*r,0x5d9870);}
+        for(let i=0;i<18;i++){const a=i*Math.PI/9;add(new THREE.DodecahedronGeometry(.12+(i%3)*.04,0),Math.cos(a)*1.67,.13,Math.sin(a)*1.67,0x97918a);}
       }else{
         add(new THREE.DodecahedronGeometry(.8,1),0,.52,0,0x817e75);
+        add(new THREE.DodecahedronGeometry(.42,0),.52,.28,-.25,0xaaa49a);
+        add(new THREE.DodecahedronGeometry(.27,0),-.48,.18,.30,0x696e68);
       }
     }
     statueGroupsRef.current=[];
@@ -438,10 +445,13 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
       const mesh=(g:THREE.BufferGeometry,x:number,y:number,z:number)=>{const m=new THREE.Mesh(g,sm.clone());m.position.set(x,y,z);sg.add(m);return m;};
       mesh(new THREE.CylinderGeometry(.42,.5,.22,18),0,.11,0);
       if(statue.kind==="lion"){
-        mesh(new THREE.SphereGeometry(.42,16,10),0,.72,0);const body=mesh(new THREE.CapsuleGeometry(.34,.8,6,12),0,.55,-.25);body.rotation.x=Math.PI/2;for(const x of [-.25,.25])for(const z of [-.48,.05])mesh(new THREE.CylinderGeometry(.07,.09,.48,10),x,.3,z);
+        mesh(new THREE.SphereGeometry(.42,16,10),0,.72,0);
+        for(let i=0;i<10;i++){const a=i*Math.PI/5;mesh(new THREE.ConeGeometry(.11,.30,5),Math.cos(a)*.35,.76+Math.sin(a)*.32,.10);}
+        mesh(new THREE.ConeGeometry(.12,.23,6),-.18,1.12,.14);mesh(new THREE.ConeGeometry(.12,.23,6),.18,1.12,.14);
+        const body=mesh(new THREE.CapsuleGeometry(.34,.8,6,12),0,.55,-.25);body.rotation.x=Math.PI/2;for(const x of [-.25,.25])for(const z of [-.48,.05])mesh(new THREE.CylinderGeometry(.07,.09,.48,10),x,.3,z);
       }else{
         mesh(new THREE.CapsuleGeometry(.24,.9,6,12),0,.8,0);mesh(new THREE.SphereGeometry(.2,16,10),0,1.52,0);
-        if(statue.kind==="angel"){for(const side of [-1,1]){const wing=mesh(new THREE.ConeGeometry(.32,1.15,5),side*.38,1.05,.08);wing.rotation.z=side*.55;}}
+        if(statue.kind==="angel"){for(const side of [-1,1]){const wing=mesh(new THREE.ConeGeometry(.38,1.35,7),side*.43,1.15,.08);wing.rotation.z=side*.55;for(let j=0;j<4;j++){const feather=mesh(new THREE.ConeGeometry(.09,.54,5),side*(.47+j*.11),.77+j*.18,.12);feather.rotation.z=side*.42;}}mesh(new THREE.TorusGeometry(.23,.025,6,24),0,1.84,0); }
         else {for(const side of [-1,1]){const arm=mesh(new THREE.CylinderGeometry(.065,.075,.65,10),side*.32,.9,0);arm.rotation.z=side*.25;}mesh(new THREE.CylinderGeometry(.12,.18,.7,12),0,.42,0);}
       }
     }
