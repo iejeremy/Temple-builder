@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import type { BuildingLevel, RoofStyle, WallFace, Perimeter, BuilderMaterial, Statue } from "@/app/page";
+import type { BuildingLevel, RoofStyle, WallFace, Perimeter, BuilderMaterial, Statue, SiteColumn } from "@/app/page";
 import { getProceduralMaps } from "./builderMaterialMaps";
 
 const COLORS: Record<BuilderMaterial, number> = { marble:0xe7e2da,sandstone:0xb98b5b,limestone:0xcbbd9d,obsidian:0x17191d,granite:0x62636a,travertine:0xc7a77d,brick:0x884838,stone:0x77736b,concrete:0x92908a,stucco:0xd8ccb8,plaster:0xe0d9ca,timber:0x70472f,bronze:0x8a5b32,gold:0xc39a36 };
@@ -28,10 +28,11 @@ const makeMaterial=(kind:BuilderMaterial,color=COLORS[kind],selected=false)=>{
   });
 };
 
-export default function Temple3DPreview({ levels, perimeter, statues, selectedStatueId, selectedLevel, onSelectLevel, onSelectFace, onMoveLevel, onPatioChange, onMoveWindow, onMoveDoor, onMoveArch, onMoveDetail, onResizePerimeter, onSelectDetail, onSelectPerimeter, onSelectStatue, onMoveStatue }: {
+export default function Temple3DPreview({ levels, perimeter, statues, siteColumns, selectedStatueId, selectedLevel, onSelectLevel, onSelectFace, onMoveLevel, onPatioChange, onMoveWindow, onMoveDoor, onMoveArch, onMoveDetail, onResizePerimeter, onSelectDetail, onSelectPerimeter, onSelectStatue, onMoveStatue }: {
   levels: BuildingLevel[];
   perimeter: Perimeter | null;
   statues: Statue[];
+  siteColumns: SiteColumn[];
   selectedStatueId?: string | null;
   selectedLevel: number;
   onSelectLevel?: (index: number) => void;
@@ -335,6 +336,24 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
         if(exposed!==level.patio) queueMicrotask(()=>onPatioChange?.(index,exposed));
       }
     });
+    // Independent site columns can be arranged around any temple without a wall attachment.
+    for(const column of siteColumns){
+      const g=new THREE.Group();g.position.set(column.x,0,column.z);g.rotation.y=THREE.MathUtils.degToRad(column.rotation);group.add(g);
+      const cm=makeMaterial(column.material,COLORS[column.material]);
+      const h=column.height,r=column.radius;
+      const mesh=(geo:THREE.BufferGeometry,y:number)=>{const m=new THREE.Mesh(geo,cm.clone());m.position.y=y;m.castShadow=true;m.receiveShadow=true;g.add(m);return m;};
+      mesh(new THREE.CylinderGeometry(r*.94,r*1.12,h*.83,column.style==="square"?4:24),h*.51);
+      mesh(new THREE.CylinderGeometry(r*1.4,r*1.55,h*.075,24),h*.065);
+      mesh(new THREE.CylinderGeometry(r*1.35,r*1.1,h*.075,24),h*.9);
+      mesh(new THREE.BoxGeometry(r*3.3,h*.075,r*3.3),h*.97);
+      if(["ionic","corinthian","composite","fluted","gothic"].includes(column.style)){
+        for(let i=0;i<12;i++){const a=i*Math.PI/6;const rib=new THREE.Mesh(new THREE.CylinderGeometry(r*.085,r*.085,h*.77,5),cm.clone());rib.position.set(Math.cos(a)*r*.97,h*.51,Math.sin(a)*r*.97);g.add(rib);}
+      }
+      if(["corinthian","composite"].includes(column.style)){
+        for(let i=0;i<8;i++){const a=i*Math.PI/4;const leaf=new THREE.Mesh(new THREE.ConeGeometry(r*.23,h*.13,5),cm.clone());leaf.position.set(Math.cos(a)*r*1.08,h*.87,Math.sin(a)*r*1.08);g.add(leaf);}
+      }
+      if(column.style==="ionic"||column.style==="composite")for(const side of [-1,1]){const volute=new THREE.Mesh(new THREE.TorusGeometry(r*.36,r*.10,8,20),cm.clone());volute.position.set(side*r*.9,h*.93,0);g.add(volute);}
+    }
     statueGroupsRef.current=[];
     const statueColor=(f:Statue["finish"])=>f==="bronze"?0x8a6038:f==="gold"?0xc9a84f:f==="obsidian"?0x25252b:0xd9d4cc;
     for(const statue of statues){
