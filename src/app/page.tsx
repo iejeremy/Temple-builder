@@ -36,7 +36,7 @@ export type LandscapeKind = "tree"|"garden"|"path"|"fountain"|"pond"|"rock";
 export type LandscapeItem = {id:string;kind:LandscapeKind;x:number;z:number;scale:number;rotation:number};
 export type SiteColumn = { id:string; style:ColumnStyle; material:BuilderMaterial; x:number; z:number; height:number; radius:number; rotation:number; };
 export type Statue = { id:string; kind:StatueKind; finish:StatueFinish; x:number; z:number; rotation:number; scale:number; };
-export type BuildingLevel = {
+export type BuildingLevel = { architecture?: "maya"|"egyptian"|"hindu"|"greek"|"gothic"|"echoes";
   id: string;
   shape: BuildingShape;
   material: BuilderMaterial;
@@ -239,6 +239,8 @@ export default function TempleBuilderPage() {
       // Echoes: ceremonial entrance colonnade.
       for(const x of [-3,-1.8,-.6,.6,1.8,3])addFreestanding("ionic","marble",x,11,3,.2);
     }
+    const architecture=(["maya","egyptian","hindu","greek","gothic","echoes"] as const)[kind]||"echoes";
+    parts=parts.map(l=>({...l,architecture}));
     if(levels.length && parts.length){
       const rightEdge=Math.max(...levels.map(l=>(l.x||0)+l.width/14));
       const leftEdge=Math.min(...parts.map(l=>(l.x||0)-l.width/14));
