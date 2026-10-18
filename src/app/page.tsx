@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const TempleWorld = dynamic(() => import("@/components/Temple3DPreview"), {
   ssr: false,
@@ -81,6 +81,29 @@ export default function TempleBuilderPage() {
   const [landscapeItems,setLandscapeItems] = useState<LandscapeItem[]>([]);
   const [scenery,setScenery] = useState<"garden"|"desert"|"twilight">("garden");
   const [panel, setPanel] = useState<"add" | "walls" | "buildings" | "fountains" | "statues" | "site-columns" | "stairs" | "scenery" | "more" | "edit" | null>(null);
+  // Save the complete building site on this device without requiring an account.
+  const [siteLoaded,setSiteLoaded] = useState(false);
+  useEffect(()=>{
+    try {
+      const raw=window.localStorage.getItem("echoes-temple-builder-v1");
+      if(raw){
+        const saved=JSON.parse(raw);
+        if(Array.isArray(saved.levels)){setLevels(saved.levels);if(saved.levels.length)setShape(saved.levels[0].shape);}
+        if(saved.perimeter)setPerimeter(saved.perimeter);
+        if(Array.isArray(saved.siteColumns))setSiteColumns(saved.siteColumns);
+        if(Array.isArray(saved.statues))setStatues(saved.statues);
+        if(Array.isArray(saved.landscapeItems))setLandscapeItems(saved.landscapeItems);
+        if(["garden","desert","twilight"].includes(saved.scenery))setScenery(saved.scenery);
+      }
+    }catch(err){console.warn("Could not restore local temple design",err);}
+    setSiteLoaded(true);
+  },[]);
+  useEffect(()=>{
+    if(!siteLoaded)return;
+    try{window.localStorage.setItem("echoes-temple-builder-v1",JSON.stringify({levels,perimeter,siteColumns,statues,landscapeItems,scenery}));}
+    catch(err){console.warn("Could not save local temple design",err);}
+  },[siteLoaded,levels,perimeter,siteColumns,statues,landscapeItems,scenery]);
+
 
 
   const addTemplate = (kind: number, greekOrder: ColumnStyle = "corinthian") => {
@@ -380,6 +403,9 @@ export default function TempleBuilderPage() {
             {detailCategory && <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
               <button onClick={()=>setDetailCategory(null)} className="shrink-0 rounded-xl bg-white/10 px-3 py-2 text-xs">Back</button>
               <span className="text-xs font-semibold capitalize text-white/70">{detailCategory}</span>
+              {detailCategory!=="levels"&&detailCategory!=="roof"&&detailCategory!=="material"&&<span className="text-[11px] text-white/60">Level {selectedLevel+1}</span>}
+              {selectedFace&&detailCategory!=="levels"&&detailCategory!=="roof"&&detailCategory!=="material"&&<button onClick={()=>setSelectedFace(null)} className="ml-auto rounded-lg border border-amber-200/50 bg-amber-200/15 px-3 py-2 text-xs capitalize text-amber-100">Wall: {selectedFace} · Change</button>}
+
             </div>}
             {detailCategory==="levels" && <div className="flex gap-2 overflow-x-auto px-3 py-3">
               {levels.length<12 && <button onClick={()=>{const base=levels[levels.length-1];setLevels([...levels,{...base,id:`level-${levels.length+1}`,width:Math.max(16,Math.round(base.width*.84)),depth:Math.max(16,Math.round(base.depth*.84)),roof:"flat",patio:false,x:base.x,z:base.z,rotation:base.rotation,elevation:(base.elevation||0)+base.height,windows:[],doors:[],arches:[],columns:[],trims:[],stairs:[],pediments:[]}]);setSelectedLevel(levels.length);}} className="min-w-[100px] shrink-0 rounded-xl bg-white/10 p-3 text-xs">+ Add Level</button>}
