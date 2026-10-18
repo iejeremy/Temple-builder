@@ -74,7 +74,8 @@ export default function TempleBuilderPage() {
   const [selectedLevel, setSelectedLevel] = useState(0);
   const [selectedFace, setSelectedFace] = useState<WallFace | null>(null);
   const [detailCategory, setDetailCategory] = useState<"levels"|"windows"|"doors"|"trim"|"columns"|"arches"|"stairs"|"pediments"|"roof"|"material"|null>(null);
-  const [panel, setPanel] = useState<"add" | "walls" | "buildings" | "fountains" | "statues" | "site-columns" | "stairs" | "more" | "edit" | null>(null);
+  const [scenery,setScenery] = useState<"garden"|"desert"|"twilight">("garden");
+  const [panel, setPanel] = useState<"add" | "walls" | "buildings" | "fountains" | "statues" | "site-columns" | "stairs" | "scenery" | "more" | "edit" | null>(null);
 
 
   const addTemplate = (kind: number) => {
@@ -254,7 +255,7 @@ export default function TempleBuilderPage() {
 
   return (
     <main className="relative h-[100dvh] overflow-hidden bg-[#b9c4cb] text-white">
-      <TempleWorld levels={levels} perimeter={perimeter} statues={statues} siteColumns={siteColumns} selectedStatueId={selectedStatueId} selectedLevel={selectedLevel}
+      <TempleWorld levels={levels} perimeter={perimeter} statues={statues} siteColumns={siteColumns} scenery={scenery} selectedStatueId={selectedStatueId} selectedLevel={selectedLevel}
         onSelectLevel={(index) => { setSelectedLevel(index); setSelectedFace(null); setDetailCategory(null); setPanel("edit"); }}
         onSelectFace={(index,face) => { setSelectedLevel(index); setSelectedFace(face); }}
         onSelectDetail={(index,face,category) => { setSelectedLevel(index); setSelectedFace(face); setDetailCategory(category); setPanel("edit"); }}
@@ -299,7 +300,7 @@ export default function TempleBuilderPage() {
       )}
 
       {/* Improved bottom menu from supplied design; existing builder actions remain intact. */}
-      <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[24px] border-t border-white/10 bg-[#0c1118]/96 pb-[max(8px,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+      <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[24px] border-t border-white/10 bg-[#0c1118]/96 max-h-[48dvh] overflow-y-auto overscroll-contain pb-[max(8px,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl">
         <div className="flex justify-center pb-1 pt-2.5"><div className="h-1 w-10 rounded-full bg-white/20" /></div>
         <div className="flex items-center gap-2 px-3 pb-2">
           {panel === null && (
@@ -337,6 +338,7 @@ export default function TempleBuilderPage() {
               ["walls","Walls","⬡","Courtyard walls"],
               ["statues","Statue","♟","Guardians & figures"],
               ["site-columns","Columns","▥","Freestanding columns"],
+              ["scenery","Scenery","◈","Garden, desert & dusk"],
               ["fountains","Fountain","◉","Coming soon"],
               ["stairs","Stairs","▤","Coming soon"],
               ["more","More","＋","Coming soon"]
@@ -423,6 +425,7 @@ export default function TempleBuilderPage() {
             <button onClick={()=>{setPerimeter(null);setWallStep("main");}} className="min-w-[100px] rounded-2xl bg-red-500/15 p-3 text-sm text-red-200">Remove</button>
           </div>
         )}
+        {panel === "scenery" && <div className="grid grid-cols-3 gap-2 border-t border-white/10 p-3">{([["garden","Garden","Green landscape"],["desert","Desert","Warm sandstone"],["twilight","Twilight","Evening light"]] as const).map(([id,name,sub])=><button key={id} aria-pressed={scenery===id} onClick={()=>setScenery(id)} className={`rounded-xl border p-3 text-left ${scenery===id?"border-amber-200 bg-amber-200/20":"border-white/10 bg-white/5"}`}><span className="block text-sm font-semibold">{name}</span><span className="text-[10px] text-white/60">{sub}</span></button>)}</div>}
         {panel === "site-columns" && (
           <div className="flex flex-wrap gap-2 border-t border-white/10 px-3 py-3">
             {(["doric","ionic","corinthian","composite","tuscan","fluted","square","twisted","gothic","roman-esque"] as ColumnStyle[]).map(style=><button key={style} className="rounded-xl bg-white/10 px-3 py-2 text-xs capitalize" onClick={()=>{const id=`site-column-${Date.now()}-${Math.random().toString(36).slice(2,5)}`;setSiteColumns(v=>[...v,{id,style,material:"marble",x:(levels[selectedLevel]?.x||0)+3,z:(levels[selectedLevel]?.z||0)+3,height:3.5,radius:.18,rotation:0}]);setSelectedSiteColumnId(id);}} >+ {style}</button>)}
@@ -450,7 +453,7 @@ export default function TempleBuilderPage() {
             </>})()}
           </div>
         )}
-        {panel && panel !== "buildings" && panel !== "walls" && panel !== "statues" && panel !== "site-columns" && panel !== "edit" && (
+        {panel && panel !== "buildings" && panel !== "walls" && panel !== "statues" && panel !== "site-columns" && panel !== "scenery" && panel !== "edit" && (
           <div className="border-t border-white/10 px-4 py-4 text-center text-sm text-white/55">
             {panel === "fountains" ? "Place fountains as separate site pieces." :
              panel === "stairs" ? "Place stairs and entrances." :
