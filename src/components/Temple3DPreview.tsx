@@ -349,6 +349,19 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
         const cg=col.style==="square"?new THREE.BoxGeometry(.28,ch,.28):new THREE.CylinderGeometry((col.style==="corinthian"||col.style==="composite") ? .18 : .14,.17,ch,col.style==="fluted"?20:14);
         const cm=new THREE.Mesh(cg,detailMat());cm.position.set(pos.x,pos.y,pos.z);cm.rotation.y=pos.rot;cm.userData.levelIndex=index;cm.userData.detailCategory="columns";cm.userData.detailId=col.id;cm.userData.detailFace=col.face;lg.add(cm);
         const cap=new THREE.Mesh(new THREE.BoxGeometry(.42,.16,.42),detailMat());cap.position.set(pos.x,baseY+h*.93,pos.z);cap.rotation.y=pos.rot;lg.add(cap);
+        // Capital abacus, neck rings and vertical fluting on wall-attached columns.
+        for(const ringY of [baseY+.18,baseY+h*.84,baseY+h*.89]){
+          const ring=new THREE.Mesh(new THREE.CylinderGeometry(.215,.215,.045,16),detailMat());ring.position.set(pos.x,ringY,pos.z);lg.add(ring);
+        }
+        if(["doric","ionic","corinthian","composite","fluted","gothic"].includes(col.style)){
+          for(let j=0;j<12;j++){const angle=j*Math.PI/6;const rib=new THREE.Mesh(new THREE.CylinderGeometry(.018,.018,ch*.82,5),detailMat());rib.position.set(pos.x+Math.cos(angle)*.155,baseY+h*.49,pos.z+Math.sin(angle)*.155);lg.add(rib);}
+        }
+        if(["corinthian","composite"].includes(col.style)){
+          for(let j=0;j<8;j++){const angle=j*Math.PI/4;const leaf=new THREE.Mesh(new THREE.ConeGeometry(.055,.23,5),detailMat());leaf.position.set(pos.x+Math.cos(angle)*.20,baseY+h*.84,pos.z+Math.sin(angle)*.20);lg.add(leaf);}
+        }
+        if(["ionic","composite"].includes(col.style)){
+          for(const side of [-1,1]){const spiral=new THREE.Mesh(new THREE.TorusGeometry(.075,.023,7,18),detailMat());spiral.position.set(pos.x+side*.19,baseY+h*.91,pos.z);lg.add(spiral);}
+        }
         const foot=new THREE.Mesh(new THREE.CylinderGeometry(.22,.25,.12,16),detailMat());foot.position.set(pos.x,baseY+.08,pos.z);lg.add(foot);
         if(col.style==="twisted") cm.rotation.y+=Math.PI/4;
       }
