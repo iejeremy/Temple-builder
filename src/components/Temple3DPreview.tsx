@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import type { BuildingLevel, RoofStyle, WallFace, Perimeter, BuilderMaterial, Statue, SiteColumn } from "@/app/page";
+import type { BuildingLevel, RoofStyle, WallFace, Perimeter, BuilderMaterial, Statue, SiteColumn, LandscapeItem } from "@/app/page";
 import { getProceduralMaps } from "./builderMaterialMaps";
 
 const COLORS: Record<BuilderMaterial, number> = { marble:0xe7e2da,sandstone:0xb98b5b,limestone:0xcbbd9d,obsidian:0x17191d,granite:0x62636a,travertine:0xc7a77d,brick:0x884838,stone:0x77736b,concrete:0x92908a,stucco:0xd8ccb8,plaster:0xe0d9ca,timber:0x70472f,bronze:0x8a5b32,gold:0xc39a36 };
@@ -28,11 +28,12 @@ const makeMaterial=(kind:BuilderMaterial,color=COLORS[kind],selected=false)=>{
   });
 };
 
-export default function Temple3DPreview({ levels, perimeter, statues, siteColumns, scenery, selectedStatueId, selectedLevel, onSelectLevel, onSelectFace, onMoveLevel, onPatioChange, onMoveWindow, onMoveDoor, onMoveArch, onMoveDetail, onResizePerimeter, onSelectDetail, onSelectPerimeter, onSelectStatue, onMoveStatue }: {
+export default function Temple3DPreview({ levels, perimeter, statues, siteColumns, scenery, landscapeItems, selectedStatueId, selectedLevel, onSelectLevel, onSelectFace, onMoveLevel, onPatioChange, onMoveWindow, onMoveDoor, onMoveArch, onMoveDetail, onResizePerimeter, onSelectDetail, onSelectPerimeter, onSelectStatue, onMoveStatue }: {
   levels: BuildingLevel[];
   perimeter: Perimeter | null;
   statues: Statue[];
   siteColumns: SiteColumn[];
+  landscapeItems: LandscapeItem[];
   scenery: "garden"|"desert"|"twilight";
   selectedStatueId?: string | null;
   selectedLevel: number;
@@ -403,6 +404,32 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
       }
       if(column.style==="ionic"||column.style==="composite")for(const side of [-1,1]){const volute=new THREE.Mesh(new THREE.TorusGeometry(r*.36,r*.10,8,20),cm.clone());volute.position.set(side*r*.9,h*.93,0);g.add(volute);}
     }
+    // User-placeable landscaping is separate from the fixed environmental backdrop.
+    for(const item of landscapeItems){
+      const g=new THREE.Group();g.position.set(item.x,0,item.z);g.rotation.y=THREE.MathUtils.degToRad(item.rotation);g.scale.setScalar(Math.max(.3,Math.min(4,item.scale||1)));group.add(g);
+      const material=(color:number)=>new THREE.MeshStandardMaterial({color,roughness:.85});
+      const add=(geo:THREE.BufferGeometry,x:number,y:number,z:number,color:number)=>{const m=new THREE.Mesh(geo,material(color));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;g.add(m);};
+      if(item.kind==="tree"){
+        add(new THREE.CylinderGeometry(.12,.19,1.6,8),0,.8,0,0x695039);
+        for(let i=0;i<3;i++)add(new THREE.ConeGeometry(.85-i*.17,1.55,9),0,1.55+i*.55,0,0x416b40);
+      }else if(item.kind==="garden"){
+        add(new THREE.CylinderGeometry(1.15,1.2,.16,24),0,.08,0,0x776c56);
+        add(new THREE.CylinderGeometry(1.05,1.05,.04,24),0,.18,0,0x394b2f);
+        for(let i=0;i<8;i++){const a=i*Math.PI/4;add(new THREE.SphereGeometry(.19,8,6),Math.cos(a)*.72,.34,Math.sin(a)*.72,i%2?0xd8b454:0x8f548f);}
+      }else if(item.kind==="path"){
+        for(let i=0;i<8;i++)add(new THREE.BoxGeometry(.78,.065,.46),0,.035,(i-3.5)*.53,0xb4a58c);
+      }else if(item.kind==="fountain"){
+        add(new THREE.CylinderGeometry(1.05,1.1,.32,32),0,.16,0,0xbbb6aa);
+        add(new THREE.CylinderGeometry(.91,.91,.025,32),0,.335,0,0x5f9faf);
+        add(new THREE.CylinderGeometry(.13,.2,.95,16),0,.8,0,0xc4c0b8);
+        add(new THREE.SphereGeometry(.23,12,10),0,1.34,0,0x80c4d5);
+      }else if(item.kind==="pond"){
+        add(new THREE.CylinderGeometry(1.7,1.75,.10,32),0,.05,0,0x8c8779);
+        add(new THREE.CylinderGeometry(1.58,1.58,.025,32),0,.115,0,0x4b8792);
+      }else{
+        add(new THREE.DodecahedronGeometry(.8,1),0,.52,0,0x817e75);
+      }
+    }
     statueGroupsRef.current=[];
     const statueColor=(f:Statue["finish"])=>f==="bronze"?0x8a6038:f==="gold"?0xc9a84f:f==="obsidian"?0x25252b:0xd9d4cc;
     for(const statue of statues){
@@ -468,7 +495,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
       fit.buildingCount=levels.length;
     }
     const o=orbitRef.current,pan=cameraPanRef.current;camera.clearViewOffset();const focus=new THREE.Vector3(cameraFocusRef.current.x+pan.x,targetYRef.current+pan.y,cameraFocusRef.current.z+pan.z);camera.position.set(focus.x+Math.sin(o.theta)*Math.sin(o.phi)*o.radius,focus.y+Math.cos(o.phi)*o.radius,focus.z+Math.cos(o.theta)*Math.sin(o.phi)*o.radius);camera.lookAt(focus);renderer.render(scene,camera);
-  },[levels,perimeter,statues,siteColumns]);
+  },[levels,perimeter,statues,siteColumns,landscapeItems]);
 
   useEffect(()=>{sceneryApplyRef.current?.(scenery);const renderer=rendererRef.current,scene=sceneRef.current,camera=cameraRef.current;if(renderer&&scene&&camera)renderer.render(scene,camera);},[scenery]);
 
