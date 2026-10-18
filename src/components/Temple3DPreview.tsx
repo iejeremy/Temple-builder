@@ -162,7 +162,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
     const wheel=(e:WheelEvent)=>{e.preventDefault();const o=orbitRef.current;o.radius=clampZoom(o.radius+e.deltaY*.012);cameraFitRef.current.userFramed=true;render();};
     canvas.addEventListener("pointerdown",down);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",up);canvas.addEventListener("pointercancel",up);canvas.addEventListener("wheel",wheel,{passive:false});
     window.addEventListener("resize",resize); resize();
-    resetCameraRef.current=()=>{const now=Date.now();const secondPress=now-lastCenterPressRef.current<1000;lastCenterPressRef.current=now;const o=orbitRef.current;if(secondPress){o.theta=.72;o.phi=1.40;}o.radius=Math.max(2,cameraFitRef.current.fitRadius);cameraPanRef.current={x:0,y:0,z:0,manual:false};cameraFitRef.current.userFramed=false;const bounds=lastBoundsRef.current;if(!bounds.isEmpty()){const center=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());cameraFocusRef.current={x:center.x,z:center.z};targetYRef.current=center.y;}resize();};
+    resetCameraRef.current=()=>{const now=Date.now();const secondPress=now-lastCenterPressRef.current<1000;lastCenterPressRef.current=now;const o=orbitRef.current;if(secondPress){o.theta=0;o.phi=Math.PI/2;}o.radius=Math.max(2,cameraFitRef.current.fitRadius);cameraPanRef.current={x:0,y:0,z:0,manual:false};cameraFitRef.current.userFramed=false;const bounds=lastBoundsRef.current;if(!bounds.isEmpty()){const center=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());cameraFocusRef.current={x:center.x,z:center.z};targetYRef.current=center.y;}resize();};
     return()=>{window.removeEventListener("resize",resize);canvas.removeEventListener("pointerdown",down);canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerup",up);canvas.removeEventListener("pointercancel",up);canvas.removeEventListener("wheel",wheel);scene.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.dispose();const m=o.material;if(Array.isArray(m))m.forEach(x=>x.dispose());else m.dispose();}});renderer.dispose();canvas.remove();};
   },[]);
 
@@ -637,7 +637,8 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
       const effectiveHeight=Math.max(1,renderer.domElement.clientHeight-uiBottom);
       const aspect=Math.max(.1,renderer.domElement.clientWidth/effectiveHeight);
       const hFov=2*Math.atan(Math.tan(vFov/2)*aspect);
-      const radius=actualSize.length()*.5;
+      const focusSize=focusBounds.getSize(new THREE.Vector3());
+      const radius=focusSize.length()*.5;
       // Fit the complete model inside the mobile viewport, reserving room for controls.
       const needed=Math.max(radius/Math.sin(vFov/2),radius/Math.sin(hFov/2))*1.18+1.5;
       const fit=cameraFitRef.current;
@@ -647,8 +648,8 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
       const grew=radius>fit.lastSpan*1.15;
       const shrankALot=radius<fit.lastSpan*.72;
       if(firstBuild){
-        orbitRef.current.theta=.72;
-        orbitRef.current.phi=1.40;
+        orbitRef.current.theta=0;
+        orbitRef.current.phi=Math.PI/2;
         orbitRef.current.radius=needed;
         cameraPanRef.current={x:0,y:0,z:0,manual:false};
       }else if(!fit.userFramed&&(grew||shrankALot)){
