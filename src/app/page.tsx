@@ -212,12 +212,41 @@ export default function TempleBuilderPage() {
       decorate(north,["front","back"],"dentils");
       parts=[rotunda,north,south,east,west,court];
     }
+    // Architectural plan enhancements: site features remain independent, editable objects.
+    const extraColumns:SiteColumn[]=[];
+    const addFreestanding=(style:ColumnStyle,material:BuilderMaterial,x:number,z:number,height=3.2,radius=.19)=>{
+      extraColumns.push({id:`plan-column-${uid()}`,style,material,x,z,height,radius,rotation:0});
+    };
+    if(kind===0){
+      // Maya: freestanding stelae and an axial approach to the stepped sanctuary.
+      for(const x of [-5,5])addFreestanding("square","limestone",x,9,2.5,.34);
+    }else if(kind===1){
+      // Egyptian hypostyle: two interior rows of columns along the temple axis.
+      for(const x of [-2.25,2.25])for(const z of [-6.8,-5.5,-4.2,-2.9])addFreestanding("square","sandstone",x,z,3.3,.3);
+      for(const x of [-4.5,4.5])for(const z of [3,5,7])addFreestanding("square","sandstone",x,z,2.5,.23);
+    }else if(kind===2){
+      // Hindu mandapa: pillared approach and processional axis.
+      for(const x of [-2.2,2.2])for(const z of [5.2,6.5,7.8])addFreestanding("twisted","stone",x,z,2.6,.21);
+    }else if(kind===3){
+      // Greek peristyle: freestanding colonnade on all four sides.
+      const nx=9,nz=5,w=52/14+1.05,d=28/14+1.05;
+      for(let i=0;i<nx;i++){const x=-w+i*2*w/(nx-1);addFreestanding(greekOrder,"marble",x,-d,3.25);addFreestanding(greekOrder,"marble",x,d,3.25);}
+      for(let i=1;i<nz-1;i++){const z=-d+i*2*d/(nz-1);addFreestanding(greekOrder,"marble",-w,z,3.25);addFreestanding(greekOrder,"marble",w,z,3.25);}
+    }else if(kind===4){
+      // Gothic nave: regularly spaced external buttress-like square piers.
+      for(const z of [-3,-1.5,0,1.5,3])for(const x of [-2.7,2.7])addFreestanding("gothic","stone",x,z,3.6,.28);
+    }else{
+      // Echoes: ceremonial entrance colonnade.
+      for(const x of [-3,-1.8,-.6,.6,1.8,3])addFreestanding("ionic","marble",x,11,3,.2);
+    }
     if(levels.length && parts.length){
       const rightEdge=Math.max(...levels.map(l=>(l.x||0)+l.width/14));
       const leftEdge=Math.min(...parts.map(l=>(l.x||0)-l.width/14));
       const shift=rightEdge-leftEdge+3;
       parts=parts.map(l=>({...l,x:l.x+shift}));
+      for(const c of extraColumns)c.x+=shift;
     }
+    setSiteColumns(current=>[...current,...extraColumns]);
     setLevels(current=>[...current,...parts]);
     setShape(parts[0].shape);
     setSelectedLevel(levels.length);
