@@ -157,10 +157,49 @@ export default function Temple3DPreview({ levels, perimeter, statues, selectedSt
       const roofMat=()=>new THREE.MeshStandardMaterial({color,roughness:.58,metalness:0});
       const add=(g:THREE.BufferGeometry,px:number,py:number,pz:number)=>{const m=new THREE.Mesh(g,roofMat());m.position.set(px,py,pz);parent.add(m);};
       if(roof==="none")return;
-      if(roof==="flat"){add(new THREE.BoxGeometry(rw+.22,.18,rd+.22),x,top+.09,z);return;}
-      if(roof==="pyramid"){const rh=Math.max(.7,Math.min(1.5,rw*.18));const g=new THREE.CylinderGeometry(0,1,rh,4,1,false);g.rotateY(Math.PI/4);g.scale(rw*.72,1,rd*.72);add(g,x,top+rh/2,z);return;}
-      if(roof==="dome"){const r=Math.min(rw,rd)*.53;add(new THREE.SphereGeometry(r,24,12,0,Math.PI*2,0,Math.PI/2),x,top,z);return;}
-      const r=Math.min(rw,rd)*.52,rh=roof==="steeple"?Math.max(2.2,r*2.6):Math.max(1.3,r*1.25);add(new THREE.ConeGeometry(r,rh,roof==="cone"?32:8),x,top+rh/2,z);
+      // Tiered stone cornices establish a visible roof silhouette from ground-level cameras.
+      const lip=Math.min(.15,Math.max(.045,Math.min(rw,rd)*.025));
+      const cornice=(spread:number,y:number,thickness:number)=>add(new THREE.BoxGeometry(rw+spread,thickness,rd+spread),x,y,z);
+      if(roof==="flat"){
+        cornice(.32,top+.055,.11);
+        cornice(.22,top+.15,.075);
+        cornice(.10,top+.215,.055);
+        return;
+      }
+      if(roof==="pyramid"){
+        cornice(.34,top+.05,.10);
+        cornice(.20,top+.135,.065);
+        const rh=Math.max(.7,Math.min(1.5,rw*.18));
+        const g=new THREE.CylinderGeometry(0,1,rh,4,1,false);g.rotateY(Math.PI/4);g.scale(rw*.72,1,rd*.72);
+        add(g,x,top+rh/2+.16,z);
+        // Small gilded finial visually finishes ceremonial pyramid roofs.
+        add(new THREE.SphereGeometry(lip*1.15,10,8),x,top+rh+.20,z);
+        return;
+      }
+      if(roof==="dome"){
+        const r=Math.min(rw,rd)*.53;
+        const drum=Math.max(.16,r*.16);
+        add(new THREE.CylinderGeometry(r*.91,r*.94,drum,32),x,top+drum/2,z);
+        add(new THREE.TorusGeometry(r*.93,Math.max(.035,r*.035),8,40),x,top+drum,z);
+        add(new THREE.SphereGeometry(r,40,20,0,Math.PI*2,0,Math.PI/2),x,top+drum,z);
+        // Meridional ribs are separate thin curved meshes, not painted-on lines.
+        for(let i=0;i<12;i++){
+          const angle=i*Math.PI/6;
+          const points:THREE.Vector3[]=[];
+          for(let j=0;j<=12;j++){
+            const a=j*Math.PI/24;
+            points.push(new THREE.Vector3(x+Math.cos(angle)*r*Math.cos(a)*1.008,top+drum+r*Math.sin(a),z+Math.sin(angle)*r*Math.cos(a)*1.008));
+          }
+          add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),16,Math.max(.012,r*.012),5,false),0,0,0);
+        }
+        add(new THREE.CylinderGeometry(r*.10,r*.14,Math.max(.12,r*.16),12),x,top+drum+r+Math.max(.06,r*.08),z);
+        add(new THREE.SphereGeometry(Math.max(.06,r*.095),12,10),x,top+drum+r+Math.max(.12,r*.16),z);
+        return;
+      }
+      const r=Math.min(rw,rd)*.52,rh=roof==="steeple"?Math.max(2.2,r*2.6):Math.max(1.3,r*1.25);
+      add(new THREE.CylinderGeometry(r*1.05,r*1.08,Math.max(.10,r*.12),roof==="cone"?32:8),x,top+.05,z);
+      add(new THREE.ConeGeometry(r,rh,roof==="cone"?32:8),x,top+rh/2+.12,z);
+      if(roof==="steeple")add(new THREE.SphereGeometry(Math.max(.055,r*.09),12,8),x,top+rh+.16,z);
     };
 
     levels.forEach((level,index)=>{
