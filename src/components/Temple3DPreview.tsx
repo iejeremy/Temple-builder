@@ -640,11 +640,12 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
       const focusSize=focusBounds.getSize(new THREE.Vector3());
       const radius=focusSize.length()*.5;
       // Fit the complete model inside the mobile viewport, reserving room for controls.
-      const needed=Math.max(radius/Math.sin(vFov/2),radius/Math.sin(hFov/2))*1.18+1.5;
+      const needed=Math.max(radius/Math.sin(vFov/2),radius/Math.sin(hFov/2))*1.35+2.5;
       const fit=cameraFitRef.current;
       fit.fitRadius=needed;
       // Refit only on the first build, or meaningful geometry changes before manual framing.
-      const firstBuild=!fit.initialized&&levels.length>0;
+      // The preview may initialize before the first building exists. That empty scene must not consume the initial camera fit.
+      const firstBuild=levels.length>0&&fit.buildingCount===0;
       const grew=radius>fit.lastSpan*1.15;
       const shrankALot=radius<fit.lastSpan*.72;
       if(firstBuild){
@@ -655,9 +656,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
       }else if(!fit.userFramed&&(grew||shrankALot)){
         orbitRef.current.radius=needed;
       }
-      fit.initialized=true;
-      fit.lastSpan=radius;
-      fit.buildingCount=levels.length;
+      if(levels.length>0){fit.initialized=true;fit.lastSpan=radius;fit.buildingCount=levels.length;}
     }
     const o=orbitRef.current,pan=cameraPanRef.current;camera.clearViewOffset();const focus=new THREE.Vector3(cameraFocusRef.current.x+pan.x,targetYRef.current+pan.y,cameraFocusRef.current.z+pan.z);camera.position.set(focus.x+Math.sin(o.theta)*Math.sin(o.phi)*o.radius,focus.y+Math.cos(o.phi)*o.radius,focus.z+Math.cos(o.theta)*Math.sin(o.phi)*o.radius);camera.lookAt(focus);renderer.render(scene,camera);
   },[levels,perimeter,statues,siteColumns,landscapeItems]);
