@@ -367,12 +367,12 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
               const openings:Opening[]=[];
               for(const door of level.doors||[]){
                 if(door.face!==face)continue;
-                const center=(door.u||0)*span*.38,half=door.width/4.4;
-                openings.push({left:Math.max(-span/2,center-half),right:Math.min(span/2,center+half),bottom:0,top:Math.min(h,door.height/2.2)});
+                const center=(door.u||0)*span*.38,half=Math.min(span*.2,Math.max(.55,door.width*h/18));
+                openings.push({left:Math.max(-span/2,center-half),right:Math.min(span/2,center+half),bottom:0,top:Math.min(h*.8,Math.max(2.8,door.height*h/7))});
               }
               for(const win of level.windows||[]){
                 if(win.face!==face)continue;
-                const center=(win.u||0)*span*.38,cy=h*(win.v||.55),half=win.width/4.8,hh=win.height/4.8;
+                const center=(win.u||0)*span*.38,cy=h*(win.v||.55),half=Math.min(span*.18,Math.max(.45,win.width*h/22)),hh=Math.max(.65,win.height*h/12);
                 openings.push({left:Math.max(-span/2,center-half),right:Math.min(span/2,center+half),bottom:Math.max(0,cy-hh),top:Math.min(h,cy+hh)});
               }
               const cuts=[-span/2,span/2,...openings.flatMap(o=>[o.left,o.right])].sort((a,b)=>a-b);
@@ -440,8 +440,8 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
               if(Math.abs(center)>length/2-unit*.3)continue;
               const y=baseY+(row+.5)*course;
               // Keep masonry off glazed and doorway surfaces.
-              const opening=(level.windows||[]).some(win=>win.face===face&&Math.abs(center-(win.u||0)*length*.38)<win.width/4.5+unit*.45&&Math.abs(y-(baseY+h*(win.v||.55)))<win.height/4.5+course*.5)||
-                (level.doors||[]).some(door=>door.face===face&&Math.abs(center-(door.u||0)*length*.38)<door.width/4.3+unit*.45&&y<door.height/2.1+course*.5);
+              const opening=(level.windows||[]).some(win=>win.face===face&&Math.abs(center-(win.u||0)*length*.38)<Math.max(.45,win.width*h/22)+unit*.45&&Math.abs(y-(baseY+h*(win.v||.55)))<Math.max(.65,win.height*h/12)+course*.5)||
+                (level.doors||[]).some(door=>door.face===face&&Math.abs(center-(door.u||0)*length*.38)<Math.max(.55,door.width*h/18)+unit*.45&&y<Math.min(h*.8,Math.max(2.8,door.height*h/7))+course*.5);
               if(opening)continue;
               const stone=new THREE.Mesh(new THREE.BoxGeometry(unit*.965,course*.94,.065),mat());
               if(face==="front"||face==="back")stone.position.set(center,y,(face==="front"?1:-1)*(d/2+.028));
@@ -452,7 +452,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
         }
       }
       for(const win of level.windows||[]){
-        const ww=win.width/2.4,wh=win.height/2.4,edge=.095;
+        const ww=Math.max(.9,win.width*h/11),wh=Math.max(1.3,win.height*h/6),edge=.095;
         let geometry:THREE.BufferGeometry;
         if(win.style==="round"||win.style==="rose") geometry=new THREE.CylinderGeometry(ww*.55,ww*.55,.08,24);
         else if(win.style==="arched") geometry=new THREE.CapsuleGeometry(ww*.5,Math.max(.15,wh-ww),6,12);
@@ -474,7 +474,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
         frame.userData.levelIndex=index;frame.userData.windowId=win.id;frame.userData.detailCategory="windows";frame.userData.detailId=win.id;frame.userData.detailFace=win.face;lg.add(frame);
       }
       for(const door of level.doors||[]){
-        const dw=door.width/2.2,dh=door.height/2.2,edge=.095;
+        const dw=Math.max(1.1,door.width*h/9),dh=Math.min(h*.8,Math.max(2.8,door.height*h/7)),edge=.095;
         const arched=door.style==="arched"||door.style==="temple"||door.style==="portico"||door.style==="wood-arch"||door.style==="stone-arch"||door.style==="grand-arch"||door.style==="carved-stone"||door.style==="metal-gate";
         let dg:THREE.BufferGeometry;
         if(arched){
