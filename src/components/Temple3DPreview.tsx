@@ -625,16 +625,12 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
     if(!actualBounds.isEmpty()){
       const actualCenter=actualBounds.getCenter(new THREE.Vector3());
       const actualSize=actualBounds.getSize(new THREE.Vector3());
-      // Compute the framing from authored building dimensions, not decorative meshes.
-      // Extruded ornaments and other helper geometry can have unexpectedly large bounds.
+      // Orbit around the actual rendered building, not the world origin or ground plane.
+      // Level groups have world transforms, so their combined bounds define the real pivot.
       const buildingBounds=new THREE.Box3();
-      for(const level of levels){
-        const x=level.x||0,z=level.z||0;
-        const half=Math.max(level.width,level.depth)/7*.85;
-        const bottom=(level.elevation||0)/7;
-        const top=bottom+level.height/7+Math.max(1.5,Math.min(level.width,level.depth)/7*.6);
-        buildingBounds.expandByPoint(new THREE.Vector3(x-half,bottom,z-half));
-        buildingBounds.expandByPoint(new THREE.Vector3(x+half,top,z+half));
+      for(const levelGroup of levelGroupsRef.current){
+        levelGroup.updateWorldMatrix(true,true);
+        buildingBounds.expandByObject(levelGroup,true);
       }
       const focusBounds=buildingBounds.isEmpty()?actualBounds:buildingBounds;
       const buildingCenter=focusBounds.getCenter(new THREE.Vector3());
@@ -644,13 +640,12 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
       const vFov=THREE.MathUtils.degToRad(camera.fov);
       const canvasHeight=Math.max(1,renderer.domElement.clientHeight);
       const canvasWidth=Math.max(1,renderer.domElement.clientWidth);
-      // Bottom controls cover roughly 15% of the screen: leave that space unused.
-      const usableHeight=canvasHeight*.76;
+      const usableHeight=canvasHeight*.75;
       const aspect=Math.max(.1,canvasWidth/usableHeight);
       const hFov=2*Math.atan(Math.tan(vFov/2)*aspect);
       const focusSize=focusBounds.getSize(new THREE.Vector3());
       const radius=focusSize.length()*.5;
-      const needed=Math.max(radius/Math.sin(vFov/2),radius/Math.sin(hFov/2))*1.5+3;
+      const needed=Math.max(radius/Math.sin(vFov/2),radius/Math.sin(hFov/2))*1.2+1.5;
       const fit=cameraFitRef.current;
       fit.fitRadius=needed;
       // Refit only on the first build, or meaningful geometry changes before manual framing.
