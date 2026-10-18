@@ -248,6 +248,51 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
         const vertices:number[]=[];for(let i=0;i<points.length;i++){const a=points[i],b=points[(i+1)%points.length];vertices.push(a[0],top,a[1],b[0],top,b[1],0,top+rh,0);}
         const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.Float32BufferAttribute(vertices,3));g.computeVertexNormals();add(g,0,0,0);
       };
+      // Architectural structural geometry from the reference plans.
+      // These are true meshes in the temple's local coordinates, not image overlays.
+      const structural=(geometry:THREE.BufferGeometry,x:number,y:number,z:number)=>{
+        const mesh=new THREE.Mesh(geometry,mat());mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;lg.add(mesh);return mesh;
+      };
+      if(level.architecture==="maya" && level.shape==="square" && level.width>=30){
+        // Receding stone terraces: tapered sloped side faces and pronounced tier bands.
+        const upperW=w*.86,upperD=d*.86;
+        const verts:number[]=[];
+        const bottom:[number,number,number][]=[[-w/2,baseY,-d/2],[w/2,baseY,-d/2],[w/2,baseY,d/2],[-w/2,baseY,d/2]];
+        const top:[number,number,number][]=[[-upperW/2,baseY+h,-upperD/2],[upperW/2,baseY+h,-upperD/2],[upperW/2,baseY+h,upperD/2],[-upperW/2,baseY+h,upperD/2]];
+        for(let i=0;i<4;i++){const j=(i+1)%4;verts.push(...bottom[i],...bottom[j],...top[i],...bottom[j],...top[j],...top[i]);}
+        const geom=new THREE.BufferGeometry();geom.setAttribute("position",new THREE.Float32BufferAttribute(verts,3));geom.computeVertexNormals();
+        const tapered=new THREE.Mesh(geom,new THREE.MeshStandardMaterial({color:COLORS[level.material],side:THREE.DoubleSide,roughness:.95}));lg.add(tapered);
+        for(const t of [.12,.88])structural(new THREE.BoxGeometry(w*(1-t*.12),.09,d*(1-t*.12)),0,baseY+h*t,0);
+      }
+      if(level.architecture==="hindu" && level.roof==="tiered" && level.width<=26){
+        // Shikhara: stacked shrinking sculptural roof courses with a vertical crown.
+        const courses=7;
+        for(let i=0;i<courses;i++){
+          const fraction=i/courses,scale=1-fraction*.63;
+          structural(new THREE.BoxGeometry(w*scale+.08,.16,d*scale+.08),0,baseY+h+.16+i*.23,0);
+          if(i%2===0)for(const side of [-1,1])structural(new THREE.BoxGeometry(.12,.13,d*scale*.78),side*w*scale*.46,baseY+h+.26+i*.23,0);
+        }
+        structural(new THREE.SphereGeometry(.25,12,8),0,baseY+h+1.92,0);
+      }
+      if(level.architecture==="gothic" && level.shape==="wide"){
+        // Exterior flying buttresses: solid piers plus curved stone arch ribs.
+        const stone=new THREE.MeshStandardMaterial({color:COLORS[level.material],roughness:.88});
+        for(const side of [-1,1])for(const fraction of [-.36,-.12,.12,.36]){
+          const z=fraction*d*2,wallX=side*w*.5,pierX=wallX+side*1.2;
+          structural(new THREE.BoxGeometry(.36,h*.73,.45),pierX,baseY+h*.365,z);
+          structural(new THREE.ConeGeometry(.23,.72,4),pierX,baseY+h*.73+.36,z);
+          const points:THREE.Vector3[]=[];
+          for(let j=0;j<=12;j++){const t=j/12;points.push(new THREE.Vector3(wallX+side*1.2*t,baseY+h*.68+.62*Math.sin(t*Math.PI),z));}
+          const curve=new THREE.CatmullRomCurve3(points);
+          const rib=new THREE.Mesh(new THREE.TubeGeometry(curve,18,.10,6,false),stone);rib.castShadow=true;lg.add(rib);
+        }
+        // Ridge ribs mark the nave's vault bays without filling the interior.
+        for(const fraction of [-.36,-.12,.12,.36]){
+          const z=fraction*d*2;
+          const pts=[new THREE.Vector3(-w*.27,baseY+h*.79,z),new THREE.Vector3(0,baseY+h*1.08,z),new THREE.Vector3(w*.27,baseY+h*.79,z)];
+          lg.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts),14,.075,6,false),stone));
+        }
+      }
       if(level.shape==="star"||level.shape==="six-star"){
         const n=level.shape==="star"?5:6,r=Math.min(w,d)*.52,pts=radialPoints(n,r,r*.46);add(polygonShape(pts),0,0,0);addFootprintRoof(pts,baseY+h);
       }else if(level.shape==="triangle"||level.shape==="diamond"||level.shape==="hexagon"){
