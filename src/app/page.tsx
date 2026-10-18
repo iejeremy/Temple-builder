@@ -292,8 +292,8 @@ export default function TempleBuilderPage() {
 
   return (
     <main className="relative h-[100dvh] overflow-hidden bg-[#b9c4cb] text-white">
-      <TempleWorld cameraMode={cameraMode} levels={levels} perimeter={perimeter} statues={statues} siteColumns={siteColumns} scenery={scenery} landscapeItems={landscapeItems} onSelectSiteColumn={(id:string)=>{setSelectedSiteColumnId(id);setActiveObject("column");setPanel(null);}} onMoveSiteColumn={(id:string,x:number,z:number)=>setSiteColumns(v=>v.map(c=>c.id===id?{...c,x,z}:c))} onSelectLandscape={(id:string)=>{setSelectedLandscapeId(id);setActiveObject("landscape");setPanel(null);}} onMoveLandscape={(id:string,x:number,z:number)=>setLandscapeItems(v=>v.map(c=>c.id===id?{...c,x,z}:c))} selectedStatueId={selectedStatueId} selectedLevel={selectedLevel}
-        onSelectLevel={(index) => { setSelectedLevel(index); setSelectedFace(null); setDetailCategory(null); setActiveObject("building");setPanel(null); }}
+      <TempleWorld cameraMode={cameraMode} levels={levels} perimeter={perimeter} statues={statues} siteColumns={siteColumns} scenery={scenery} landscapeItems={landscapeItems} onSelectSiteColumn={(id:string)=>{setSelectedSiteColumnId(id);setActiveObject("column");setPanel("site-columns");}} onMoveSiteColumn={(id:string,x:number,z:number)=>setSiteColumns(v=>v.map(c=>c.id===id?{...c,x,z}:c))} onSelectLandscape={(id:string)=>{setSelectedLandscapeId(id);setActiveObject("landscape");setPanel("scenery");}} onMoveLandscape={(id:string,x:number,z:number)=>setLandscapeItems(v=>v.map(c=>c.id===id?{...c,x,z}:c))} selectedStatueId={selectedStatueId} selectedLevel={selectedLevel}
+        onSelectLevel={(index) => { setSelectedLevel(index); setSelectedFace(null); setDetailCategory(null); setActiveObject("building");setPanel("edit"); }}
         onSelectFace={(index,face) => { setSelectedLevel(index); setSelectedFace(face); }}
         onSelectDetail={(index,face,category) => { setSelectedLevel(index); setSelectedFace(face); setDetailCategory(category); setActiveObject("building");setPanel("edit"); }}
         onMoveLevel={(index,x,z) => {
@@ -318,7 +318,7 @@ export default function TempleBuilderPage() {
         }))}
         onResizePerimeter={(margin)=>setPerimeter(p=>p?{...p,margin}:p)}
         onSelectPerimeter={()=>{setPanel("walls");setWallStep("features");}}
-        onSelectStatue={(id)=>{setSelectedStatueId(id);setActiveObject("statue");setPanel(null);}}
+        onSelectStatue={(id)=>{setSelectedStatueId(id);setActiveObject("statue");setPanel("statues");}}
         onMoveStatue={(id,x,z)=>setStatues(v=>v.map(s=>s.id===id?{...s,x,z}:s))} />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between p-3">
@@ -463,7 +463,7 @@ export default function TempleBuilderPage() {
           <div className="border-t border-white/10 px-3 py-3">
             <p className="mb-2 text-xs text-white/65">Swipe to choose a column. Tap one to add it, then drag it on the site.</p>
             <div className="flex snap-x gap-2 overflow-x-auto pb-2">
-              {(["doric","ionic","corinthian","composite","tuscan","fluted","square","twisted","gothic","roman-esque"] as ColumnStyle[]).map(style=><button key={style} onClick={()=>{const id=`site-column-${Date.now()}-${Math.random().toString(36).slice(2,5)}`;setSiteColumns(v=>[...v,{id,style,material:levels[selectedLevel]?.material||"marble",x:(levels[selectedLevel]?.x||0)+3,z:(levels[selectedLevel]?.z||0)+3,height:3.5,radius:.18,rotation:0}]);setSelectedSiteColumnId(id);setActiveObject("column");setPanel(null);}} className="min-w-[112px] snap-start rounded-2xl border border-white/15 bg-white/5 p-3 text-center active:bg-amber-200/20">
+              {(["doric","ionic","corinthian","composite","tuscan","fluted","square","twisted","gothic","roman-esque"] as ColumnStyle[]).map(style=><button key={style} onClick={()=>{const id=`site-column-${Date.now()}-${Math.random().toString(36).slice(2,5)}`;setSiteColumns(v=>[...v,{id,style,material:levels[selectedLevel]?.material||"marble",x:(levels[selectedLevel]?.x||0)+3,z:(levels[selectedLevel]?.z||0)+3,height:3.5,radius:.18,rotation:0}]);setSelectedSiteColumnId(id);setActiveObject("column");setPanel("site-columns");}} className="min-w-[112px] snap-start rounded-2xl border border-white/15 bg-white/5 p-3 text-center active:bg-amber-200/20">
                 <div className="mx-auto mb-2 flex h-16 items-center justify-center"><div className={`relative h-12 w-3 rounded-t-sm bg-gradient-to-r from-stone-500 via-stone-100 to-stone-400 ${style==="square"?"rounded-none":""}`}><div className="absolute -left-2 -top-2 h-2 w-7 rounded-sm bg-stone-200"/><div className="absolute -left-1 bottom-0 h-1 w-5 bg-stone-300"/></div></div>
                 <div className="text-xs capitalize">{style.replace("-"," ")}</div>
               </button>)}
