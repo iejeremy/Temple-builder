@@ -28,11 +28,12 @@ const makeMaterial=(kind:BuilderMaterial,color=COLORS[kind],selected=false)=>{
   });
 };
 
-export default function Temple3DPreview({ levels, perimeter, statues, siteColumns, selectedStatueId, selectedLevel, onSelectLevel, onSelectFace, onMoveLevel, onPatioChange, onMoveWindow, onMoveDoor, onMoveArch, onMoveDetail, onResizePerimeter, onSelectDetail, onSelectPerimeter, onSelectStatue, onMoveStatue }: {
+export default function Temple3DPreview({ levels, perimeter, statues, siteColumns, scenery, selectedStatueId, selectedLevel, onSelectLevel, onSelectFace, onMoveLevel, onPatioChange, onMoveWindow, onMoveDoor, onMoveArch, onMoveDetail, onResizePerimeter, onSelectDetail, onSelectPerimeter, onSelectStatue, onMoveStatue }: {
   levels: BuildingLevel[];
   perimeter: Perimeter | null;
   statues: Statue[];
   siteColumns: SiteColumn[];
+  scenery: "garden"|"desert"|"twilight";
   selectedStatueId?: string | null;
   selectedLevel: number;
   onSelectLevel?: (index: number) => void;
@@ -50,6 +51,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
   onMoveStatue?: (id:string,x:number,z:number) => void;
 }) {
   const hostRef = useRef<HTMLDivElement|null>(null);
+  const sceneryApplyRef=useRef<((kind:"garden"|"desert"|"twilight")=>void)|null>(null);
   const groupRef = useRef<THREE.Group|null>(null);
   const sceneRef = useRef<THREE.Scene|null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer|null>(null);
@@ -102,6 +104,26 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
     const ground=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.MeshStandardMaterial({color:0x878777,roughness:1}));ground.receiveShadow=true;
     ground.rotation.x=-Math.PI/2; scene.add(ground);
     const grid=new THREE.GridHelper(40,24,0x66685e,0x7b7d70); grid.position.y=.01; scene.add(grid);
+    // Scenery sits outside the primary building area so site editing remains unobstructed.
+    const landscape=new THREE.Group();scene.add(landscape);
+    const foliage=new THREE.MeshStandardMaterial({color:0x436a3c,roughness:1});
+    const trunk=new THREE.MeshStandardMaterial({color:0x65503a,roughness:1});
+    for(let i=0;i<26;i++){
+      const angle=i*Math.PI*2/26,radius=17+(i%4)*1.2;
+      const x=Math.cos(angle)*radius,z=Math.sin(angle)*radius;
+      const tree=new THREE.Group();tree.position.set(x,0,z);landscape.add(tree);
+      const stem=new THREE.Mesh(new THREE.CylinderGeometry(.10,.15,1.25,6),trunk);stem.position.y=.63;tree.add(stem);
+      const crown=new THREE.Mesh(new THREE.ConeGeometry(.65+(i%3)*.1,2.2,7),foliage);crown.position.y=2.05;tree.add(crown);
+    }
+    const applyScenery=(kind:"garden"|"desert"|"twilight")=>{
+      const bg=kind==="twilight"?0x29334c:kind==="desert"?0xd8b98b:0xb9c4cb;
+      scene.background=new THREE.Color(bg);if(scene.fog instanceof THREE.Fog)scene.fog.color.setHex(bg);
+      (ground.material as THREE.MeshStandardMaterial).color.setHex(kind==="desert"?0xbda079:kind==="twilight"?0x454d51:0x878777);
+      grid.visible=kind!=="twilight";landscape.visible=kind==="garden";
+      sun.color.setHex(kind==="twilight"?0xffad75:kind==="desert"?0xffe4b2:0xfff4df);
+      sun.intensity=kind==="twilight"?1.45:2.35;
+    };
+    sceneryApplyRef.current=applyScenery;applyScenery(scenery);
     const group=new THREE.Group(); scene.add(group);
     sceneRef.current=scene; rendererRef.current=renderer; cameraRef.current=camera; groupRef.current=group;
 
@@ -447,6 +469,8 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
     }
     const o=orbitRef.current,pan=cameraPanRef.current;camera.clearViewOffset();const focus=new THREE.Vector3(cameraFocusRef.current.x+pan.x,targetYRef.current+pan.y,cameraFocusRef.current.z+pan.z);camera.position.set(focus.x+Math.sin(o.theta)*Math.sin(o.phi)*o.radius,focus.y+Math.cos(o.phi)*o.radius,focus.z+Math.cos(o.theta)*Math.sin(o.phi)*o.radius);camera.lookAt(focus);renderer.render(scene,camera);
   },[levels,perimeter,statues,siteColumns]);
+
+  useEffect(()=>{sceneryApplyRef.current?.(scenery);const renderer=rendererRef.current,scene=sceneRef.current,camera=cameraRef.current;if(renderer&&scene&&camera)renderer.render(scene,camera);},[scenery]);
 
   // Selection highlighting does not require rebuilding geometry or reframing the camera.
   useEffect(()=>{
