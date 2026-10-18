@@ -392,6 +392,15 @@ export default function Temple3DPreview({ cameraMode, levels, perimeter, statues
         }
         for(const [rw,rd,x,z] of parts)addRoof(lg,level.roof,rw,rd,x,z,baseY+h,color);
       }
+      // Visible connecting course at the junction between stacked levels.
+      // Use the same material maps as the level so this reads as architecture, not a pasted-on shape.
+      if((level.elevation||0)>0){
+        const transition=mat();
+        const circular=["circle","rotunda","octagon","hexagon","oval","ring"].includes(level.shape);
+        const geometry=circular?new THREE.CylinderGeometry(Math.min(w,d)*.54,Math.min(w,d)*.57,.20,circular?32:12):new THREE.BoxGeometry(w+.22,.20,d+.22);
+        const plinth=new THREE.Mesh(geometry,transition);
+        plinth.position.set(0,baseY+.10,0);plinth.castShadow=true;plinth.receiveShadow=true;lg.add(plinth);
+      }
       // Low-poly masonry courses: staggered individual blocks with visible mortar gaps.
       // Applied to the four exterior faces of rectangular building footprints.
       if(["rectangle","square","wide"].includes(level.shape) && !["stucco","plaster","timber","bronze","gold"].includes(level.material)){
