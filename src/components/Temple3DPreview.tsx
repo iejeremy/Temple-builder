@@ -226,7 +226,25 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
         add(new THREE.SphereGeometry(Math.max(.06,r*.095),12,10),x,top+drum+r+Math.max(.12,r*.16),z);
         return;
       }
-      const r=Math.min(rw,rd)*.52,rh=roof==="steeple"?Math.max(2.2,r*2.6):Math.max(1.3,r*1.25);
+      // Each roof type gets its own recognizable silhouette.
+      const r=Math.min(rw,rd)*.52;
+      if(roof==="tiered"){
+        for(let i=0;i<4;i++){const scale=1-i*.19;add(new THREE.BoxGeometry(rw*scale,.18,rd*scale),x,top+.12+i*.38,z);}
+        add(new THREE.ConeGeometry(r*.42,.72,4),x,top+1.65,z);return;
+      }
+      if(roof==="curved"){
+        const curve=new THREE.Shape();curve.moveTo(-rw*.5,0);curve.quadraticCurveTo(-rw*.24,Math.max(.45,rd*.22),0,Math.max(.65,rd*.29));curve.quadraticCurveTo(rw*.24,Math.max(.45,rd*.22),rw*.5,0);
+        curve.lineTo(rw*.5,-.08);curve.lineTo(-rw*.5,-.08);curve.closePath();
+        const g=new THREE.ExtrudeGeometry(curve,{depth:rd,bevelEnabled:false});g.translate(0,top,-rd/2);add(g,x,0,z);return;
+      }
+      if(roof==="ornate"){
+        cornice(.4,top+.10,.2);cornice(.24,top+.28,.12);
+        const h=Math.max(.8,r*.6);
+        add(new THREE.ConeGeometry(r,h,8),x,top+.35+h/2,z);
+        for(const side of [-1,1])add(new THREE.ConeGeometry(.2,.55,8),x+side*rw*.38,top+.56,z);
+        return;
+      }
+      const rh=roof==="steeple"?Math.max(2.2,r*2.6):Math.max(1.3,r*1.25);
       add(new THREE.CylinderGeometry(r*1.05,r*1.08,Math.max(.10,r*.12),roof==="cone"?32:8),x,top+.05,z);
       add(new THREE.ConeGeometry(r,rh,roof==="cone"?32:8),x,top+rh/2+.12,z);
       if(roof==="steeple")add(new THREE.SphereGeometry(Math.max(.055,r*.09),12,8),x,top+rh+.16,z);
@@ -244,6 +262,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
       const polygonShape=(points:Array<[number,number]>)=>{const s=new THREE.Shape();points.forEach(([x,z],i)=>i?s.lineTo(x,z):s.moveTo(x,z));s.closePath();const g=new THREE.ExtrudeGeometry(s,{depth:h,bevelEnabled:false});g.rotateX(Math.PI/2);g.translate(0,baseY+h,0);return g;};
       const radialPoints=(count:number,outer:number,inner?:number)=>Array.from({length:inner?count*2:count},(_,i)=>{const r=inner?(i%2===0?outer:inner):outer;const a=-Math.PI/2+i*Math.PI/(inner?count:count/2);return [Math.cos(a)*r,Math.sin(a)*r] as [number,number];});
       const addFootprintRoof=(points:Array<[number,number]>,top:number)=>{
+        if(["dome","cone","steeple","tiered","curved","ornate"].includes(level.roof)){addRoof(lg,level.roof,w,d,0,0,top,color);return;}
         if(level.roof==="none")return;
         if(level.roof==="flat"){
           const s=new THREE.Shape();points.forEach(([x,z],i)=>i?s.lineTo(x,z):s.moveTo(x,z));s.closePath();
