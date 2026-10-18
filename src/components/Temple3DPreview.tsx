@@ -348,7 +348,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
         }
       }
       for(const win of level.windows||[]){
-        const ww=win.width/2.4,wh=win.height/2.4,edge=.04;
+        const ww=win.width/2.4,wh=win.height/2.4,edge=["rectangle","square","wide"].includes(level.shape)?-.075:.04;
         let geometry:THREE.BufferGeometry;
         if(win.style==="round"||win.style==="rose") geometry=new THREE.CylinderGeometry(ww*.55,ww*.55,.08,24);
         else if(win.style==="arched") geometry=new THREE.CapsuleGeometry(ww*.5,Math.max(.15,wh-ww),6,12);
@@ -370,7 +370,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
         frame.userData.levelIndex=index;frame.userData.windowId=win.id;frame.userData.detailCategory="windows";frame.userData.detailId=win.id;frame.userData.detailFace=win.face;lg.add(frame);
       }
       for(const door of level.doors||[]){
-        const dw=door.width/2.2,dh=door.height/2.2,edge=.055;
+        const dw=door.width/2.2,dh=door.height/2.2,edge=["rectangle","square","wide"].includes(level.shape)?-.07:.055;
         const arched=door.style==="arched"||door.style==="temple"||door.style==="portico"||door.style==="wood-arch"||door.style==="stone-arch"||door.style==="grand-arch"||door.style==="carved-stone"||door.style==="metal-gate";
         let dg:THREE.BufferGeometry;
         if(arched){
