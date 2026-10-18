@@ -72,6 +72,8 @@ export default function TempleBuilderPage() {
   const [siteColumns,setSiteColumns] = useState<SiteColumn[]>([]);
   const [selectedSiteColumnId,setSelectedSiteColumnId] = useState<string|null>(null);
   const [selectedStatueId, setSelectedStatueId] = useState<string | null>(null);
+  const [selectedLandscapeId,setSelectedLandscapeId]=useState<string|null>(null);
+  const [activeObject,setActiveObject]=useState<"building"|"column"|"statue"|"landscape"|null>(null);
   const [wallStep, setWallStep] = useState<"main"|"features"|"options">("main");
   const [selectedLevel, setSelectedLevel] = useState(0);
   const [selectedFace, setSelectedFace] = useState<WallFace | null>(null);
@@ -290,10 +292,10 @@ export default function TempleBuilderPage() {
 
   return (
     <main className="relative h-[100dvh] overflow-hidden bg-[#b9c4cb] text-white">
-      <TempleWorld cameraMode={cameraMode} levels={levels} perimeter={perimeter} statues={statues} siteColumns={siteColumns} scenery={scenery} landscapeItems={landscapeItems} onSelectSiteColumn={(id:string)=>{setSelectedSiteColumnId(id);setPanel("site-columns");}} onMoveSiteColumn={(id:string,x:number,z:number)=>setSiteColumns(v=>v.map(c=>c.id===id?{...c,x,z}:c))} onSelectLandscape={(id:string)=>setPanel("scenery")} onMoveLandscape={(id:string,x:number,z:number)=>setLandscapeItems(v=>v.map(c=>c.id===id?{...c,x,z}:c))} selectedStatueId={selectedStatueId} selectedLevel={selectedLevel}
-        onSelectLevel={(index) => { setSelectedLevel(index); setSelectedFace(null); setDetailCategory(null); setPanel("edit"); }}
+      <TempleWorld cameraMode={cameraMode} levels={levels} perimeter={perimeter} statues={statues} siteColumns={siteColumns} scenery={scenery} landscapeItems={landscapeItems} onSelectSiteColumn={(id:string)=>{setSelectedSiteColumnId(id);setActiveObject("column");setPanel(null);}} onMoveSiteColumn={(id:string,x:number,z:number)=>setSiteColumns(v=>v.map(c=>c.id===id?{...c,x,z}:c))} onSelectLandscape={(id:string)=>{setSelectedLandscapeId(id);setActiveObject("landscape");setPanel(null);}} onMoveLandscape={(id:string,x:number,z:number)=>setLandscapeItems(v=>v.map(c=>c.id===id?{...c,x,z}:c))} selectedStatueId={selectedStatueId} selectedLevel={selectedLevel}
+        onSelectLevel={(index) => { setSelectedLevel(index); setSelectedFace(null); setDetailCategory(null); setActiveObject("building");setPanel(null); }}
         onSelectFace={(index,face) => { setSelectedLevel(index); setSelectedFace(face); }}
-        onSelectDetail={(index,face,category) => { setSelectedLevel(index); setSelectedFace(face); setDetailCategory(category); setPanel("edit"); }}
+        onSelectDetail={(index,face,category) => { setSelectedLevel(index); setSelectedFace(face); setDetailCategory(category); setActiveObject("building");setPanel("edit"); }}
         onMoveLevel={(index,x,z) => {
           const currentLevel=levels[index];
           // Ground-floor buildings/wings can be dragged together into any footprint.
@@ -316,7 +318,7 @@ export default function TempleBuilderPage() {
         }))}
         onResizePerimeter={(margin)=>setPerimeter(p=>p?{...p,margin}:p)}
         onSelectPerimeter={()=>{setPanel("walls");setWallStep("features");}}
-        onSelectStatue={(id)=>{setSelectedStatueId(id);setPanel("statues");}}
+        onSelectStatue={(id)=>{setSelectedStatueId(id);setActiveObject("statue");setPanel(null);}}
         onMoveStatue={(id,x,z)=>setStatues(v=>v.map(s=>s.id===id?{...s,x,z}:s))} />
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between p-3">
@@ -342,23 +344,17 @@ export default function TempleBuilderPage() {
       <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[24px] border-t border-white/10 bg-[#0c1118]/96 max-h-[34dvh] overflow-y-auto overscroll-contain pb-[max(8px,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl">
         <div className="flex justify-center pb-1 pt-2.5"><div className="h-1 w-10 rounded-full bg-white/20" /></div>
         <div className="flex items-center gap-2 px-3 pb-2">
-          {panel === null && (
-            <button onClick={()=>setPanel("add")} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-b from-amber-200 to-amber-300 px-5 py-3.5 text-sm font-bold text-black shadow-lg shadow-amber-900/20 active:scale-[0.98]"><span className="text-lg leading-none">+</span> Add to site</button>
-          )}
-          {panel !== null && panel !== "edit" && (
-            <>
-              <button onClick={()=>setPanel(panel==="add"?null:"add")} className="shrink-0 rounded-xl bg-white/10 px-3.5 py-2.5 text-xs font-medium text-white/80 active:bg-white/15">{panel==="add"?"Done":"‹ Back"}</button>
-              <div className="min-w-0 flex-1 text-center text-sm font-semibold tracking-wide text-white/90 capitalize">{panel==="add"?"Add":panel}</div>
-              <button onClick={()=>setPanel(null)} className="shrink-0 rounded-xl bg-white/10 px-3.5 py-2.5 text-xs font-medium text-white/80 active:bg-white/15">Close</button>
-            </>
-          )}
-          {panel === "edit" && (
-            <>
-              <div className="min-w-0 flex-1 text-sm font-semibold text-white/90">Edit{levels[selectedLevel]?` · Level ${selectedLevel+1}`:""}</div>
-              <button onClick={()=>{setDetailCategory(null);setPanel(null)}} className="shrink-0 rounded-xl bg-amber-200/90 px-4 py-2.5 text-xs font-bold text-black active:bg-amber-200">Done</button>
-            </>
-          )}
+          {panel===null ? <>
+            <button onClick={()=>{setPanel("add");setDetailCategory(null);}} className="flex-1 rounded-xl bg-amber-200 px-3 py-3 text-sm font-bold text-black">+ Add</button>
+            <button onClick={()=>{if(!activeObject&&levels.length){setActiveObject("building");setSelectedLevel(Math.min(selectedLevel,levels.length-1));}if(activeObject==="building")setPanel("edit");else if(activeObject==="column")setPanel("site-columns");else if(activeObject==="statue")setPanel("statues");else if(activeObject==="landscape")setPanel("scenery");}} className="flex-1 rounded-xl bg-white/15 px-3 py-3 text-sm font-semibold">Edit</button>
+            <button onClick={()=>{setPanel(null);setDetailCategory(null);setActiveObject(null);setSelectedSiteColumnId(null);setSelectedStatueId(null);setSelectedLandscapeId(null);}} className="flex-1 rounded-xl bg-white/15 px-3 py-3 text-sm font-semibold">Done</button>
+          </> : <>
+            <button onClick={()=>{setPanel(null);setDetailCategory(null);}} className="rounded-xl bg-white/15 px-4 py-2.5 text-xs">‹ Back</button>
+            <div className="flex-1 text-center text-sm font-semibold capitalize">{panel==="site-columns"?"Columns":panel==="buildings"?"Shapes":panel}</div>
+            <button onClick={()=>{setPanel(null);setDetailCategory(null);}} className="rounded-xl bg-amber-200 px-4 py-2.5 text-xs font-bold text-black">Done</button>
+          </>}
         </div>
+        {panel===null&&activeObject&&<div className="px-3 pb-2 text-center text-xs text-white/65">Selected: {activeObject==="building"?(levels[selectedLevel]?.shape||"building"):activeObject==="column"?siteColumns.find(c=>c.id===selectedSiteColumnId)?.style||"column":activeObject==="statue"?"statue":"scenery"} · Tap Edit for its controls</div>}
         {panel === "add" && (
           <div className="grid grid-cols-4 gap-2 px-3 pb-3">
             {([
@@ -371,7 +367,7 @@ export default function TempleBuilderPage() {
               ["stairs","Stairs","▤","Coming soon"],
               ["more","More","＋","Coming soon"]
             ] as const).map(([id,name,icon,sub])=>(
-              <button key={id} onClick={()=>{setPanel(id);if(id==="walls")setWallStep(perimeter?"features":"main");}} className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.06] px-1 py-2 text-center transition active:bg-white/10">
+              <button key={id} onClick={()=>{setPanel(id);setActiveObject(null);if(id==="walls")setWallStep(perimeter?"features":"main");}} className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.06] px-1 py-2 text-center transition active:bg-white/10">
                 <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-200/15 text-lg text-amber-100">{icon}</span>
                 <span className="text-xs font-semibold text-white">{name}</span>
                 <span className="text-[10px] leading-tight text-white/45">{sub}</span>
@@ -421,7 +417,7 @@ export default function TempleBuilderPage() {
         {panel === "buildings" && (
           <div className="flex gap-2 overflow-x-auto border-t border-white/10 px-3 py-3">
             {[["star","5-Point Star"],["circle","Circle"],["six-star","6-Point Star"],["rectangle","Rectangle"],["square","Square"],["wide","Wide Hall"],["l-shape","L Shape"],["t-shape","T Shape"],["u-shape","U Shape"],["cross","Cross"],["octagon","Octagon"],["rotunda","Rotunda"],["courtyard","Courtyard"],["triangle","Triangle"],["hexagon","Hexagon"],["diamond","Diamond"],["oval","Oval"],["horseshoe","Horseshoe"],["x-shape","X Shape"],["ring","Ring"]].map(([id,name])=>(
-              <button key={id} onClick={()=>chooseShape(id as BuildingShape)} className="min-w-[118px] rounded-2xl border border-white/10 bg-white/5 p-3 text-left">
+              <button key={id} onClick={()=>{chooseShape(id as BuildingShape);setActiveObject("building");setPanel(null);}} className="min-w-[118px] rounded-2xl border border-white/10 bg-white/5 p-3 text-left">
                 <div className="mb-2 h-10 rounded-md border-2 border-amber-100/60 bg-amber-100/10"/>
                 <div className="text-sm font-medium">{name}</div>
               </button>
@@ -467,7 +463,7 @@ export default function TempleBuilderPage() {
           <div className="border-t border-white/10 px-3 py-3">
             <p className="mb-2 text-xs text-white/65">Swipe to choose a column. Tap one to add it, then drag it on the site.</p>
             <div className="flex snap-x gap-2 overflow-x-auto pb-2">
-              {(["doric","ionic","corinthian","composite","tuscan","fluted","square","twisted","gothic","roman-esque"] as ColumnStyle[]).map(style=><button key={style} onClick={()=>{const id=`site-column-${Date.now()}-${Math.random().toString(36).slice(2,5)}`;setSiteColumns(v=>[...v,{id,style,material:levels[selectedLevel]?.material||"marble",x:(levels[selectedLevel]?.x||0)+3,z:(levels[selectedLevel]?.z||0)+3,height:3.5,radius:.18,rotation:0}]);setSelectedSiteColumnId(id);}} className="min-w-[112px] snap-start rounded-2xl border border-white/15 bg-white/5 p-3 text-center active:bg-amber-200/20">
+              {(["doric","ionic","corinthian","composite","tuscan","fluted","square","twisted","gothic","roman-esque"] as ColumnStyle[]).map(style=><button key={style} onClick={()=>{const id=`site-column-${Date.now()}-${Math.random().toString(36).slice(2,5)}`;setSiteColumns(v=>[...v,{id,style,material:levels[selectedLevel]?.material||"marble",x:(levels[selectedLevel]?.x||0)+3,z:(levels[selectedLevel]?.z||0)+3,height:3.5,radius:.18,rotation:0}]);setSelectedSiteColumnId(id);setActiveObject("column");setPanel(null);}} className="min-w-[112px] snap-start rounded-2xl border border-white/15 bg-white/5 p-3 text-center active:bg-amber-200/20">
                 <div className="mx-auto mb-2 flex h-16 items-center justify-center"><div className={`relative h-12 w-3 rounded-t-sm bg-gradient-to-r from-stone-500 via-stone-100 to-stone-400 ${style==="square"?"rounded-none":""}`}><div className="absolute -left-2 -top-2 h-2 w-7 rounded-sm bg-stone-200"/><div className="absolute -left-1 bottom-0 h-1 w-5 bg-stone-300"/></div></div>
                 <div className="text-xs capitalize">{style.replace("-"," ")}</div>
               </button>)}
