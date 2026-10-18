@@ -61,7 +61,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
   const sceneRef = useRef<THREE.Scene|null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer|null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera|null>(null);
-  const orbitRef = useRef({ theta: 0, phi: Math.PI/2, radius: 13, lastX: 0, lastY: 0, dragging: false, pinch: 0 });
+  const orbitRef = useRef({ theta: 0, phi: 1.28, radius: 13, lastX: 0, lastY: 0, dragging: false, pinch: 0 });
   const targetYRef = useRef(1.4);
   const cameraPanRef = useRef({x:0,y:0,z:0,manual:false});
   const cameraFocusRef = useRef({x:0,z:0});
@@ -165,7 +165,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
     const wheel=(e:WheelEvent)=>{e.preventDefault();const o=orbitRef.current;o.radius=clampZoom(o.radius+e.deltaY*.012);cameraFitRef.current.userFramed=true;render();};
     canvas.addEventListener("pointerdown",down);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",up);canvas.addEventListener("pointercancel",up);canvas.addEventListener("wheel",wheel,{passive:false});
     window.addEventListener("resize",resize); resize();
-    resetCameraRef.current=()=>{const o=orbitRef.current;o.theta=0;o.phi=Math.PI/2;o.radius=Math.max(2,cameraFitRef.current.fitRadius);cameraPanRef.current={x:0,y:0,z:0,manual:false};cameraFitRef.current.userFramed=false;const bounds=lastBoundsRef.current;if(!bounds.isEmpty()){const center=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());cameraFocusRef.current={x:center.x,z:center.z};targetYRef.current=center.y;}resize();};
+    resetCameraRef.current=()=>{const o=orbitRef.current;o.theta=0;o.phi=1.28;o.radius=Math.max(3,cameraFitRef.current.fitRadius*1.3);cameraPanRef.current={x:0,y:0,z:0,manual:false};cameraFitRef.current.userFramed=false;const bounds=lastBoundsRef.current;if(!bounds.isEmpty()){const center=bounds.getCenter(new THREE.Vector3());cameraFocusRef.current={x:center.x,z:center.z};targetYRef.current=center.y;}resize();};
     return()=>{window.removeEventListener("resize",resize);canvas.removeEventListener("pointerdown",down);canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerup",up);canvas.removeEventListener("pointercancel",up);canvas.removeEventListener("wheel",wheel);scene.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.dispose();const m=o.material;if(Array.isArray(m))m.forEach(x=>x.dispose());else m.dispose();}});renderer.dispose();canvas.remove();};
   },[]);
 
@@ -666,7 +666,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
       // The camera's pivot always follows the structure, not the old ground location.
       if(firstBuild||(!fit.userFramed&&(changedStories||resized))){
         orbitRef.current.radius=needed;
-        if(firstBuild){orbitRef.current.theta=0;orbitRef.current.phi=Math.PI/2;}
+        if(firstBuild){orbitRef.current.theta=0;orbitRef.current.phi=1.28;}
         cameraPanRef.current={x:0,y:0,z:0,manual:false};
       }
       if(levels.length>0){fit.initialized=true;fit.lastSpan=radius;fit.buildingCount=levels.length;}
