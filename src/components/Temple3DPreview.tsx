@@ -508,7 +508,6 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
       }
     });
     // Independent site columns can be arranged around any temple without a wall attachment.
-    siteObjectGroupsRef.current=[];
     for(const column of siteColumns){
       const g=new THREE.Group();g.position.set(column.x,0,column.z);g.rotation.y=THREE.MathUtils.degToRad(column.rotation);g.userData.siteObjectId=column.id;g.userData.siteObjectKind="column";siteObjectGroupsRef.current.push(g);group.add(g);
       const cm=makeMaterial(column.material,COLORS[column.material]);
@@ -527,6 +526,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
       if(column.style==="ionic"||column.style==="composite")for(const side of [-1,1]){const volute=new THREE.Mesh(new THREE.TorusGeometry(r*.36,r*.10,8,20),cm.clone());volute.position.set(side*r*.9,h*.93,0);g.add(volute);}
     }
     // User-placeable landscaping is separate from the fixed environmental backdrop.
+    siteObjectGroupsRef.current=[];
     for(const item of landscapeItems){
       const g=new THREE.Group();g.position.set(item.x,0,item.z);g.rotation.y=THREE.MathUtils.degToRad(item.rotation);g.scale.setScalar(Math.max(.3,Math.min(4,item.scale||1)));g.userData.siteObjectId=item.id;g.userData.siteObjectKind="landscape";siteObjectGroupsRef.current.push(g);group.add(g);
       const material=(color:number)=>new THREE.MeshStandardMaterial({color,roughness:.85});
