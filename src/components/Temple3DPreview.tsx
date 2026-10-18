@@ -240,6 +240,33 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
         for(const [rw,rd,x,z] of parts){box(rw+.12,.18,rd+.12,x,baseY+.09,z);box(rw,h,rd,x,baseY+h/2,z);}
         for(const [rw,rd,x,z] of parts)addRoof(lg,level.roof,rw,rd,x,z,baseY+h,color);
       }
+      // Low-poly masonry courses: staggered individual blocks with visible mortar gaps.
+      // Applied to the four exterior faces of rectangular building footprints.
+      if(["rectangle","square","wide"].includes(level.shape) && !["stucco","plaster","timber","bronze","gold"].includes(level.material)){
+        const rows=Math.min(12,Math.max(3,Math.round(h/.48)));
+        const course=h/rows;
+        for(const face of ["front","back","left","right"] as WallFace[]){
+          const length=face==="front"||face==="back"?w:d;
+          const count=Math.min(22,Math.max(4,Math.ceil(length/.68)));
+          const unit=length/count;
+          for(let row=0;row<rows;row++){
+            const offset=row%2?unit/2:0;
+            for(let i=0;i<=count;i++){
+              const center=-length/2+(i+.5)*unit+offset;
+              if(Math.abs(center)>length/2-unit*.3)continue;
+              const y=baseY+(row+.5)*course;
+              // Keep masonry off glazed and doorway surfaces.
+              const opening=(level.windows||[]).some(win=>win.face===face&&Math.abs(center-(win.u||0)*length*.38)<win.width/4.5+unit*.45&&Math.abs(y-(baseY+h*(win.v||.55)))<win.height/4.5+course*.5)||
+                (level.doors||[]).some(door=>door.face===face&&Math.abs(center-(door.u||0)*length*.38)<door.width/4.3+unit*.45&&y<door.height/2.1+course*.5);
+              if(opening)continue;
+              const stone=new THREE.Mesh(new THREE.BoxGeometry(unit*.965,course*.94,.065),mat());
+              if(face==="front"||face==="back")stone.position.set(center,y,(face==="front"?1:-1)*(d/2+.028));
+              else {stone.position.set((face==="right"?1:-1)*(w/2+.028),y,center);stone.rotation.y=Math.PI/2;}
+              lg.add(stone);
+            }
+          }
+        }
+      }
       for(const win of level.windows||[]){
         const ww=win.width/2.4,wh=win.height/2.4,edge=.04;
         let geometry:THREE.BufferGeometry;
@@ -419,7 +446,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
       fit.buildingCount=levels.length;
     }
     const o=orbitRef.current,pan=cameraPanRef.current;camera.clearViewOffset();const focus=new THREE.Vector3(cameraFocusRef.current.x+pan.x,targetYRef.current+pan.y,cameraFocusRef.current.z+pan.z);camera.position.set(focus.x+Math.sin(o.theta)*Math.sin(o.phi)*o.radius,focus.y+Math.cos(o.phi)*o.radius,focus.z+Math.cos(o.theta)*Math.sin(o.phi)*o.radius);camera.lookAt(focus);renderer.render(scene,camera);
-  },[levels,perimeter,statues]);
+  },[levels,perimeter,statues,siteColumns]);
 
   // Selection highlighting does not require rebuilding geometry or reframing the camera.
   useEffect(()=>{
