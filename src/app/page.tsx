@@ -334,7 +334,7 @@ export default function TempleBuilderPage() {
       )}
 
       {/* Improved bottom menu from supplied design; existing builder actions remain intact. */}
-      <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[24px] border-t border-white/10 bg-[#0c1118]/96 max-h-[48dvh] overflow-y-auto overscroll-contain pb-[max(8px,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+      <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[24px] border-t border-white/10 bg-[#0c1118]/96 max-h-[34dvh] overflow-y-auto overscroll-contain pb-[max(8px,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl">
         <div className="flex justify-center pb-1 pt-2.5"><div className="h-1 w-10 rounded-full bg-white/20" /></div>
         <div className="flex items-center gap-2 px-3 pb-2">
           {panel === null && (
@@ -355,19 +355,19 @@ export default function TempleBuilderPage() {
           )}
         </div>
         {panel === "add" && (
-          <div className="grid grid-cols-3 gap-2.5 px-3 pb-3">
+          <div className="grid grid-cols-4 gap-2 px-3 pb-3">
             {([
-              ["buildings","Building","▣","Templates & shapes"],
+              ["buildings","Shapes","▣","Choose a footprint"],
               ["walls","Walls","⬡","Courtyard walls"],
               ["statues","Statue","♟","Guardians & figures"],
-              ["site-columns","Columns","▥","Freestanding columns"],
+              ["site-columns","Columns","▥","Swipe styles"],
               ["scenery","Scenery","◈","Garden, desert & dusk"],
               ["fountains","Fountain","◉","Coming soon"],
               ["stairs","Stairs","▤","Coming soon"],
               ["more","More","＋","Coming soon"]
             ] as const).map(([id,name,icon,sub])=>(
-              <button key={id} onClick={()=>{setPanel(id);if(id==="walls")setWallStep(perimeter?"features":"main");}} className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.06] px-2 py-4 text-center transition active:bg-white/10">
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-200/15 text-lg text-amber-100">{icon}</span>
+              <button key={id} onClick={()=>{setPanel(id);if(id==="walls")setWallStep(perimeter?"features":"main");}} className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.06] px-1 py-2 text-center transition active:bg-white/10">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-200/15 text-lg text-amber-100">{icon}</span>
                 <span className="text-xs font-semibold text-white">{name}</span>
                 <span className="text-[10px] leading-tight text-white/45">{sub}</span>
               </button>
@@ -458,36 +458,23 @@ export default function TempleBuilderPage() {
             <button onClick={()=>setLandscapeItems(v=>v.filter(q=>q.id!==item.id))} className="text-red-200">Delete</button>
           </div>)}
         </div>}
-        {panel === "site-columns" && <div className="border-t border-amber-200/20 px-3 py-3">
-          <div className="mb-2 text-sm font-semibold text-amber-100">Greek colonnade generator</div>
-          <p className="mb-2 text-xs text-white/65">Create an evenly spaced row or a complete perimeter of independent, editable columns around your selected temple.</p>
-          <div className="grid grid-cols-2 gap-2">
-            {(["doric","ionic","corinthian","composite"] as ColumnStyle[]).map(style=><button key={style} onClick={()=>{
-              const building=levels[selectedLevel];if(!building)return;
-              const width=building.width/7,depth=building.depth/7,cx=building.x||0,cz=building.z||0;
-              const margin=1.15,halfW=width/2+margin,halfD=depth/2+margin;
-              const nx=Math.max(3,Math.min(12,Math.ceil(width/1.4)+1)),nz=Math.max(3,Math.min(12,Math.ceil(depth/1.4)+1));
-              const points:Array<[number,number]>=[];
-              for(let i=0;i<nx;i++){const x=-halfW+i*2*halfW/(nx-1);points.push([x,-halfD],[x,halfD]);}
-              for(let i=1;i<nz-1;i++){const z=-halfD+i*2*halfD/(nz-1);points.push([-halfW,z],[halfW,z]);}
-              const angle=building.rotation*Math.PI/180;
-              const batch=points.map(([x,z],i)=>({id:`colonnade-${Date.now()}-${i}`,style,material:building.material,x:cx+x*Math.cos(angle)-z*Math.sin(angle),z:cz+x*Math.sin(angle)+z*Math.cos(angle),height:Math.max(2,building.height/7*.9),radius:.18,rotation:building.rotation}));
-              setSiteColumns(v=>[...v,...batch]);setSelectedSiteColumnId(null);
-            }} className="rounded-xl border border-amber-200/25 bg-amber-200/10 px-3 py-3 text-left text-xs capitalize">+ {style} perimeter</button>)}
-          </div>
-        </div>}
         {panel === "site-columns" && (
-          <div className="flex flex-wrap gap-2 border-t border-white/10 px-3 py-3">
-            {(["doric","ionic","corinthian","composite","tuscan","fluted","square","twisted","gothic","roman-esque"] as ColumnStyle[]).map(style=><button key={style} className="rounded-xl bg-white/10 px-3 py-2 text-xs capitalize" onClick={()=>{const id=`site-column-${Date.now()}-${Math.random().toString(36).slice(2,5)}`;setSiteColumns(v=>[...v,{id,style,material:"marble",x:(levels[selectedLevel]?.x||0)+3,z:(levels[selectedLevel]?.z||0)+3,height:3.5,radius:.18,rotation:0}]);setSelectedSiteColumnId(id);}} >+ {style}</button>)}
-            {selectedSiteColumnId && siteColumns.filter(c=>c.id===selectedSiteColumnId).map(c=><div key={c.id} className="flex w-full flex-wrap items-center gap-2 rounded-xl bg-black/30 p-2 text-xs">
-              <span className="font-semibold">Selected: {c.style}</span>
-              {(["X","Z"] as const).map(axis=><label key={axis} className="flex items-center gap-1">{axis}<input aria-label={`${axis} position`} type="number" step="0.25" value={c[axis.toLowerCase() as "x"|"z"]} onChange={e=>setSiteColumns(v=>v.map(q=>q.id===c.id?{...q,[axis.toLowerCase()]:Number(e.target.value)}:q))} className="w-16 rounded bg-white/15 p-2"/></label>)}
-              <label>Height <input aria-label="Column height" type="number" min="1" max="15" step=".25" value={c.height} onChange={e=>setSiteColumns(v=>v.map(q=>q.id===c.id?{...q,height:Math.max(1,Math.min(15,Number(e.target.value)||1))}:q))} className="w-16 rounded bg-white/15 p-2"/></label>
-              <button className="rounded bg-white/15 p-2" onClick={()=>setSiteColumns(v=>[...v,{...c,id:`site-column-${Date.now()}`,x:c.x+.6}])}>Duplicate</button>
-              <button className="rounded bg-red-800/60 p-2" onClick={()=>{setSiteColumns(v=>v.filter(q=>q.id!==c.id));setSelectedSiteColumnId(null);}}>Delete</button>
-              <button className="rounded bg-white/15 p-2" onClick={()=>setSelectedSiteColumnId(null)}>Done</button>
+          <div className="border-t border-white/10 px-3 py-3">
+            <p className="mb-2 text-xs text-white/65">Swipe to choose a column. Tap one to add it, then drag it on the site.</p>
+            <div className="flex snap-x gap-2 overflow-x-auto pb-2">
+              {(["doric","ionic","corinthian","composite","tuscan","fluted","square","twisted","gothic","roman-esque"] as ColumnStyle[]).map(style=><button key={style} onClick={()=>{const id=`site-column-${Date.now()}-${Math.random().toString(36).slice(2,5)}`;setSiteColumns(v=>[...v,{id,style,material:levels[selectedLevel]?.material||"marble",x:(levels[selectedLevel]?.x||0)+3,z:(levels[selectedLevel]?.z||0)+3,height:3.5,radius:.18,rotation:0}]);setSelectedSiteColumnId(id);}} className="min-w-[112px] snap-start rounded-2xl border border-white/15 bg-white/5 p-3 text-center active:bg-amber-200/20">
+                <div className="mx-auto mb-2 flex h-16 items-center justify-center"><div className={`relative h-12 w-3 rounded-t-sm bg-gradient-to-r from-stone-500 via-stone-100 to-stone-400 ${style==="square"?"rounded-none":""}`}><div className="absolute -left-2 -top-2 h-2 w-7 rounded-sm bg-stone-200"/><div className="absolute -left-1 bottom-0 h-1 w-5 bg-stone-300"/></div></div>
+                <div className="text-xs capitalize">{style.replace("-"," ")}</div>
+              </button>)}
+            </div>
+            {selectedSiteColumnId && siteColumns.filter(c=>c.id===selectedSiteColumnId).map(c=><div key={c.id} className="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-white/10 p-2 text-xs">
+              <span className="font-semibold capitalize">{c.style}</span>
+              <label>Height <input type="range" min="1" max="10" step=".25" value={c.height} onChange={e=>setSiteColumns(v=>v.map(q=>q.id===c.id?{...q,height:Number(e.target.value)}:q))}/></label>
+              <button className="rounded-lg bg-white/15 px-3 py-2" onClick={()=>setSiteColumns(v=>[...v,{...c,id:`site-column-${Date.now()}`,x:c.x+.75}])}>Duplicate</button>
+              <button className="rounded-lg bg-red-900/50 px-3 py-2" onClick={()=>{setSiteColumns(v=>v.filter(q=>q.id!==c.id));setSelectedSiteColumnId(null);}}>Delete</button>
+              <button className="rounded-lg bg-white/15 px-3 py-2" onClick={()=>setSelectedSiteColumnId(null)}>Done</button>
             </div>)}
-            {!selectedSiteColumnId&&siteColumns.length>0&&<div className="flex w-full flex-wrap gap-2">{siteColumns.map((c,i)=><button key={c.id} className="rounded bg-white/15 px-3 py-2 text-xs" onClick={()=>setSelectedSiteColumnId(c.id)}>Edit column {i+1}</button>)}</div>}
+            {!selectedSiteColumnId&&siteColumns.length>0&&<div className="flex gap-2 overflow-x-auto py-2">{siteColumns.map((c,i)=><button key={c.id} className="shrink-0 rounded-lg bg-white/10 px-3 py-2 text-xs" onClick={()=>setSelectedSiteColumnId(c.id)}>Edit {i+1}</button>)}</div>}
           </div>
         )}
         {panel === "statues" && (
