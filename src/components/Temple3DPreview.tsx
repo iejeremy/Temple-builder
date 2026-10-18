@@ -28,6 +28,14 @@ const makeMaterial=(kind:BuilderMaterial,color=COLORS[kind],selected=false)=>{
   });
 };
 
+// Shared by initial framing, viewport resize, and the explicit Center Temple action.
+function templeFitDistance(radius:number,camera:THREE.PerspectiveCamera){
+  const halfVertical=THREE.MathUtils.degToRad(camera.fov)/2;
+  const halfHorizontal=Math.atan(Math.tan(halfVertical)*camera.aspect);
+  const usableHalfAngle=Math.atan(Math.tan(Math.min(halfVertical,halfHorizontal))*.75);
+  return Math.max(3,radius/Math.sin(usableHalfAngle)*1.05);
+}
+
 export default function Temple3DPreview({ levels, perimeter, statues, siteColumns, scenery, landscapeItems, selectedStatueId, selectedLevel, onSelectLevel, onSelectFace, onMoveLevel, onPatioChange, onMoveWindow, onMoveDoor, onMoveArch, onMoveDetail, onResizePerimeter, onSelectDetail, onSelectPerimeter, onSelectStatue, onMoveStatue, onSelectSiteColumn, onMoveSiteColumn, onSelectLandscape, onMoveLandscape }: {
   levels: BuildingLevel[];
   perimeter: Perimeter | null;
@@ -67,6 +75,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
   const cameraFocusRef = useRef({x:0,z:0});
   const cameraFitRef = useRef({initialized:false,lastSpan:0,fitRadius:13,buildingCount:0,userFramed:false});
   const lastBoundsRef=useRef(new THREE.Box3());
+  const framingRadiusRef=useRef(0);
   const resetCameraRef = useRef<()=>void>(()=>{});
   const gestureRef = useRef({midX:0,midY:0});
   const renderCameraRef=useRef<()=>void>(()=>{});
@@ -148,27 +157,22 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
     renderCameraRef.current=render;
     const zoomLimits=()=>({min:Math.max(2,cameraFitRef.current.fitRadius*.18),max:Math.max(20,cameraFitRef.current.fitRadius*2.2)});
     const clampZoom=(radius:number)=>{const limits=zoomLimits();return Math.max(limits.min,Math.min(limits.max,radius));};
-    let previousAspect=0;
+    // A sphere about the structural pivot encloses roofs and attached details at every orbit angle.
+    const centerTemple=()=>{
+      const bounds=lastBoundsRef.current;if(bounds.isEmpty())return;
+      const center=bounds.getCenter(new THREE.Vector3());
+      cameraFocusRef.current={x:center.x,z:center.z};targetYRef.current=center.y;
+      cameraPanRef.current={x:0,y:0,z:0,manual:false};
+      orbitRef.current.radius=cameraFitRef.current.fitRadius=templeFitDistance(framingRadiusRef.current,camera);
+    };
+    let previousWidth=0,previousHeight=0;
     const resize=()=>{
       const w=Math.max(1,host.clientWidth),h=Math.max(1,host.clientHeight);
+      if(w===previousWidth&&h===previousHeight)return;
+      previousWidth=w;previousHeight=h;
       camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);
-      // Fit the current temple in both portrait and landscape, including space for controls.
-      const bounds=lastBoundsRef.current;
-      if(!bounds.isEmpty()&&cameraFitRef.current.buildingCount>0){
-        const size=bounds.getSize(new THREE.Vector3());
-        const radius=size.length()*.5;
-        const vFov=THREE.MathUtils.degToRad(camera.fov);
-        const hFov=2*Math.atan(Math.tan(vFov/2)*Math.max(.1,w/(h*.75)));
-        const fitDistance=Math.max(radius/Math.sin(vFov/2),radius/Math.sin(hFov/2))*1.3+2;
-        cameraFitRef.current.fitRadius=fitDistance;
-        if(!cameraFitRef.current.userFramed || Math.abs(camera.aspect-previousAspect)>.01){
-          orbitRef.current.radius=fitDistance;
-          cameraPanRef.current={x:0,y:0,z:0,manual:false};
-          const center=bounds.getCenter(new THREE.Vector3());
-          cameraFocusRef.current={x:center.x,z:center.z};targetYRef.current=center.y;
-        }
-      }
-      previousAspect=camera.aspect;
+      // Only a real viewport change refits; observer notifications from selection do nothing.
+      centerTemple();
       render();
     };
     const canvas=renderer.domElement; canvas.style.touchAction="none";
@@ -187,22 +191,12 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
     const wheel=(e:WheelEvent)=>{e.preventDefault();const o=orbitRef.current;o.radius=clampZoom(o.radius+e.deltaY*.012);cameraFitRef.current.userFramed=true;render();};
     canvas.addEventListener("pointerdown",down);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",up);canvas.addEventListener("pointercancel",up);canvas.addEventListener("wheel",wheel,{passive:false});
     window.addEventListener("resize",resize); const sizeObserver=new ResizeObserver(resize);sizeObserver.observe(host); resize();
-    resetCameraRef.current=()=>{const o=orbitRef.current;o.theta=0;o.phi=1.28;o.radius=Math.max(3,cameraFitRef.current.fitRadius*1.3);cameraPanRef.current={x:0,y:0,z:0,manual:false};cameraFitRef.current.userFramed=false;const bounds=lastBoundsRef.current;if(!bounds.isEmpty()){const center=bounds.getCenter(new THREE.Vector3());cameraFocusRef.current={x:center.x,z:center.z};targetYRef.current=center.y;}resize();};
+    resetCameraRef.current=()=>{const o=orbitRef.current;o.theta=0;o.phi=1.28;cameraFitRef.current.userFramed=false;centerTemple();render();};
     return()=>{sizeObserver.disconnect();window.removeEventListener("resize",resize);canvas.removeEventListener("pointerdown",down);canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerup",up);canvas.removeEventListener("pointercancel",up);canvas.removeEventListener("wheel",wheel);scene.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.dispose();const m=o.material;if(Array.isArray(m))m.forEach(x=>x.dispose());else m.dispose();}});renderer.dispose();canvas.remove();};
   },[]);
 
   useEffect(()=>{
     const group=groupRef.current,scene=sceneRef.current,renderer=rendererRef.current,camera=cameraRef.current;if(!group||!scene||!renderer||!camera)return;
-    // Frame the actual structures, not the sum of unrelated ground-floor wings.
-    const minX=Math.min(0,...levels.map(l=>l.x-l.width/14));
-    const maxX=Math.max(0,...levels.map(l=>l.x+l.width/14));
-    const minZ=Math.min(0,...levels.map(l=>l.z-l.depth/14));
-    const maxZ=Math.max(0,...levels.map(l=>l.z+l.depth/14));
-    const top=Math.max(2.8,...levels.map(l=>((l.elevation||0)+l.height)/7));
-    const centerX=(minX+maxX)/2,centerZ=(minZ+maxZ)/2;
-    // Always aim at the vertical center of the complete building, not the ground or roof.
-    targetYRef.current=Math.max(1.4,top*.52);
-    const span=Math.max(maxX-minX,maxZ-minZ,top);
     while(group.children.length){const o=group.children[0];group.remove(o);o.traverse(child=>{if(child instanceof THREE.Mesh){child.geometry.dispose();const m=child.material;if(Array.isArray(m))m.forEach(x=>x.dispose());else m.dispose();}});}
     levelGroupsRef.current=[];
     let baseY=0;
@@ -644,55 +638,45 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
       if(perimeter.columns||perimeter.arches){const frontZ=Math.max(...points.map(p=>p[1]));for(const x of [-1.1,1.1]){if(perimeter.columns){const col=new THREE.Mesh(new THREE.CylinderGeometry(.12,.15,perimeter.height*1.1,12),mat.clone());col.position.set(x,perimeter.height*.55,frontZ);pg.add(col);}}if(perimeter.arches){const arch=new THREE.Mesh(new THREE.TorusGeometry(.75,.12,8,20,Math.PI),mat.clone());arch.rotation.z=Math.PI;arch.position.set(0,perimeter.height*.78,frontZ);pg.add(arch);}}
     }
     enableShadows(group);if(perimeterGroupRef.current)enableShadows(perimeterGroupRef.current);statueGroupsRef.current.forEach(enableShadows);
-    // Frame the finished 3D building, including rotated geometry, roofs and attached details.
+    // Structural bounds define the orbit pivot; site decorations never move it.
     group.updateMatrixWorld(true);
-    const actualBounds=new THREE.Box3().setFromObject(group);
-    if(!actualBounds.isEmpty()){
-      const actualCenter=actualBounds.getCenter(new THREE.Vector3());
-      const actualSize=actualBounds.getSize(new THREE.Vector3());
-      // Orbit around the actual rendered building, not the world origin or ground plane.
-      // Level groups have world transforms, so their combined bounds define the real pivot.
-      const buildingBounds=new THREE.Box3();
-      // Use the structural shell only for the orbit pivot; decorative geometry may
-      // extend beyond the building and must not drag the orbit target off-center.
-      for(const level of levels){
-        const x=level.x||0,z=level.z||0;
-        const halfW=level.width/14,halfD=level.depth/14;
-        const bottom=(level.elevation||0)/7;
-        const top=bottom+level.height/7;
-        buildingBounds.expandByPoint(new THREE.Vector3(x-halfW,bottom,z-halfD));
-        buildingBounds.expandByPoint(new THREE.Vector3(x+halfW,top,z+halfD));
-      }
-      const focusBounds=buildingBounds.isEmpty()?actualBounds:buildingBounds;
-      const buildingCenter=focusBounds.getCenter(new THREE.Vector3());
-      cameraFocusRef.current={x:buildingCenter.x,z:buildingCenter.z};
-      targetYRef.current=buildingCenter.y;
-      lastBoundsRef.current.copy(focusBounds);
-      const vFov=THREE.MathUtils.degToRad(camera.fov);
-      const canvasHeight=Math.max(1,renderer.domElement.clientHeight);
-      const canvasWidth=Math.max(1,renderer.domElement.clientWidth);
-      const usableHeight=canvasHeight*.75;
-      const aspect=Math.max(.1,canvasWidth/usableHeight);
-      const hFov=2*Math.atan(Math.tan(vFov/2)*aspect);
-      const focusSize=focusBounds.getSize(new THREE.Vector3());
-      const radius=focusSize.length()*.5;
-      const needed=Math.max(radius/Math.sin(vFov/2),radius/Math.sin(hFov/2))*1.15+1.5;
-      const fit=cameraFitRef.current;
-      const previousSpan=fit.lastSpan;
-      const previousCount=fit.buildingCount;
-      const firstBuild=levels.length>0&&previousCount===0;
-      const changedStories=levels.length!==previousCount;
-      const resized=previousSpan>0&&(radius>previousSpan*1.12||radius<previousSpan*.88);
+    const buildingBounds=new THREE.Box3();
+    const renderedBounds=new THREE.Box3();
+    levelGroupsRef.current.forEach((levelGroup,index)=>{
+      const level=levels[index],bottom=(level.elevation||0)/7;
+      const shell=new THREE.Box3(
+        new THREE.Vector3(-level.width/14,bottom,-level.depth/14),
+        new THREE.Vector3(level.width/14,bottom+level.height/7,level.depth/14)
+      ).applyMatrix4(levelGroup.matrixWorld);
+      buildingBounds.union(shell);
+      renderedBounds.union(new THREE.Box3().setFromObject(levelGroup));
+    });
+    const fit=cameraFitRef.current;
+    if(!buildingBounds.isEmpty()){
+      const center=buildingBounds.getCenter(new THREE.Vector3());
+      let radius=0;
+      for(const x of [renderedBounds.min.x,renderedBounds.max.x])
+        for(const y of [renderedBounds.min.y,renderedBounds.max.y])
+          for(const z of [renderedBounds.min.z,renderedBounds.max.z])
+            radius=Math.max(radius,center.distanceTo(new THREE.Vector3(x,y,z)));
+      const geometryChanged=!buildingBounds.equals(lastBoundsRef.current)||Math.abs(radius-framingRadiusRef.current)>1e-6;
+      lastBoundsRef.current.copy(buildingBounds);framingRadiusRef.current=radius;
+      const needed=templeFitDistance(radius,camera);
+      const firstBuild=fit.buildingCount===0;
       fit.fitRadius=needed;
-      // Recenter whenever the building changes, unless the user deliberately panned.
-      // The camera's pivot always follows the structure, not the old ground location.
-      if(firstBuild||(!fit.userFramed&&(changedStories||resized))){
-        orbitRef.current.radius=needed;
+      if(firstBuild||geometryChanged){
+        cameraFocusRef.current={x:center.x,z:center.z};targetYRef.current=center.y;
+        if(firstBuild||!fit.userFramed){
+          orbitRef.current.radius=needed;
+          cameraPanRef.current={x:0,y:0,z:0,manual:false};
+        }
         if(firstBuild){orbitRef.current.theta=0;orbitRef.current.phi=1.28;}
-        cameraPanRef.current={x:0,y:0,z:0,manual:false};
       }
-      if(levels.length>0){fit.initialized=true;fit.lastSpan=radius;fit.buildingCount=levels.length;}
+      fit.initialized=true;fit.lastSpan=radius;
+    }else{
+      lastBoundsRef.current.makeEmpty();framingRadiusRef.current=0;fit.initialized=false;
     }
+    fit.buildingCount=levels.length;
     renderCameraRef.current();
 
   },[levels,perimeter,statues,siteColumns,landscapeItems]);
