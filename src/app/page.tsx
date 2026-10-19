@@ -80,7 +80,7 @@ export default function TempleBuilderPage() {
   const [detailCategory, setDetailCategory] = useState<"levels"|"windows"|"doors"|"trim"|"columns"|"arches"|"stairs"|"pediments"|"roof"|"material"|null>(null);
   const [landscapeItems,setLandscapeItems] = useState<LandscapeItem[]>([]);
   const [scenery,setScenery] = useState<"garden"|"desert"|"twilight">("garden");
-  const [panel, setPanel] = useState<"add" | "walls" | "buildings" | "fountains" | "statues" | "site-columns" | "stairs" | "scenery" | "more" | "edit" | null>(null);
+  const [panel, setPanel] = useState<"add" | "floors" | "walls" | "buildings" | "fountains" | "statues" | "site-columns" | "stairs" | "scenery" | "more" | "edit" | null>(null);
   // Save the complete building site on this device without requiring an account.
   const [siteLoaded,setSiteLoaded] = useState(false);
   useEffect(()=>{
@@ -280,19 +280,19 @@ export default function TempleBuilderPage() {
     setSelectedFace(null);setDetailCategory(null);setPanel("edit");
   };
 
-  const chooseShape = (next: BuildingShape) => {
+  const chooseShape = (next: BuildingShape, floorWidth?: number) => {
     const dims: Record<BuildingShape,[number,number]> = {
       square:[28,28], rectangle:[34,26], wide:[46,24], "l-shape":[38,34], "t-shape":[40,34],
       "u-shape":[42,36], cross:[40,40], octagon:[28,28], rotunda:[28,28], courtyard:[46,40],
       star:[36,36], "six-star":[36,36], circle:[36,36], triangle:[36,34], hexagon:[36,36],
       diamond:[36,34], oval:[42,30], horseshoe:[40,38], "x-shape":[40,38], ring:[36,36]
     };
-    const [nextWidth,nextDepth]=dims[next];
+    const [nextWidth,nextDepth]=floorWidth ? [floorWidth,36] : dims[next];
     setShape(next); setWidth(nextWidth); setDepth(nextDepth); setHeight(22);
 
     const fresh: BuildingLevel = {
-      id:`building-${Date.now()}`, shape:next, material, width:nextWidth, depth:nextDepth, height:22,
-      roof:"flat", patio:false, x:0, z:0, rotation:0, elevation:0,
+      id:`building-${Date.now()}`, shape:next, material, width:nextWidth, depth:nextDepth, height:floorWidth ? 1 : 22,
+      roof:floorWidth ? "none" : "flat", patio:false, x:0, z:0, rotation:0, elevation:0,
       windows:[], doors:[], arches:[], columns:[], trims:[], stairs:[], pediments:[]
     };
 
@@ -379,6 +379,7 @@ export default function TempleBuilderPage() {
             {([
               ["buildings","Shapes","▣","Choose a footprint"],
               ["walls","Walls","⬡","Courtyard walls"],
+              ["floors","Floors","▱","Square & wide floors"],
               ["statues","Statue","♟","Guardians & figures"],
               ["site-columns","Columns","▥","Swipe styles"],
               ["scenery","Scenery","◈","Garden, desert & dusk"],
@@ -386,7 +387,7 @@ export default function TempleBuilderPage() {
               ["edit","Stairs","▤","Add entrance stairs"],
               ["more","More","＋","Coming soon"]
             ] as const).map(([id,name,icon,sub])=>(
-              <button key={id} onClick={()=>{setPanel(id);setActiveObject(null);if(id==="walls")setWallStep(perimeter?"features":"main");}} className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.06] px-1 py-2 text-center transition active:bg-white/10">
+              <button key={name} onClick={()=>{setPanel(id);setActiveObject(null);if(id==="walls")setWallStep(perimeter?"features":"main");}} className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.06] px-1 py-2 text-center transition active:bg-white/10">
                 <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-200/15 text-lg text-amber-100">{icon}</span>
                 <span className="text-xs font-semibold text-white">{name}</span>
                 <span className="text-[10px] leading-tight text-white/45">{sub}</span>
@@ -394,6 +395,9 @@ export default function TempleBuilderPage() {
             ))}
           </div>
         )}
+        {panel === "floors" && <div className="flex gap-2 overflow-x-auto px-3 py-3">
+          {([[36,"Square Floor"],[55,"Wide Floor"]] as const).map(([size,label])=><button key={size} onClick={()=>chooseShape("rectangle",size)} className="min-w-[110px] shrink-0 rounded-xl bg-white/10 p-3 text-xs">{label}</button>)}
+        </div>}
         {panel === "edit" && shape && levels[selectedLevel] && (
           <div className="border-t border-white/10">
             {!detailCategory && <div className="flex gap-2 overflow-x-auto px-3 py-3">
@@ -408,7 +412,7 @@ export default function TempleBuilderPage() {
 
             </div>}
             {detailCategory==="levels" && <div className="flex gap-2 overflow-x-auto px-3 py-3">
-              {levels.length<12 && <button onClick={()=>{const base=levels[levels.length-1];setLevels([...levels,{...base,id:`level-${levels.length+1}`,width:Math.max(16,Math.round(base.width*.84)),depth:Math.max(16,Math.round(base.depth*.84)),roof:"flat",patio:false,x:base.x,z:base.z,rotation:base.rotation,elevation:(base.elevation||0)+base.height,windows:[],doors:[],arches:[],columns:[],trims:[],stairs:[],pediments:[]}]);setSelectedLevel(levels.length);}} className="min-w-[100px] shrink-0 rounded-xl bg-white/10 p-3 text-xs">+ Add Level</button>}
+              {levels.length<12 && <button onClick={()=>{const base=levels[selectedLevel];setLevels([...levels,{...base,id:`level-${levels.length+1}`,width:Math.max(16,Math.round(base.width*.84)),depth:Math.max(16,Math.round(base.depth*.84)),roof:"flat",patio:false,x:base.x,z:base.z,rotation:base.rotation,elevation:(base.elevation||0)+base.height,windows:[],doors:[],arches:[],columns:[],trims:[],stairs:[],pediments:[]}]);setSelectedLevel(levels.length);}} className="min-w-[100px] shrink-0 rounded-xl bg-white/10 p-3 text-xs">+ Add Level</button>}
               {levels.map((_,i)=><button key={i} onClick={()=>setSelectedLevel(i)} className={`min-w-[90px] shrink-0 rounded-xl p-3 text-xs ${i===selectedLevel?"bg-amber-200 text-black":"bg-white/10"}`}>Level {i+1}</button>)}
               {([["star","Star"],["circle","Circle"],["six-star","6-Point Star"],["rectangle","Rectangle"],["square","Square"],["wide","Wide"],["l-shape","L Shape"],["t-shape","T Shape"],["u-shape","U Shape"],["cross","Cross"],["octagon","Octagon"],["rotunda","Rotunda"],["courtyard","Courtyard"],["triangle","Triangle"],["hexagon","Hexagon"],["diamond","Diamond"],["oval","Oval"],["horseshoe","Horseshoe"],["x-shape","X Shape"],["ring","Ring"]] as [BuildingShape,string][]).map(([id,name])=><button key={id} onClick={()=>setLevels(v=>v.map((l,i)=>i===selectedLevel?{...l,shape:id}:l))} className={`min-w-[100px] shrink-0 rounded-xl border p-3 text-xs ${levels[selectedLevel].shape===id?"border-amber-200 bg-amber-200/15":"border-white/10 bg-white/5"}`}>{name}</button>)}
             </div>}
