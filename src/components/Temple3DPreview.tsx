@@ -687,8 +687,8 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
       const firstBuild=fit.buildingCount===0;
       fit.fitRadius=needed;
       if(firstBuild||geometryChanged){
-        cameraFocusRef.current={x:center.x,z:center.z};targetYRef.current=center.y;
         if(firstBuild||!fit.userFramed){
+          cameraFocusRef.current={x:center.x,z:center.z};targetYRef.current=center.y;
           orbitRef.current.radius=needed;
           cameraPanRef.current={x:0,y:0,z:0,manual:false};
         }
