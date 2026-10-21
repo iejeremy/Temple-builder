@@ -115,11 +115,29 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
     const sun=new THREE.DirectionalLight(0xfff4df,2.35); sun.position.set(8,12,7); sun.castShadow=true;
     sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.near=.5;sun.shadow.camera.far=42;
     sun.shadow.camera.left=-14;sun.shadow.camera.right=14;sun.shadow.camera.top=14;sun.shadow.camera.bottom=-14;
-    sun.shadow.bias=-.00035;scene.add(sun);
+    sun.shadow.bias=-.00035;sun.shadow.normalBias=.025;sun.shadow.radius=2;scene.add(sun);
     const fill=new THREE.DirectionalLight(0xbfd7ff,.55);fill.position.set(-7,6,-5);scene.add(fill);
     // Low-cost hemisphere bounce keeps recesses readable without flattening the sun shadows.
     const bounce=new THREE.HemisphereLight(0xdde8f2,0x554b3e,.32);scene.add(bounce);
-    const ground=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.MeshStandardMaterial({color:0x878777,roughness:1}));ground.receiveShadow=true;
+    // Subtle repeating terrain variation gives the site depth without downloading textures.
+    const terrainCanvas=document.createElement("canvas");terrainCanvas.width=128;terrainCanvas.height=128;
+    const terrainCtx=terrainCanvas.getContext("2d");
+    if(terrainCtx){
+      const pixels=terrainCtx.createImageData(128,128);
+      for(let y=0;y<128;y++)for(let x=0;x<128;x++){
+        const n=Math.sin(x*12.9898+y*78.233)*43758.5453;
+        const grain=(n-Math.floor(n))-.5;
+        const broad=Math.sin(x*.14)*Math.cos(y*.11)*8;
+        const value=Math.max(0,Math.min(255,190+grain*27+broad));
+        const k=(y*128+x)*4;pixels.data[k]=value;pixels.data[k+1]=Math.min(255,value+5);pixels.data[k+2]=Math.max(0,value-8);pixels.data[k+3]=255;
+      }
+      terrainCtx.putImageData(pixels,0,0);
+    }
+    const terrainTexture=new THREE.CanvasTexture(terrainCanvas);
+    terrainTexture.wrapS=THREE.RepeatWrapping;terrainTexture.wrapT=THREE.RepeatWrapping;
+    terrainTexture.repeat.set(10,10);terrainTexture.colorSpace=THREE.SRGBColorSpace;
+    terrainTexture.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
+    const ground=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.MeshStandardMaterial({color:0x878777,map:terrainTexture,roughness:1}));ground.receiveShadow=true;
     ground.rotation.x=-Math.PI/2; scene.add(ground);
     const grid=new THREE.GridHelper(40,24,0x66685e,0x7b7d70); grid.position.y=.01; scene.add(grid);
     // Scenery sits outside the primary building area so site editing remains unobstructed.
@@ -246,7 +264,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
     canvas.addEventListener("pointerdown",down);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",up);canvas.addEventListener("pointercancel",up);canvas.addEventListener("wheel",wheel,{passive:false});
     window.addEventListener("resize",resize); const sizeObserver=new ResizeObserver(resize);sizeObserver.observe(host); resize();
     resetCameraRef.current=()=>{const o=orbitRef.current;o.theta=0;o.phi=1.28;cameraFitRef.current.userFramed=false;centerTemple();render();};
-    return()=>{sizeObserver.disconnect();window.removeEventListener("resize",resize);canvas.removeEventListener("pointerdown",down);canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerup",up);canvas.removeEventListener("pointercancel",up);canvas.removeEventListener("wheel",wheel);scene.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.dispose();const m=o.material;if(Array.isArray(m))m.forEach(x=>x.dispose());else m.dispose();}});renderer.dispose();canvas.remove();};
+    return()=>{sizeObserver.disconnect();window.removeEventListener("resize",resize);canvas.removeEventListener("pointerdown",down);canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerup",up);canvas.removeEventListener("pointercancel",up);canvas.removeEventListener("wheel",wheel);scene.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.dispose();const m=o.material;if(Array.isArray(m))m.forEach(x=>x.dispose());else m.dispose();}});terrainTexture.dispose();renderer.dispose();canvas.remove();};
   },[]);
 
   useEffect(()=>{
