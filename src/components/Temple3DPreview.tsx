@@ -518,7 +518,7 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
         }
       }
       for(const win of level.windows||[]){
-        const ww=Math.max(.9,win.width*h/11),wh=Math.max(1.3,win.height*h/6),edge=.095;
+        const ww=Math.max(.9,win.width*h/11),wh=Math.max(1.3,win.height*h/6),edge=.018;
         let geometry:THREE.BufferGeometry;
         if(win.style==="round"||win.style==="rose") geometry=new THREE.CylinderGeometry(ww*.55,ww*.55,.08,24);
         else if(win.style==="arched") geometry=new THREE.CapsuleGeometry(ww*.5,Math.max(.15,wh-ww),6,12);
@@ -537,10 +537,23 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
         if(win.style==="double"){
           const mullion=new THREE.Mesh(new THREE.BoxGeometry(.035,wh*.92,.1),new THREE.MeshStandardMaterial({color:0xd8c9a8,roughness:.65}));mullion.position.copy(frame.position);mullion.rotation.copy(frame.rotation);lg.add(mullion);
         }
+        // Window casing adds architectural depth while leaving the glass selectable.
+        if(win.style!=="round"&&win.style!=="rose"&&win.style!=="arched"){
+          const casing=new THREE.Group();
+          casing.position.copy(frame.position);casing.rotation.copy(frame.rotation);
+          const trimMaterial=new THREE.MeshStandardMaterial({color:0xc5b9a4,roughness:.78});
+          const rail=(width:number,height:number,px:number,py:number)=>{
+            const piece=new THREE.Mesh(new THREE.BoxGeometry(width,height,.085),trimMaterial);
+            piece.position.set(px,py,.012);piece.castShadow=true;casing.add(piece);
+          };
+          rail(ww+.18,.075,0,wh/2+.045);rail(ww+.18,.09,0,-wh/2-.05);
+          rail(.075,wh+.14,-ww/2-.045,0);rail(.075,wh+.14,ww/2+.045,0);
+          lg.add(casing);
+        }
         frame.userData.levelIndex=index;frame.userData.windowId=win.id;frame.userData.detailCategory="windows";frame.userData.detailId=win.id;frame.userData.detailFace=win.face;lg.add(frame);
       }
       for(const door of level.doors||[]){
-        const dw=Math.max(1.1,door.width*h/9),dh=Math.min(h*.8,Math.max(2.8,door.height*h/7)),edge=.095;
+        const dw=Math.max(1.1,door.width*h/9),dh=Math.min(h*.8,Math.max(2.8,door.height*h/7)),edge=.018;
         const arched=door.style==="arched"||door.style==="temple"||door.style==="portico"||door.style==="wood-arch"||door.style==="stone-arch"||door.style==="grand-arch"||door.style==="carved-stone"||door.style==="metal-gate";
         let dg:THREE.BufferGeometry;
         if(arched){
@@ -558,6 +571,18 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
         const y=arched?baseY:baseY+dh/2;
         if(door.face==="front"||door.face==="back"){mesh.position.set((door.u||0)*(w*.38),y,door.face==="front"?d/2+edge:-d/2-edge);if(door.face==="back")mesh.rotation.y=Math.PI;}
         else{mesh.position.set(door.face==="right"?w/2+edge:-w/2-edge,y,(door.u||0)*(d*.38));mesh.rotation.y=Math.PI/2;}
+        // A shallow stone sill and lintel visually anchor rectangular doors in the wall.
+        if(!arched){
+          const surround=new THREE.Group();surround.position.copy(mesh.position);surround.rotation.copy(mesh.rotation);
+          const trimMaterial=new THREE.MeshStandardMaterial({color:0xaaa092,roughness:.83});
+          for(const side of [-1,1]){
+            const jamb=new THREE.Mesh(new THREE.BoxGeometry(.09,dh+.12,.1),trimMaterial);
+            jamb.position.set(side*(dw/2+.045),0,.01);jamb.castShadow=true;surround.add(jamb);
+          }
+          const lintel=new THREE.Mesh(new THREE.BoxGeometry(dw+.22,.11,.11),trimMaterial);
+          lintel.position.set(0,dh/2+.055,.01);lintel.castShadow=true;surround.add(lintel);
+          lg.add(surround);
+        }
         mesh.userData.levelIndex=index;mesh.userData.doorId=door.id;mesh.userData.doorFace=door.face;mesh.userData.detailCategory="doors";mesh.userData.detailFace=door.face;lg.add(mesh);
         if(door.style==="portico"){
           const colMat=new THREE.MeshStandardMaterial({color:0xd9d4cc,roughness:.75});
