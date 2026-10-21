@@ -41,13 +41,26 @@ function create(kind:BuilderMaterial){
     const vein=isMarble?Math.pow(Math.max(0,wave*.5+.5),19)*(.45+fine*.55):0;
     const pits=isTravertine&&grain>.72?(grain-.72)*2.8:0;
     const woodGrain=isTimber?Math.sin(y*.21+coarse*4)*17+Math.sin(y*.055+fine*7)*12:0;
-    const variation=(coarse-.5)*(isGranite?95:kind==="sandstone"?48:22)+(fine-.5)*20-vein*95-pits*95+woodGrain;
+    // Staggered masonry courses: visible mortar and subtle per-block color variation.
+    const masonry=kind==="stone"||kind==="brick"||kind==="limestone"||kind==="sandstone";
+    const courseHeight=kind==="brick"?32:64;
+    const blockWidth=kind==="brick"?64:128;
+    const course=Math.floor(y/courseHeight);
+    const stagger=course%2?blockWidth/2:0;
+    const localX=((x+stagger)%blockWidth+blockWidth)%blockWidth;
+    const localY=y%courseHeight;
+    const joint=masonry&&(localY<2||localX<2);
+    const blockVariation=masonry?(hash(Math.floor((x+stagger)/blockWidth),course,39)-.5)*18:0;
+    const marbleFlow=Math.sin(x*.033+y*.016+tileNoise(x,y,64,31)*6);
+    const secondaryVein=isMarble?Math.pow(Math.max(0,marbleFlow),26)*25:0;
+    const graniteSpeckle=isGranite?(hash(x,y,77)-.5)*32:0;
+    const variation=(coarse-.5)*(isGranite?95:kind==="sandstone"?48:22)+(fine-.5)*20-vein*95-secondaryVein-pits*95+woodGrain+blockVariation+graniteSpeckle-(joint?kind==="brick"?67:44:0);
     for(let c=0;c<3;c++)ci.data[i+c]=Math.max(0,Math.min(255,rgb[c]+variation));
     ci.data[i+3]=255;
     const rough=(isMetal?65:kind==="obsidian"?52:isMarble?110:kind==="granite"?175:235)+(fine-.5)*35;
     for(let c=0;c<3;c++)ri.data[i+c]=Math.max(0,Math.min(255,rough));
     ri.data[i+3]=255;
-    const height=Math.max(0,Math.min(255,128+(coarse-.5)*100+(fine-.5)*70-pits*95));
+    const height=Math.max(0,Math.min(255,128+(coarse-.5)*100+(fine-.5)*70-pits*95-(joint?105:0)));
     for(let c=0;c<3;c++)bi.data[i+c]=height;
     bi.data[i+3]=255;
   }
