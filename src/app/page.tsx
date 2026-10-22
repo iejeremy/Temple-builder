@@ -67,6 +67,7 @@ export default function TempleBuilderPage() {
   const [height, setHeight] = useState(22);
   const [roof, setRoof] = useState<RoofStyle>("flat");
   const [levels, setLevels] = useState<BuildingLevel[]>([]);
+  const [pendingBuilding,setPendingBuilding] = useState<BuildingLevel|null>(null);
   const [perimeter, setPerimeter] = useState<Perimeter | null>(null);
   const [statues, setStatues] = useState<Statue[]>([]);
   const [siteColumns,setSiteColumns] = useState<SiteColumn[]>([]);
@@ -296,29 +297,27 @@ export default function TempleBuilderPage() {
       windows:[], doors:[], arches:[], columns:[], trims:[], stairs:[], pediments:[]
     };
 
-    setLevels(current => {
-      if(current.length===0) return [fresh];
-      // Building choices after the first one ADD a new ground-floor wing instead of replacing the temple.
-      // Start it beside the selected structure so it is visible immediately; the user can drag it into place.
-      const anchor=current[selectedLevel] || current[0];
-      const offset=(anchor.width+nextWidth)/14 + .35;
-      fresh.x=(anchor.x||0)+offset;
+    // New buildings are staged, not saved, until the user confirms placement.
+    if(levels.length){
+      const anchor=levels[selectedLevel] || levels[0];
+      fresh.x=(anchor.x||0)+(anchor.width+nextWidth)/14+.35;
       fresh.z=anchor.z||0;
-      return [...current,fresh];
-    });
+    }
+    setPendingBuilding(fresh);
     setSelectedLevel(levels.length);
     setSelectedFace(null);
-    setPanel("edit");
+    setPanel(null);
     setDetailCategory(null);
   };
 
   return (
     <main className="relative h-[100dvh] overflow-hidden bg-[#b9c4cb] text-white">
-      <TempleWorld levels={levels} perimeter={perimeter} statues={statues} siteColumns={siteColumns} scenery={scenery} landscapeItems={landscapeItems} onSelectSiteColumn={(id:string)=>{setSelectedSiteColumnId(id);setActiveObject("column");setPanel("site-columns");}} onMoveSiteColumn={(id:string,x:number,z:number)=>setSiteColumns(v=>v.map(c=>c.id===id?{...c,x,z}:c))} onSelectLandscape={(id:string)=>{setSelectedLandscapeId(id);setActiveObject("landscape");setPanel("scenery");}} onMoveLandscape={(id:string,x:number,z:number)=>setLandscapeItems(v=>v.map(c=>c.id===id?{...c,x,z}:c))} selectedStatueId={selectedStatueId} selectedLevel={selectedLevel}
+      <TempleWorld levels={pendingBuilding?[...levels,pendingBuilding]:levels} pendingLevelIndex={pendingBuilding?levels.length:null} perimeter={perimeter} statues={statues} siteColumns={siteColumns} scenery={scenery} landscapeItems={landscapeItems} onSelectSiteColumn={(id:string)=>{setSelectedSiteColumnId(id);setActiveObject("column");setPanel("site-columns");}} onMoveSiteColumn={(id:string,x:number,z:number)=>setSiteColumns(v=>v.map(c=>c.id===id?{...c,x,z}:c))} onSelectLandscape={(id:string)=>{setSelectedLandscapeId(id);setActiveObject("landscape");setPanel("scenery");}} onMoveLandscape={(id:string,x:number,z:number)=>setLandscapeItems(v=>v.map(c=>c.id===id?{...c,x,z}:c))} selectedStatueId={selectedStatueId} selectedLevel={selectedLevel}
         onSelectLevel={(index) => { setSelectedLevel(index); setSelectedFace(null); setDetailCategory(null); setActiveObject("building");setPanel("edit"); }}
         onSelectFace={(index,face) => { setSelectedLevel(index); setSelectedFace(face); }}
         onSelectDetail={(index,face,category) => { setSelectedLevel(index); setSelectedFace(face); setDetailCategory(category); setActiveObject("building");setPanel("edit"); }}
         onMoveLevel={(index,x,z) => {
+          if(pendingBuilding && index===levels.length){setPendingBuilding(p=>p?{...p,x,z}:p);return;}
           const currentLevel=levels[index];
           // Ground-floor buildings/wings can be dragged together into any footprint.
           // Elevated stories stay attached vertically.
@@ -358,6 +357,11 @@ export default function TempleBuilderPage() {
         </div>
       )}
 
+      {pendingBuilding && <div className="absolute right-3 top-16 z-40 flex items-center gap-2 rounded-2xl bg-[#0c1118]/90 p-2 shadow-xl">
+        <span className="px-2 text-xs text-blue-100">Drag blue building to position</span>
+        <button aria-label="Cancel placement" onClick={()=>{setPendingBuilding(null);setSelectedLevel(Math.max(0,levels.length-1));}} className="rounded-xl bg-white/15 px-3 py-2 text-lg">✕</button>
+        <button aria-label="Confirm placement" onClick={()=>{setLevels(current=>[...current,pendingBuilding]);setPendingBuilding(null);setActiveObject("building");setPanel(null);}} className="rounded-xl bg-blue-500 px-4 py-2 text-lg font-bold text-white">✓</button>
+      </div>}
       {/* Improved bottom menu from supplied design; existing builder actions remain intact. */}
       <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[24px] border-t border-white/10 bg-[#0c1118]/96 max-h-[34dvh] overflow-y-auto overscroll-contain pb-[max(8px,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl">
         <div className="flex justify-center pb-1 pt-2.5"><div className="h-1 w-10 rounded-full bg-white/20" /></div>
