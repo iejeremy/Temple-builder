@@ -236,9 +236,10 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
       previousWidth=w;previousHeight=h;
       const bottom=Math.min(128,h*.34),top=Math.min(112,h*.25);
       camera.userData.builderVerticalReserve=top+bottom;
-      camera.aspect=w/h;camera.setViewOffset(w,h,0,(bottom-top)/2,w,h);camera.updateProjectionMatrix();renderer.setSize(w,h,false);
+      // A negative view offset shifts the temple UP, clear of the bottom toolbar.
+      camera.aspect=w/h;camera.setViewOffset(w,h,0,(top-bottom)/2,w,h);camera.updateProjectionMatrix();renderer.setSize(w,h,false);
       // Only a real viewport change refits; observer notifications from selection do nothing.
-      centerTemple();
+      if(cameraFitRef.current.initialized && !cameraFitRef.current.userFramed) centerTemple();
       render();
     };
     const canvas=renderer.domElement; canvas.style.touchAction="none";
