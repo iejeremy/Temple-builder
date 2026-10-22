@@ -46,6 +46,22 @@ function templeFitDistance(radius:number,camera:THREE.PerspectiveCamera){
   return Math.max(3,radius/Math.sin(usableHalfAngle)*1.05);
 }
 
+/** Camera math is pure and independent of the renderer and pointer handlers. */
+const orbitCameraPosition=(target:THREE.Vector3,theta:number,phi:number,radius:number)=>{
+  const sinPhi=Math.sin(phi);
+  return new THREE.Vector3(
+    target.x+Math.sin(theta)*sinPhi*radius,
+    target.y+Math.cos(phi)*radius,
+    target.z+Math.cos(theta)*sinPhi*radius
+  );
+};
+
+const clampCameraRadius=(radius:number,fitRadius:number)=>{
+  const min=Math.max(2,fitRadius*.18);
+  const max=Math.max(20,fitRadius*2.2);
+  return THREE.MathUtils.clamp(radius,min,max);
+};
+
 /** Convert pointer coordinates into normalized device coordinates for scene picking. */
 const pointerToNdc=(clientX:number,clientY:number,rect:DOMRect)=>new THREE.Vector2(
   ((clientX-rect.left)/rect.width)*2-1,
@@ -232,16 +248,14 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     const render=()=>{
       const o=orbitRef.current,p=cameraPanRef.current;
       const target=new THREE.Vector3(cameraFocusRef.current.x+p.x,targetYRef.current+p.y,cameraFocusRef.current.z+p.z);
-      const sin=Math.sin(o.phi);
-      camera.position.set(target.x+Math.sin(o.theta)*sin*o.radius,target.y+Math.cos(o.phi)*o.radius,target.z+Math.cos(o.theta)*sin*o.radius);
+      camera.position.copy(orbitCameraPosition(target,o.theta,o.phi,o.radius));
       camera.up.set(0,1,0);
       camera.lookAt(target);
       camera.updateMatrixWorld(true);
       renderer.render(scene,camera);
     };
     renderCameraRef.current=render;
-    const zoomLimits=()=>({min:Math.max(2,cameraFitRef.current.fitRadius*.18),max:Math.max(20,cameraFitRef.current.fitRadius*2.2)});
-    const clampZoom=(radius:number)=>{const limits=zoomLimits();return Math.max(limits.min,Math.min(limits.max,radius));};
+    const clampZoom=(radius:number)=>clampCameraRadius(radius,cameraFitRef.current.fitRadius);
     // A sphere about the structural pivot encloses roofs and attached details at every orbit angle.
     const centerTemple=()=>{
       const bounds=lastBoundsRef.current;if(bounds.isEmpty())return;
