@@ -76,7 +76,7 @@ const pointerSeparation=(points:Iterable<{x:number;y:number}>)=>{
   return pair.length<2?0:Math.hypot(pair[0].x-pair[1].x,pair[0].y-pair[1].y);
 };
 
-export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, statues, siteColumns, scenery, landscapeItems, selectedStatueId, selectedLevel, onSelectLevel, onSelectFace, onMoveLevel, onPatioChange, onMoveWindow, onMoveDoor, onMoveArch, onMoveDetail, onResizePerimeter, onSelectDetail, onSelectPerimeter, onSelectStatue, onMoveStatue, onSelectSiteColumn, onMoveSiteColumn, onSelectLandscape, onMoveLandscape }: {
+export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, statues, siteColumns, scenery, landscapeItems, selectedStatueId, selectedLevel, onSelectLevel, onSelectFace, onCameraFacingChange, onMoveLevel, onPatioChange, onMoveWindow, onMoveDoor, onMoveArch, onMoveDetail, onResizePerimeter, onSelectDetail, onSelectPerimeter, onSelectStatue, onMoveStatue, onSelectSiteColumn, onMoveSiteColumn, onSelectLandscape, onMoveLandscape }: {
   levels: BuildingLevel[];
   pendingLevelIndex?: number|null;
   perimeter: Perimeter | null;
@@ -88,6 +88,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
   selectedLevel: number;
   onSelectLevel?: (index: number) => void;
   onSelectFace?: (index: number, face: WallFace) => void;
+  onCameraFacingChange?: (face:WallFace) => void;
   onMoveLevel?: (index: number, x: number, z: number) => void;
   onPatioChange?: (index: number, patio: boolean) => void;
   onMoveWindow?: (levelIndex: number, id: string, u: number, v: number) => void;
@@ -114,6 +115,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
   const targetYRef = useRef(1.4);
   const cameraPanRef = useRef({x:0,y:0,z:0,manual:false});
   const cameraFocusRef = useRef({x:0,z:0});
+  const lastFacingRef=useRef<WallFace|null>(null);
   const cameraFitRef = useRef({initialized:false,lastSpan:0,fitRadius:13,buildingCount:0,userFramed:false});
   const lastBoundsRef=useRef(new THREE.Box3());
   const framingRadiusRef=useRef(0);
@@ -134,8 +136,8 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
   const movingStatueRef = useRef<string | null>(null);
   const siteObjectGroupsRef=useRef<THREE.Group[]>([]);
   const movingSiteObjectRef=useRef<{kind:"column"|"landscape";id:string}|null>(null);
-  const liveRef = useRef({levels,perimeter,selectedLevel,onSelectLevel,onSelectFace,onMoveLevel,onMoveDoor,onMoveArch,onMoveDetail,onResizePerimeter,onSelectDetail,onSelectPerimeter,onSelectStatue,onMoveStatue,selectedStatueId,onSelectSiteColumn,onMoveSiteColumn,onSelectLandscape,onMoveLandscape});
-  liveRef.current={levels,perimeter,selectedLevel,onSelectLevel,onSelectFace,onMoveLevel,onMoveDoor,onMoveArch,onMoveDetail,onResizePerimeter,onSelectDetail,onSelectPerimeter,onSelectStatue,onMoveStatue,selectedStatueId,onSelectSiteColumn,onMoveSiteColumn,onSelectLandscape,onMoveLandscape};
+  const liveRef = useRef({levels,perimeter,selectedLevel,onSelectLevel,onSelectFace,onCameraFacingChange,onMoveLevel,onMoveDoor,onMoveArch,onMoveDetail,onResizePerimeter,onSelectDetail,onSelectPerimeter,onSelectStatue,onMoveStatue,selectedStatueId,onSelectSiteColumn,onMoveSiteColumn,onSelectLandscape,onMoveLandscape});
+  liveRef.current={levels,perimeter,selectedLevel,onSelectLevel,onSelectFace,onCameraFacingChange,onMoveLevel,onMoveDoor,onMoveArch,onMoveDetail,onResizePerimeter,onSelectDetail,onSelectPerimeter,onSelectStatue,onMoveStatue,selectedStatueId,onSelectSiteColumn,onMoveSiteColumn,onSelectLandscape,onMoveLandscape};
 
   useEffect(() => {
     const host=hostRef.current; if(!host) return;
@@ -251,6 +253,14 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       const o=orbitRef.current,p=cameraPanRef.current;
       const target=new THREE.Vector3(cameraFocusRef.current.x+p.x,targetYRef.current+p.y,cameraFocusRef.current.z+p.z);
       camera.position.copy(orbitCameraPosition(target,o.theta,o.phi,o.radius));
+      // Report the wall actually facing the viewer, accounting for building rotation.
+      const currentLevel=liveRef.current.levels[liveRef.current.selectedLevel]||liveRef.current.levels[0];
+      if(currentLevel){
+        const angle=o.theta-THREE.MathUtils.degToRad(currentLevel.rotation||0);
+        const x=Math.sin(angle),z=Math.cos(angle);
+        const facing:WallFace=Math.abs(x)>Math.abs(z)?(x>0?"right":"left"):(z>0?"front":"back");
+        if(lastFacingRef.current!==facing){lastFacingRef.current=facing;liveRef.current.onCameraFacingChange?.(facing);}
+      }
       camera.up.set(0,1,0);
       camera.lookAt(target);
       camera.updateMatrixWorld(true);
@@ -275,10 +285,10 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       const orientation: "portrait"|"landscape"=w>=h?"landscape":"portrait";
       const orientationChanged=previousOrientation!==null&&orientation!==previousOrientation;
       previousOrientation=orientation;
-      const bottom=Math.min(128,h*.34),top=Math.min(112,h*.25);
+      const bottom=Math.min(190,h*.32),top=Math.min(85,h*.14);
       camera.userData.builderVerticalReserve=top+bottom;
-      // A negative view offset shifts the temple UP, clear of the bottom toolbar.
-      camera.aspect=w/h;camera.setViewOffset(w,h,0,(top-bottom)/2,w,h);camera.updateProjectionMatrix();renderer.setSize(w,h,false);
+      // Positive vertical offset moves the projected temple upward, away from the bottom controls.
+      camera.aspect=w/h;camera.setViewOffset(w,h,0,(bottom-top)/2,w,h);camera.updateProjectionMatrix();renderer.setSize(w,h,false);
       // Reframe on an actual portrait/landscape rotation; ordinary resize preserves manual orbit.
       // The old logic retained stale pan/zoom across orientation changes, hiding the temple.
       if(cameraFitRef.current.initialized && orientationChanged){
