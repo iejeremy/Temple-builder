@@ -54,13 +54,21 @@ function create(kind:BuilderMaterial){
     const marbleFlow=Math.sin(x*.033+y*.016+tileNoise(x,y,64,31)*6);
     const secondaryVein=isMarble?Math.pow(Math.max(0,marbleFlow),26)*25:0;
     const graniteSpeckle=isGranite?(hash(x,y,77)-.5)*32:0;
-    const variation=(coarse-.5)*(isGranite?95:kind==="sandstone"?48:22)+(fine-.5)*20-vein*95-secondaryVein-pits*95+woodGrain+blockVariation+graniteSpeckle-(joint?kind==="brick"?67:44:0);
+    // Fine mineral grains, pores and layered deposits add close-up surface variation.
+    // Stable hash noise remains tileable and does not require external texture downloads.
+    const mineral=hash(x,y,101);
+    const mineralGrain=(mineral-.5)*(isGranite?25:isMarble?5:isMetal?2:11);
+    const pores=(kind==="limestone"||kind==="sandstone"||kind==="travertine")&&mineral>.975?(mineral-.975)*950:0;
+    const stratification=(kind==="sandstone"||kind==="travertine")?
+      Math.sin(y*.115+coarse*2.5)*4+Math.sin(y*.035+fine*4)*5:0;
+    const variation=(coarse-.5)*(isGranite?95:kind==="sandstone"?48:22)+(fine-.5)*20-vein*95-secondaryVein-pits*95+woodGrain+blockVariation+graniteSpeckle+mineralGrain+stratification-pores-(joint?kind==="brick"?67:44:0);
     for(let c=0;c<3;c++)ci.data[i+c]=Math.max(0,Math.min(255,rgb[c]+variation));
     ci.data[i+3]=255;
-    const rough=(isMetal?65:kind==="obsidian"?52:isMarble?110:kind==="granite"?175:235)+(fine-.5)*35;
+    const rough=(isMetal?65:kind==="obsidian"?52:isMarble?110:kind==="granite"?175:235)
+      +(fine-.5)*35+(mineral-.5)*(isMetal?7:24)+(joint?30:0)+pores*.25;
     for(let c=0;c<3;c++)ri.data[i+c]=Math.max(0,Math.min(255,rough));
     ri.data[i+3]=255;
-    const height=Math.max(0,Math.min(255,128+(coarse-.5)*100+(fine-.5)*70-pits*95-(joint?105:0)));
+    const height=Math.max(0,Math.min(255,128+(coarse-.5)*80+(fine-.5)*45+(mineral-.5)*26-pits*95-pores*.65-(joint?105:0)));
     for(let c=0;c<3;c++)bi.data[i+c]=height;
     bi.data[i+3]=255;
   }
