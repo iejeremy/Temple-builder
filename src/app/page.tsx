@@ -378,6 +378,7 @@ export default function TempleBuilderPage() {
           <div className="grid grid-cols-4 gap-2 px-3 pb-3">
             {([
               ["buildings","Shapes","▣","Choose a footprint"],
+              ["templates","Templates","▤","Six complete temple designs"],
               ["walls","Walls","⬡","Courtyard walls"],
               ["floors","Floors","▱","Square & wide floors"],
               ["statues","Statue","♟","Guardians & figures"],
@@ -438,6 +439,17 @@ export default function TempleBuilderPage() {
             )}
             {detailCategory==="stairs" && <div className="flex gap-2 overflow-x-auto px-3 py-3">{!selectedFace&&<div className="flex shrink-0 items-center gap-2 px-2 py-2 text-xs text-white/80"><span>Choose wall:</span>{(["front","back","left","right"] as WallFace[]).map(face=><button key={face} onClick={()=>setSelectedFace(face)} className="rounded-lg bg-amber-200 px-3 py-2 font-semibold capitalize text-black">{face}</button>)}<span className="sr-only">Tap the entrance wall, then choose stairs.</span></div>}{selectedFace&&(["straight","wide","curved","spiral","split","corner"] as StairStyle[]).map(style=><button key={style} onClick={()=>setLevels(v=>v.map((l,i)=>i===selectedLevel?{...l,stairs:[...(l.stairs||[]),{id:`stair-${Date.now()}`,face:selectedFace,u:0,style}]}:l))} className="min-w-[105px] shrink-0 rounded-xl bg-white/10 p-3 text-xs capitalize">{style}</button>)}</div>}
             {detailCategory==="pediments" && <div className="flex gap-2 overflow-x-auto px-3 py-3">{!selectedFace&&<div className="flex shrink-0 items-center gap-2 px-2 py-2 text-xs text-white/80"><span>Choose wall:</span>{(["front","back","left","right"] as WallFace[]).map(face=><button key={face} onClick={()=>setSelectedFace(face)} className="rounded-lg bg-amber-200 px-3 py-2 font-semibold capitalize text-black">{face}</button>)}<span className="sr-only">Tap a wall, then choose a pediment.</span></div>}{selectedFace&&([["straight","Straight"],["triangular","Triangular"],["segmental","Segmental"],["broken-triangular","Broken Triangular"],["broken-segmental","Broken Segmental"],["swan-neck","Swan Neck"],["stepped","Stepped"],["ornate","Ornate"]] as [PedimentStyle,string][]).map(([style,name])=><button key={style} onClick={()=>setLevels(v=>v.map((l,i)=>i===selectedLevel?{...l,pediments:[...(l.pediments||[]),{id:`pediment-${Date.now()}`,face:selectedFace,u:0,style}]}:l))} className="min-w-[125px] shrink-0 rounded-xl bg-white/10 p-3 text-xs">{name}</button>)}</div>}
+          </div>
+        )}
+        {panel === "templates" && (
+          <div className="flex gap-2 overflow-x-auto border-t border-white/10 px-3 py-3">
+            {(["Temple of the Sun","Eternal Courtyard","Celestial Shrine","Marble Pantheon","Cathedral of Echoes","Temple of Unity"] as const).map((name,index)=>(
+              <button key={name} onClick={()=>{addTemplate(index);setActiveObject("building");}}
+                className="min-w-[155px] shrink-0 rounded-2xl border border-amber-200/30 bg-white/10 p-3 text-left">
+                <span className="block text-sm font-semibold text-amber-100">{name}</span>
+                <span className="mt-1 block text-[11px] text-white/65">Add complete design</span>
+              </button>
+            ))}
           </div>
         )}
         {panel === "buildings" && (
