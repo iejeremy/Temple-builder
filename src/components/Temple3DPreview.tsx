@@ -142,45 +142,57 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
     const grid=new THREE.GridHelper(40,24,0x66685e,0x7b7d70); grid.position.y=.01; scene.add(grid);
     // Scenery sits outside the primary building area so site editing remains unobstructed.
     const landscape=new THREE.Group();scene.add(landscape);
-    // Deterministic, low-poly woodland variety: no external assets or changes to builder data.
+    // Fine-grained tree crowns use instancing: hundreds of small leaf clusters per tree
+    // without hundreds of draw calls. No new dependencies or builder-data changes.
     const leafColors=[0x42683d,0x54753e,0x365b46,0x698049,0x7c8650,0x315b40];
-    const leafMats=leafColors.map(color=>new THREE.MeshStandardMaterial({color,roughness:.96}));
+    const leafMats=leafColors.map(color=>new THREE.MeshStandardMaterial({color,roughness:.94,side:THREE.DoubleSide}));
     const barkMats=[0x65503a,0x594b39,0x756044].map(color=>new THREE.MeshStandardMaterial({color,roughness:1}));
+    const leafGeometry=new THREE.IcosahedronGeometry(1,0);
+    const trunkGeometry=new THREE.CylinderGeometry(.09,.17,1.55,7);
     const rand=(seed:number)=>{const v=Math.sin(seed*127.1+78.233)*43758.5453;return v-Math.floor(v);};
-    const addFoliage=(parent:THREE.Group,geometry:THREE.BufferGeometry,material:THREE.Material,x:number,y:number,z:number,scaleX=1,scaleY=1,scaleZ=1)=>{
-      const mesh=new THREE.Mesh(geometry,material);mesh.position.set(x,y,z);mesh.scale.set(scaleX,scaleY,scaleZ);
-      mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
-    };
+    const leafDummy=new THREE.Object3D();
     for(let i=0;i<26;i++){
       const angle=i*Math.PI*2/26+(rand(i+17)-.5)*.19;
       const radius=17+(i%4)*1.2+(rand(i+32)-.5)*1.25;
-      const x=Math.cos(angle)*radius,z=Math.sin(angle)*radius;
-      const tree=new THREE.Group();tree.position.set(x,0,z);tree.rotation.y=rand(i+91)*Math.PI*2;
-      const height=.76+rand(i+51)*.7;tree.scale.set(height*(.9+rand(i+6)*.2),height,height*(.9+rand(i+9)*.2));
+      const tree=new THREE.Group();tree.position.set(Math.cos(angle)*radius,0,Math.sin(angle)*radius);
+      tree.rotation.y=rand(i+91)*Math.PI*2;
+      const height=.76+rand(i+51)*.7;
+      tree.scale.set(height*(.9+rand(i+6)*.2),height,height*(.9+rand(i+9)*.2));
       landscape.add(tree);
-      const bark=barkMats[i%barkMats.length],leaves=leafMats[i%leafMats.length];
       const type=i%5;
-      if(type===0){ // Layered evergreen: offset whorls rather than identical cones.
-        addFoliage(tree,new THREE.CylinderGeometry(.085,.15,1.5,7),bark,0,.75,0);
-        for(let j=0;j<3;j++)addFoliage(tree,new THREE.ConeGeometry(.76-j*.16,1.18,8),leaves,(rand(i*11+j)-.5)*.13,1.34+j*.51,0);
-      }else if(type===1){ // Broad deciduous canopy, with uneven overlapping lobes.
-        addFoliage(tree,new THREE.CylinderGeometry(.12,.2,1.45,8),bark,0,.72,0);
-        for(let j=0;j<5;j++){const a=j*2.399+rand(i+40);addFoliage(tree,new THREE.IcosahedronGeometry(.65,1),leafMats[(i+j)%leafMats.length],Math.cos(a)*(.34+rand(j+i)*.19),1.76+rand(i*13+j)*.6,Math.sin(a)*.35,1.15,.85+rand(j+8)*.3,1.1);}
-      }else if(type===2){ // Tall narrow cypress.
-        addFoliage(tree,new THREE.CylinderGeometry(.07,.13,1.5,7),bark,0,.75,0);
-        addFoliage(tree,new THREE.ConeGeometry(.42,2.65,9),leaves,0,2.04,0,1,1,1);
-        addFoliage(tree,new THREE.ConeGeometry(.33,1.25,9),leafMats[(i+1)%leafMats.length],.07,2.68,0);
-      }else if(type===3){ // Rounded ornamental tree.
-        addFoliage(tree,new THREE.CylinderGeometry(.1,.16,1.65,8),bark,0,.82,0);
-        addFoliage(tree,new THREE.SphereGeometry(.91,10,7),leaves,0,1.95,0,1.08,.74,.98);
-        for(let j=0;j<3;j++){const a=j*Math.PI*2/3;addFoliage(tree,new THREE.SphereGeometry(.4,8,6),leafMats[(i+j+2)%leafMats.length],Math.cos(a)*.55,2.02+rand(i+j)*.27,Math.sin(a)*.5);}
-      }else{ // Open-canopy woodland tree with visible limbs.
-        addFoliage(tree,new THREE.CylinderGeometry(.1,.2,1.65,7),bark,0,.82,0);
-        for(let j=0;j<4;j++){const a=j*Math.PI/2+rand(i+j)*.5,dist=.43+rand(i*3+j)*.3;
-          const branch=addFoliage(tree,new THREE.CylinderGeometry(.045,.085,1.03,6),bark,Math.cos(a)*dist*.48,1.6,Math.sin(a)*dist*.48);
-          branch.rotation.z=Math.sin(a)*-.55;branch.rotation.x=Math.cos(a)*.55;
-          addFoliage(tree,new THREE.IcosahedronGeometry(.62,1),leafMats[(i+j)%leafMats.length],Math.cos(a)*dist,2.0+rand(i*7+j)*.44,Math.sin(a)*dist,1,.78,1);
-        }
+      const trunk=new THREE.Mesh(trunkGeometry,barkMats[i%barkMats.length]);
+      trunk.position.y=.775;trunk.castShadow=true;tree.add(trunk);
+      // Narrow conifers, columnar cypress, oval ornamentals and wide woodland crowns.
+      const count=type===0?170:type===2?180:260;
+      const instances=leafMats.map(mat=>new THREE.InstancedMesh(leafGeometry,mat,Math.ceil(count/leafMats.length)));
+      const counts=new Array(instances.length).fill(0);
+      for(let j=0;j<count;j++){
+        const u=rand(i*701+j*19+1),v=rand(i*701+j*19+2),w=rand(i*701+j*19+3);
+        const theta=u*Math.PI*2;
+        const radial=Math.sqrt(v);
+        let rx=1,rz=.85,cy=2.05,ry=.72;
+        if(type===0){rx=.68;rz=.68;cy=2.04;ry=1.15;}
+        if(type===2){rx=.35;rz=.35;cy=2.13;ry=1.25;}
+        if(type===3){rx=.86;rz=.8;cy=1.96;ry=.63;}
+        if(type===4){rx=1.2;rz=.94;cy=2.06;ry=.62;}
+        // Multi-lobed density variation prevents a single spherical silhouette.
+        const lobe=.82+.18*Math.sin(theta*(type===4?5:7)+i);
+        const layer=(w-.5)*2;
+        const taper=type===0||type===2?Math.max(.14,1-(layer+.8)*.48):Math.sqrt(Math.max(.12,1-layer*layer));
+        const x=Math.cos(theta)*radial*rx*lobe*taper;
+        const z=Math.sin(theta)*radial*rz*lobe*taper;
+        const y=cy+layer*ry+.10*Math.sin(theta*4+i);
+        const size=(type===2?.075:.09)*(0.7+rand(i*503+j*7)*.7);
+        leafDummy.position.set(x,y,z);
+        leafDummy.rotation.set(u*6.28,v*6.28,w*6.28);
+        leafDummy.scale.set(size*.7,size*1.2,size*.65);
+        leafDummy.updateMatrix();
+        const slot=j%instances.length;
+        instances[slot].setMatrixAt(counts[slot]++,leafDummy.matrix);
+      }
+      for(let j=0;j<instances.length;j++){
+        const mesh=instances[j];mesh.count=counts[j];mesh.instanceMatrix.needsUpdate=true;
+        mesh.castShadow=true;mesh.receiveShadow=true;mesh.computeBoundingSphere();tree.add(mesh);
       }
     }
     const applyScenery=(kind:"garden"|"desert"|"twilight")=>{
