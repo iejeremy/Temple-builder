@@ -41,7 +41,9 @@ function templeFitDistance(radius:number,camera:THREE.PerspectiveCamera){
   const viewportHeight=camera.view?.fullHeight||1;
   const reserved=camera.userData.builderVerticalReserve||0;
   const halfVertical=Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)*Math.max(.25,1-reserved/viewportHeight));
-  const halfHorizontal=Math.atan(Math.tan(halfVertical)*camera.aspect);
+  // The vertical reserve is already excluded above; horizontal FOV must use
+  // the full camera projection, not a second reduction from the toolbar reserve.
+  const halfHorizontal=Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)*camera.aspect);
   const usableHalfAngle=Math.atan(Math.tan(Math.min(halfVertical,halfHorizontal))*.75);
   return Math.max(3,radius/Math.sin(usableHalfAngle)*1.05);
 }
@@ -829,13 +831,18 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       const needed=templeFitDistance(radius,camera);
       const firstBuild=fit.buildingCount===0;
       fit.fitRadius=needed;
-      if(firstBuild||geometryChanged){
-        if(firstBuild||!fit.userFramed){
-          cameraFocusRef.current={x:center.x,z:center.z};targetYRef.current=center.y;
-          orbitRef.current.radius=needed;
-          cameraPanRef.current={x:0,y:0,z:0,manual:false};
-        }
-        if(firstBuild){orbitRef.current.theta=0;orbitRef.current.phi=1.28;}
+      // Keep the user's orbit and pan during ordinary edits. Only a first build
+      // or a substantial scene-size change may automatically adjust framing.
+      const substantialSizeChange=fit.lastSpan>0 && (radius>fit.lastSpan*1.35 || radius<fit.lastSpan*.70);
+      if(firstBuild){
+        cameraFocusRef.current={x:center.x,z:center.z};targetYRef.current=center.y;
+        orbitRef.current.radius=needed;
+        cameraPanRef.current={x:0,y:0,z:0,manual:false};
+        orbitRef.current.theta=0;orbitRef.current.phi=1.28;
+      }else if(geometryChanged && substantialSizeChange && !fit.userFramed){
+        cameraFocusRef.current={x:center.x,z:center.z};targetYRef.current=center.y;
+        orbitRef.current.radius=needed;
+        cameraPanRef.current={x:0,y:0,z:0,manual:false};
       }
       fit.initialized=true;fit.lastSpan=radius;
     }else{
