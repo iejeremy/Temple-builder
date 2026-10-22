@@ -38,8 +38,9 @@ function templeFitDistance(radius:number,camera:THREE.PerspectiveCamera){
   return Math.max(3,radius/Math.sin(usableHalfAngle)*1.05);
 }
 
-export default function Temple3DPreview({ levels, perimeter, statues, siteColumns, scenery, landscapeItems, selectedStatueId, selectedLevel, onSelectLevel, onSelectFace, onMoveLevel, onPatioChange, onMoveWindow, onMoveDoor, onMoveArch, onMoveDetail, onResizePerimeter, onSelectDetail, onSelectPerimeter, onSelectStatue, onMoveStatue, onSelectSiteColumn, onMoveSiteColumn, onSelectLandscape, onMoveLandscape }: {
+export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, statues, siteColumns, scenery, landscapeItems, selectedStatueId, selectedLevel, onSelectLevel, onSelectFace, onMoveLevel, onPatioChange, onMoveWindow, onMoveDoor, onMoveArch, onMoveDetail, onResizePerimeter, onSelectDetail, onSelectPerimeter, onSelectStatue, onMoveStatue, onSelectSiteColumn, onMoveSiteColumn, onSelectLandscape, onMoveLandscape }: {
   levels: BuildingLevel[];
+  pendingLevelIndex?: number|null;
   perimeter: Perimeter | null;
   statues: Statue[];
   siteColumns: SiteColumn[];
@@ -754,6 +755,15 @@ export default function Temple3DPreview({ levels, perimeter, statues, siteColumn
       if(perimeter.gate){const front=points.reduce((best,p)=>p[1]>best[1]?p:best,points[0]);const gate=new THREE.Mesh(new THREE.BoxGeometry(1.4,perimeter.height*.82,.16),new THREE.MeshStandardMaterial({color:0x4b3527,roughness:.65,metalness:.18}));gate.position.set(front[0],perimeter.height*.41,front[1]);pg.add(gate);}
       if(perimeter.towers){const towerMat=mat.clone();points.forEach(([x,z])=>{const r=.38;let g:THREE.BufferGeometry;if(perimeter.towerShape==="square")g=new THREE.BoxGeometry(.8,perimeter.height*1.5,.8);else if(perimeter.towerShape==="star"){const sh=new THREE.Shape();for(let i=0;i<10;i++){const rr=i%2===0?r:r*.48,a=-Math.PI/2+i*Math.PI/5;i?sh.lineTo(Math.cos(a)*rr,Math.sin(a)*rr):sh.moveTo(Math.cos(a)*rr,Math.sin(a)*rr);}sh.closePath();g=new THREE.ExtrudeGeometry(sh,{depth:perimeter.height*1.5,bevelEnabled:false});g.rotateX(Math.PI/2);g.translate(0,perimeter.height*1.5,0);}else g=new THREE.CylinderGeometry(r,r,perimeter.height*1.5,perimeter.towerShape==="octagon"?8:perimeter.towerShape==="hexagon"?6:20);const t=new THREE.Mesh(g,towerMat.clone());t.position.set(x,perimeter.towerShape==="star"?0:perimeter.height*.75,z);pg.add(t);});}
       if(perimeter.columns||perimeter.arches){const frontZ=Math.max(...points.map(p=>p[1]));for(const x of [-1.1,1.1]){if(perimeter.columns){const col=new THREE.Mesh(new THREE.CylinderGeometry(.12,.15,perimeter.height*1.1,12),mat.clone());col.position.set(x,perimeter.height*.55,frontZ);pg.add(col);}}if(perimeter.arches){const arch=new THREE.Mesh(new THREE.TorusGeometry(.75,.12,8,20,Math.PI),mat.clone());arch.rotation.z=Math.PI;arch.position.set(0,perimeter.height*.78,frontZ);pg.add(arch);}}
+    }
+    // Render the unconfirmed building as a translucent blue ghost, preserving its geometry.
+    if(pendingLevelIndex!==null && pendingLevelIndex!==undefined){
+      const pendingGroup=levelGroupsRef.current[pendingLevelIndex];
+      pendingGroup?.traverse(object=>{
+        if(!(object instanceof THREE.Mesh))return;
+        object.material=new THREE.MeshBasicMaterial({color:0x48a9ff,transparent:true,opacity:.38,depthWrite:false,side:THREE.DoubleSide});
+        object.castShadow=false;
+      });
     }
     enableShadows(group);if(perimeterGroupRef.current)enableShadows(perimeterGroupRef.current);statueGroupsRef.current.forEach(enableShadows);
     // Structural bounds define the orbit pivot; site decorations never move it.
