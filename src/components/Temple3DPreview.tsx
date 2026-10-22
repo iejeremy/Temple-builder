@@ -14,6 +14,14 @@ const MATERIAL_PROPS: Record<BuilderMaterial,{roughness:number;metalness:number}
   stucco:{roughness:.98,metalness:0}, plaster:{roughness:.84,metalness:0}, timber:{roughness:.72,metalness:0},
   bronze:{roughness:.3,metalness:.86}, gold:{roughness:.24,metalness:.95}
 };
+/** Geometry helpers are deliberately independent of camera and gesture state. */
+const addArchitecturalMesh=(parent:THREE.Group,geometry:THREE.BufferGeometry,material:THREE.Material,x:number,y:number,z:number)=>{
+  const mesh=new THREE.Mesh(geometry,material);
+  mesh.position.set(x,y,z);
+  parent.add(mesh);
+  return mesh;
+};
+
 const makeMaterial=(kind:BuilderMaterial,color=COLORS[kind],selected=false)=>{
   const p=MATERIAL_PROPS[kind];
   const maps=getProceduralMaps(kind);
@@ -298,7 +306,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     const enableShadows=(root:THREE.Object3D)=>root.traverse(o=>{if(o instanceof THREE.Mesh){o.castShadow=true;o.receiveShadow=true;}});
     const addRoof=(parent:THREE.Group,roof:RoofStyle,rw:number,rd:number,x:number,z:number,top:number,color:number)=>{
       const roofMat=()=>new THREE.MeshStandardMaterial({color,roughness:.58,metalness:0});
-      const add=(g:THREE.BufferGeometry,px:number,py:number,pz:number)=>{const m=new THREE.Mesh(g,roofMat());m.position.set(px,py,pz);parent.add(m);};
+      const add=(g:THREE.BufferGeometry,px:number,py:number,pz:number)=>addArchitecturalMesh(parent,g,roofMat(),px,py,pz);
       if(roof==="none")return;
       // Tiered stone cornices establish a visible roof silhouette from ground-level cameras.
       const lip=Math.min(.15,Math.max(.045,Math.min(rw,rd)*.025));
