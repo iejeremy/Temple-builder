@@ -305,8 +305,9 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
 
     const enableShadows=(root:THREE.Object3D)=>root.traverse(o=>{if(o instanceof THREE.Mesh){o.castShadow=true;o.receiveShadow=true;}});
     const addRoof=(parent:THREE.Group,roof:RoofStyle,rw:number,rd:number,x:number,z:number,top:number,color:number)=>{
-      const roofMat=()=>new THREE.MeshStandardMaterial({color,roughness:.58,metalness:0});
-      const add=(g:THREE.BufferGeometry,px:number,py:number,pz:number)=>addArchitecturalMesh(parent,g,roofMat(),px,py,pz);
+      // Roof pieces share a single material rather than allocating one per cornice or tier.
+      const roofMaterial=new THREE.MeshStandardMaterial({color,roughness:.58,metalness:0});
+      const add=(g:THREE.BufferGeometry,px:number,py:number,pz:number)=>addArchitecturalMesh(parent,g,roofMaterial,px,py,pz);
       if(roof==="none")return;
       // Tiered stone cornices establish a visible roof silhouette from ground-level cameras.
       const lip=Math.min(.15,Math.max(.045,Math.min(rw,rd)*.025));
