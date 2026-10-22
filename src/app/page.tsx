@@ -80,7 +80,7 @@ export default function TempleBuilderPage() {
   const [detailCategory, setDetailCategory] = useState<"levels"|"windows"|"doors"|"trim"|"columns"|"arches"|"stairs"|"pediments"|"roof"|"material"|null>(null);
   const [landscapeItems,setLandscapeItems] = useState<LandscapeItem[]>([]);
   const [scenery,setScenery] = useState<"garden"|"desert"|"twilight">("garden");
-  const [panel, setPanel] = useState<"add" | "floors" | "walls" | "buildings" | "fountains" | "statues" | "site-columns" | "stairs" | "scenery" | "more" | "edit" | null>(null);
+  const [panel, setPanel] = useState<"add" | "floors" | "walls" | "buildings" | "templates" | "fountains" | "statues" | "site-columns" | "stairs" | "scenery" | "more" | "edit" | null>(null);
   // Save the complete building site on this device without requiring an account.
   const [siteLoaded,setSiteLoaded] = useState(false);
   useEffect(()=>{
