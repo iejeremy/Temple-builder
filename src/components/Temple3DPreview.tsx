@@ -613,7 +613,9 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       }
       // Architectural detail system: references supplied for arches, classical/Gothic columns,
       // pediments, stairs and ornamental trim are rendered as procedural 3D pieces.
-      const detailMat=()=>makeMaterial(level.material,color,false);
+      // Reuse one material for identical details within a level.
+      const detailMaterial=makeMaterial(level.material,color,false);
+      const detailMat=()=>detailMaterial;
       const facePlace=(face:WallFace,u:number,y:number,out:number)=>{
         if(face==="front"||face==="back") return {x:u*(w*.38),y,z:face==="front"?d/2+out:-d/2-out,rot:face==="back"?Math.PI:0};
         return {x:face==="right"?w/2+out:-w/2-out,y,z:u*(d*.38),rot:face==="right"?Math.PI/2:-Math.PI/2};
