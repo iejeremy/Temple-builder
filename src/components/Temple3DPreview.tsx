@@ -291,10 +291,12 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       camera.aspect=w/h;camera.setViewOffset(w,h,0,(bottom-top)/2,w,h);camera.updateProjectionMatrix();renderer.setSize(w,h,false);
       // Reframe on an actual portrait/landscape rotation; ordinary resize preserves manual orbit.
       // The old logic retained stale pan/zoom across orientation changes, hiding the temple.
+      // Only a real orientation change may reframe automatically after first load.
+      // Ordinary viewport resizing never overrides a manually chosen view.
       if(cameraFitRef.current.initialized && orientationChanged){
         cameraFitRef.current.userFramed=false;
         centerTemple();
-      }else if(cameraFitRef.current.initialized && !cameraFitRef.current.userFramed) centerTemple();
+      }
       render();
     };
     const canvas=renderer.domElement; canvas.style.touchAction="none";
@@ -836,23 +838,21 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
         for(const y of [renderedBounds.min.y,renderedBounds.max.y])
           for(const z of [renderedBounds.min.z,renderedBounds.max.z])
             radius=Math.max(radius,center.distanceTo(new THREE.Vector3(x,y,z)));
-      const geometryChanged=!buildingBounds.equals(lastBoundsRef.current)||Math.abs(radius-framingRadiusRef.current)>1e-6;
-      lastBoundsRef.current.copy(buildingBounds);framingRadiusRef.current=radius;
+      lastBoundsRef.current.copy(buildingBounds);
+      framingRadiusRef.current=radius;
       const needed=templeFitDistance(radius,camera);
-      const firstBuild=fit.buildingCount===0;
+      const firstBuild=!fit.initialized;
       fit.fitRadius=needed;
-      // Keep the user's orbit and pan during ordinary edits. Only a first build
-      // or a substantial scene-size change may automatically adjust framing.
-      const substantialSizeChange=fit.lastSpan>0 && (radius>fit.lastSpan*1.35 || radius<fit.lastSpan*.70);
+      // Scene edits update the reset target and fit distance, but never move the
+      // live camera. Only first load, explicit Center Temple, or orientation reset
+      // can change the camera's target and radius.
       if(firstBuild){
-        cameraFocusRef.current={x:center.x,z:center.z};targetYRef.current=center.y;
-        orbitRef.current.radius=needed;
+        cameraFocusRef.current={x:center.x,z:center.z};
+        targetYRef.current=center.y;
         cameraPanRef.current={x:0,y:0,z:0,manual:false};
-        orbitRef.current.theta=0;orbitRef.current.phi=1.28;
-      }else if(geometryChanged && substantialSizeChange && !fit.userFramed){
-        cameraFocusRef.current={x:center.x,z:center.z};targetYRef.current=center.y;
         orbitRef.current.radius=needed;
-        cameraPanRef.current={x:0,y:0,z:0,manual:false};
+        orbitRef.current.theta=0;
+        orbitRef.current.phi=1.28;
       }
       fit.initialized=true;fit.lastSpan=radius;
     }else{
