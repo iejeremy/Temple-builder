@@ -112,7 +112,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
   const sceneRef = useRef<THREE.Scene|null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer|null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera|null>(null);
-  const orbitRef = useRef({ theta: 0, phi: 0.90, radius: 19, lastX: 0, lastY: 0, dragging: false, pinch: 0 });
+  const orbitRef = useRef({ theta: 0, phi: 0.90, radius: 30, lastX: 0, lastY: 0, dragging: false, pinch: 0 });
   const targetYRef = useRef(0.6);
   const cameraPanRef = useRef({x:0,y:0,z:0,manual:false});
   const cameraFocusRef = useRef({x:0,z:0});
@@ -296,7 +296,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
         cameraFocusRef.current={x:0,z:0};
         targetYRef.current=0.6;
         cameraPanRef.current={x:0,y:0,z:0,manual:false};
-        orbitRef.current.radius=cameraFitRef.current.fitRadius=25;
+        orbitRef.current.radius=cameraFitRef.current.fitRadius=30;
         return;
       }
       const center=bounds.getCenter(new THREE.Vector3());
@@ -928,7 +928,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       lastBoundsRef.current.makeEmpty();framingRadiusRef.current=0;fit.initialized=false;
       // Clear stale camera framing when the last building is removed; preserve the
       // current user view until Center Temple is explicitly requested.
-      fit.fitRadius=25;
+      fit.fitRadius=30;
     }
     fit.buildingCount=levels.length;
     renderCameraRef.current();
