@@ -313,7 +313,13 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       const bottom=Math.min(190,h*.32),top=Math.min(85,h*.14);
       camera.userData.builderVerticalReserve=top+bottom;
       // Positive vertical offset moves the projected temple upward, away from the bottom controls.
-      camera.aspect=w/h;camera.setViewOffset(w,h,0,(bottom-top)/2,w,h);camera.updateProjectionMatrix();renderer.setSize(w,h,false);
+      // Use a genuinely larger virtual viewport so the visible crop is valid.
+      // Cropping from the bottom shifts the scene's optical center upward into
+      // the space above the toolbar without moving the orbit target itself.
+      const virtualHeight=h+top+bottom;
+      camera.aspect=w/virtualHeight;
+      camera.setViewOffset(w,virtualHeight,0,bottom,w,h);
+      camera.updateProjectionMatrix();renderer.setSize(w,h,false);
       // Reframe on an actual portrait/landscape rotation; ordinary resize preserves manual orbit.
       // The old logic retained stale pan/zoom across orientation changes, hiding the temple.
       // Only a real orientation change may reframe automatically after first load.
