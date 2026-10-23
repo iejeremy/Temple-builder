@@ -45,7 +45,7 @@ function templeFitDistance(radius:number,camera:THREE.PerspectiveCamera){
   const halfVertical=Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)*visibleHeight/virtualHeight);
   const halfHorizontal=Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)*camera.aspect);
   const usableHalfAngle=Math.atan(Math.tan(Math.min(halfVertical,halfHorizontal))*.75);
-  return Math.max(3,radius/Math.sin(usableHalfAngle)*1.15);
+  return Math.max(5,radius/Math.sin(usableHalfAngle)*1.38);
 }
 
 /** Camera math is pure and independent of the renderer and pointer handlers. */
@@ -313,7 +313,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       const orientation: "portrait"|"landscape"=w>=h?"landscape":"portrait";
       const orientationChanged=previousOrientation!==null&&orientation!==previousOrientation;
       previousOrientation=orientation;
-      const bottom=Math.min(190,h*.32),top=Math.min(85,h*.14);
+      const bottom=Math.min(235,h*.34),top=Math.min(65,h*.10);
       camera.userData.builderVerticalReserve=top+bottom;
       // Positive vertical offset moves the projected temple upward, away from the bottom controls.
       // Use a genuinely larger virtual viewport so the visible crop is valid.
