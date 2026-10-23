@@ -45,7 +45,7 @@ function templeFitDistance(radius:number,camera:THREE.PerspectiveCamera){
   const halfVertical=Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)*visibleHeight/virtualHeight);
   const halfHorizontal=Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)*camera.aspect);
   const usableHalfAngle=Math.atan(Math.tan(Math.min(halfVertical,halfHorizontal))*.75);
-  return Math.max(3,radius/Math.sin(usableHalfAngle)*1.35);
+  return Math.max(3,radius/Math.sin(usableHalfAngle)*1.15);
 }
 
 /** Camera math is pure and independent of the renderer and pointer handlers. */
@@ -891,6 +891,8 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     });
     const fit=cameraFitRef.current;
     if(!buildingBounds.isEmpty()){
+      // Frame the full rendered geometry, including roofs, cornices and trim,
+      // while keeping the orbit pivot on the structural building center.
       const center=buildingBounds.getCenter(new THREE.Vector3());
       let radius=0;
       for(const x of [renderedBounds.min.x,renderedBounds.max.x])
