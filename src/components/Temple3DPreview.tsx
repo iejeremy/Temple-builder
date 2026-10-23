@@ -915,7 +915,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       // Scene edits update the reset target and fit distance, but never move the
       // live camera. Only first load, explicit Center Temple, or orientation reset
       // can change the camera's target and radius.
-      if(firstBuild || (hadNoBuilding && !fit.userFramed)){
+      if(firstBuild || hadNoBuilding){
         cameraFocusRef.current={x:center.x,z:center.z};
         targetYRef.current=center.y;
         cameraPanRef.current={x:0,y:0,z:0,manual:false};
