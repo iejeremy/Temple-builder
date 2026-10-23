@@ -413,7 +413,7 @@ export default function TempleBuilderPage() {
             <button onClick={()=>{setPanel(null);setDetailCategory(null);setActiveObject(null);setSelectedSiteColumnId(null);setSelectedStatueId(null);setSelectedLandscapeId(null);}} className="flex-1 rounded-xl bg-white/15 px-3 py-3 text-sm font-semibold">Done</button>
           </> : <>
             <button onClick={()=>{setPanel(null);setDetailCategory(null);}} className="rounded-xl bg-white/15 px-4 py-2.5 text-xs">‹ Back</button>
-            <div className="flex-1 text-center text-sm font-semibold capitalize">{panel==="site-columns"?"Columns":panel==="buildings"?"Shapes":panel}</div>
+            <div className="flex-1 text-center text-sm font-semibold capitalize">{panel==="site-columns"?"Columns":panel==="buildings"?"Temples":panel}</div>
             <button onClick={()=>{setPanel(null);setDetailCategory(null);}} className="rounded-xl bg-amber-200 px-4 py-2.5 text-xs font-bold text-black">Done</button>
           </>}
         </div>
@@ -421,7 +421,7 @@ export default function TempleBuilderPage() {
         {panel === "add" && (
           <div className="grid grid-cols-4 gap-2 px-3 pb-3">
             {([
-              ["buildings","Shapes","▣","Choose a footprint"],
+              ["buildings","Temples","▣","Choose a temple foundation"],
               ["templates","Templates","▤","Six complete temple designs"],
               ["walls","Walls","⬡","Courtyard walls"],
               ["floors","Floors","▱","Square & wide floors"],
@@ -528,6 +528,7 @@ export default function TempleBuilderPage() {
           <div className="flex gap-2 overflow-x-auto border-t border-white/10 px-3 py-3">
             {([["towers","Towers"],["gate","Gate"],["arches","Arches"],["columns","Columns"]] as [PerimeterFeature,string][]).map(([key,name])=><button key={key} onClick={()=>setPerimeter(p=>p?{...p,[key]:!p[key]}:p)} className={`min-w-[104px] rounded-2xl border p-3 text-left ${perimeter[key]?"border-amber-200 bg-amber-200/15":"border-white/10 bg-white/5"}`}><div className="mb-2 h-9 rounded-md border border-amber-100/40"/><div className="text-sm">{name}</div></button>)}
             <div className="min-w-[150px] shrink-0 rounded-2xl border border-amber-200/30 bg-amber-200/10 p-3 text-xs text-amber-100">Pinch the wall in/out to resize it</div>
+            <button onClick={()=>{if(window.confirm("Remove the optional perimeter wall? Your temples and other objects will remain.")){setPerimeter(null);setWallStep("main");}}} className="min-w-[110px] rounded-2xl border border-red-300/40 bg-red-500/15 p-3 text-sm text-red-100">Remove Wall</button>
             <button onClick={()=>setWallStep("options")} className="min-w-[92px] rounded-2xl border border-white/10 bg-white/5 p-3 text-sm">Style</button>
             <button onClick={()=>setPanel(null)} className="min-w-[72px] rounded-2xl border border-white/10 bg-white/5 p-3 text-sm">Done</button>
           </div>
