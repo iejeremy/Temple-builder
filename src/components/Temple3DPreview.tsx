@@ -141,6 +141,21 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
   const liveRef = useRef({levels,perimeter,selectedLevel,moveMode,onSelectLevel,onSelectFace,onCameraFacingChange,onMoveLevel,onMoveDoor,onMoveArch,onMoveDetail,onResizePerimeter,onSelectDetail,onSelectPerimeter,onSelectStatue,onMoveStatue,selectedStatueId,onSelectSiteColumn,onMoveSiteColumn,onSelectLandscape,onMoveLandscape});
   liveRef.current={levels,perimeter,selectedLevel,moveMode,onSelectLevel,onSelectFace,onCameraFacingChange,onMoveLevel,onMoveDoor,onMoveArch,onMoveDetail,onResizePerimeter,onSelectDetail,onSelectPerimeter,onSelectStatue,onMoveStatue,selectedStatueId,onSelectSiteColumn,onMoveSiteColumn,onSelectLandscape,onMoveLandscape};
 
+  // Dispose each GPU resource only once per teardown, even when meshes share it.
+  const disposeMeshResources=(root:THREE.Object3D)=>{
+    const geometries=new Set<THREE.BufferGeometry>();
+    const materials=new Set<THREE.Material>();
+    root.traverse(object=>{
+      if(!(object instanceof THREE.Mesh))return;
+      geometries.add(object.geometry);
+      const assigned=object.material;
+      if(Array.isArray(assigned))assigned.forEach(material=>materials.add(material));
+      else materials.add(assigned);
+    });
+    geometries.forEach(geometry=>geometry.dispose());
+    materials.forEach(material=>material.dispose());
+  };
+
   useEffect(() => {
     const host=hostRef.current; if(!host) return;
     const scene=new THREE.Scene(); scene.background=new THREE.Color(0xb9c4cb); scene.fog=new THREE.Fog(0xb9c4cb,220,420);
@@ -349,12 +364,12 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     canvas.addEventListener("pointerdown",down);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",up);canvas.addEventListener("pointercancel",up);canvas.addEventListener("wheel",wheel,{passive:false});
     window.addEventListener("resize",resize); const sizeObserver=new ResizeObserver(resize);sizeObserver.observe(host); resize();
     resetCameraRef.current=()=>{const o=orbitRef.current;o.theta=0;o.phi=1.28;cameraFitRef.current.userFramed=false;centerTemple();render();};
-    return()=>{sizeObserver.disconnect();window.removeEventListener("resize",resize);canvas.removeEventListener("pointerdown",down);canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerup",up);canvas.removeEventListener("pointercancel",up);canvas.removeEventListener("wheel",wheel);scene.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.dispose();const m=o.material;if(Array.isArray(m))m.forEach(x=>x.dispose());else m.dispose();}});terrainTexture.dispose();renderer.dispose();canvas.remove();};
+    return()=>{sizeObserver.disconnect();window.removeEventListener("resize",resize);canvas.removeEventListener("pointerdown",down);canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerup",up);canvas.removeEventListener("pointercancel",up);canvas.removeEventListener("wheel",wheel);disposeMeshResources(scene);terrainTexture.dispose();renderer.dispose();canvas.remove();};
   },[]);
 
   useEffect(()=>{
     const group=groupRef.current,scene=sceneRef.current,renderer=rendererRef.current,camera=cameraRef.current;if(!group||!scene||!renderer||!camera)return;
-    while(group.children.length){const o=group.children[0];group.remove(o);o.traverse(child=>{if(child instanceof THREE.Mesh){child.geometry.dispose();const m=child.material;if(Array.isArray(m))m.forEach(x=>x.dispose());else m.dispose();}});}
+    while(group.children.length){const o=group.children[0];group.remove(o);disposeMeshResources(o);}
     levelGroupsRef.current=[];
     let baseY=0;
 
