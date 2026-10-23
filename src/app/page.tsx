@@ -324,7 +324,17 @@ export default function TempleBuilderPage() {
           // Ground-floor buildings/wings can be dragged together into any footprint.
           // Elevated stories stay attached vertically.
           if ((currentLevel?.elevation ?? 0) > 0) return;
-          setLevels(current => current.map((l,i)=>i===index?{...l,x,z}:l));
+          setLevels(current => {
+            const base=current[index];
+            if(!base)return current;
+            const dx=x-(base.x||0),dz=z-(base.z||0);
+            if(dx===0&&dz===0)return current;
+            // Move vertically stacked stories together; other ground-floor buildings stay put.
+            return current.map((l,i)=>{
+              const sameStack=i===index || ((l.elevation||0)>0 && Math.abs((l.x||0)-(base.x||0))<.01 && Math.abs((l.z||0)-(base.z||0))<.01);
+              return sameStack?{...l,x:(l.x||0)+dx,z:(l.z||0)+dz}:l;
+            });
+          });
         }}
         onPatioChange={(index,patio) => setLevels(current => current.map((l,i)=>i===index?{...l,patio}:l))}
         onMoveWindow={(levelIndex,id,u,v) => setLevels(current => current.map((l,i)=>i===levelIndex?{...l,windows:l.windows.map(win=>win.id===id?{...win,u,v}:win)}:l))}
