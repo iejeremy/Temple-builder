@@ -321,7 +321,10 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       // the space above the toolbar without moving the orbit target itself.
       const virtualHeight=h+top+bottom;
       camera.aspect=w/virtualHeight;
-      camera.setViewOffset(w,virtualHeight,0,bottom,w,h);
+      // setViewOffset's y offset is the TOP of the visible crop, not the
+      // bottom reserve. Using bottom here shifted the scene DOWN on phones.
+      // Keep the optical center above the bottom toolbar instead.
+      camera.setViewOffset(w,virtualHeight,0,top,w,h);
       camera.updateProjectionMatrix();renderer.setSize(w,h,false);
       // Reframe on an actual portrait/landscape rotation; ordinary resize preserves manual orbit.
       // The old logic retained stale pan/zoom across orientation changes, hiding the temple.
