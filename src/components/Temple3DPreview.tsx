@@ -112,7 +112,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
   const sceneRef = useRef<THREE.Scene|null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer|null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera|null>(null);
-  const orbitRef = useRef({ theta: 0, phi: 1.28, radius: 13, lastX: 0, lastY: 0, dragging: false, pinch: 0 });
+  const orbitRef = useRef({ theta: 0, phi: 1.12, radius: 13, lastX: 0, lastY: 0, dragging: false, pinch: 0 });
   const targetYRef = useRef(1.4);
   const cameraPanRef = useRef({x:0,y:0,z:0,manual:false});
   const cameraFocusRef = useRef({x:0,z:0});
@@ -363,7 +363,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     const wheel=(e:WheelEvent)=>{e.preventDefault();const o=orbitRef.current;o.radius=clampZoom(o.radius+e.deltaY*.012);cameraFitRef.current.userFramed=true;render();};
     canvas.addEventListener("pointerdown",down);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",up);canvas.addEventListener("pointercancel",up);canvas.addEventListener("wheel",wheel,{passive:false});
     window.addEventListener("resize",resize); const sizeObserver=new ResizeObserver(resize);sizeObserver.observe(host); resize();
-    resetCameraRef.current=()=>{const o=orbitRef.current;o.theta=0;o.phi=1.28;cameraFitRef.current.userFramed=false;centerTemple();render();};
+    resetCameraRef.current=()=>{const o=orbitRef.current;o.theta=0;o.phi=1.12;cameraFitRef.current.userFramed=false;centerTemple();render();};
     return()=>{sizeObserver.disconnect();window.removeEventListener("resize",resize);canvas.removeEventListener("pointerdown",down);canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerup",up);canvas.removeEventListener("pointercancel",up);canvas.removeEventListener("wheel",wheel);disposeMeshResources(scene);terrainTexture.dispose();renderer.dispose();canvas.remove();};
   },[]);
 
@@ -882,7 +882,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
         cameraPanRef.current={x:0,y:0,z:0,manual:false};
         orbitRef.current.radius=needed;
         orbitRef.current.theta=0;
-        orbitRef.current.phi=1.28;
+        orbitRef.current.phi=1.12;
       }
       fit.initialized=true;fit.lastSpan=radius;
     }else{
