@@ -38,6 +38,7 @@ export type SiteColumn = { id:string; style:ColumnStyle; material:BuilderMateria
 export type Statue = { id:string; kind:StatueKind; finish:StatueFinish; x:number; z:number; rotation:number; scale:number; };
 export type BuildingLevel = { architecture?: "maya"|"egyptian"|"hindu"|"greek"|"gothic"|"echoes";
   id: string;
+  buildingId?: string;
   shape: BuildingShape;
   material: BuilderMaterial;
   width: number;
@@ -61,6 +62,20 @@ export type BuildingLevel = { architecture?: "maya"|"egyptian"|"hindu"|"greek"|"
 
 const uniqueId=(prefix:string)=>`${prefix}-${typeof crypto!=="undefined"&&typeof crypto.randomUUID==="function"?crypto.randomUUID():`${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
 
+function ensureBuildingIds(levels:BuildingLevel[]):BuildingLevel[]{
+  const grounds:{x:number;z:number;id:string}[]=[];
+  return levels.map(level=>{
+    const x=level.x||0,z=level.z||0;
+    if((level.elevation||0)===0){
+      const id=level.buildingId||level.id||uniqueId("building");
+      grounds.push({x,z,id});
+      return {...level,buildingId:id};
+    }
+    const match=[...grounds].reverse().find(g=>Math.abs(g.x-x)<.01&&Math.abs(g.z-z)<.01);
+    return {...level,buildingId:level.buildingId||match?.id||level.id||uniqueId("building")};
+  });
+}
+
 export default function TempleBuilderPage() {
   const [shape, setShape] = useState<BuildingShape | null>(null);
   const [material, setMaterial] = useState<BuilderMaterial>("marble");
@@ -70,7 +85,7 @@ export default function TempleBuilderPage() {
   const [roof, setRoof] = useState<RoofStyle>("flat");
   const [levels, setLevels] = useState<BuildingLevel[]>([]);
   const [pendingBuilding,setPendingBuilding] = useState<BuildingLevel|null>(null);
-  const [deletedBuildingUndo,setDeletedBuildingUndo] = useState<{levels:BuildingLevel[];selectedLevel:number}|null>(null);
+  const [deletedBuildingUndo,setDeletedBuildingUndo] = useState<{levels:BuildingLevel[];selectedLevel:number;message:string}|null>(null);
   const [perimeter, setPerimeter] = useState<Perimeter | null>(null);
   const [statues, setStatues] = useState<Statue[]>([]);
   const [siteColumns,setSiteColumns] = useState<SiteColumn[]>([]);
@@ -94,7 +109,7 @@ export default function TempleBuilderPage() {
       const raw=window.localStorage.getItem("echoes-temple-builder-v1");
       if(raw){
         const saved=JSON.parse(raw);
-        if(Array.isArray(saved.levels)){setLevels(saved.levels);if(saved.levels.length)setShape(saved.levels[0].shape);}
+        if(Array.isArray(saved.levels)){setLevels(ensureBuildingIds(saved.levels));if(saved.levels.length)setShape(saved.levels[0].shape);}
         if(saved.perimeter)setPerimeter(saved.perimeter);
         if(Array.isArray(saved.siteColumns))setSiteColumns(saved.siteColumns);
         if(Array.isArray(saved.statues))setStatues(saved.statues);
@@ -271,7 +286,7 @@ export default function TempleBuilderPage() {
       for(const x of [-3,-1.8,-.6,.6,1.8,3])addFreestanding("ionic","marble",x,11,3,.2);
     }
     const architecture=(["maya","egyptian","hindu","greek","gothic","echoes"] as const)[kind]||"echoes";
-    parts=parts.map(l=>({...l,architecture}));
+    parts=ensureBuildingIds(parts.map(l=>({...l,id:uniqueId("template-level"),buildingId:undefined,architecture})));
     if(levels.length && parts.length){
       const rightEdge=Math.max(...levels.map(l=>(l.x||0)+l.width/14));
       const leftEdge=Math.min(...parts.map(l=>(l.x||0)-l.width/14));
@@ -289,17 +304,10 @@ export default function TempleBuilderPage() {
   const deleteSelectedBuilding = () => {
     const base=levels[selectedLevel];
     if(!base)return;
-    // A selected upper story belongs to its ground-floor building.
-    const ground=base.elevation>0
-      ? [...levels].reverse().find(l=>(l.elevation||0)===0 && Math.abs((l.x||0)-(base.x||0))<.01 && Math.abs((l.z||0)-(base.z||0))<.01)
-      : base;
-    const anchor=ground||base;
-    const indices=levels.flatMap((l,i)=>(
-      (l===anchor || ((l.elevation||0)>0 && Math.abs((l.x||0)-(anchor.x||0))<.01 && Math.abs((l.z||0)-(anchor.z||0))<.01))
-        ? [i] : []
-    ));
+    const owner=base.buildingId||base.id;
+    const indices=levels.flatMap((l,i)=>(l.buildingId||l.id)===owner?[i]:[]);
     if(!window.confirm(`Delete this building and its ${indices.length} level${indices.length===1?"":"s"}? You can undo this deletion.`))return;
-    setDeletedBuildingUndo({levels:[...levels],selectedLevel});
+    setDeletedBuildingUndo({levels:[...levels],selectedLevel,message:"Building deleted."});
     const removed=new Set(indices);
     const remaining=levels.filter((_,i)=>!removed.has(i));
     setLevels(remaining);
@@ -308,6 +316,40 @@ export default function TempleBuilderPage() {
     setDetailCategory(null);
     setPanel(remaining.length?"edit":"add");
     if(!remaining.length)setShape(null);
+  };
+
+  const removeSelectedLevel = () => {
+    const selected=levels[selectedLevel];
+    if(!selected)return;
+    const owner=selected.buildingId||selected.id;
+    const owned=levels.map((level,index)=>({level,index}))
+      .filter(({level})=>(level.buildingId||level.id)===owner)
+      .sort((a,b)=>a.level.elevation-b.level.elevation);
+    const position=owned.findIndex(({index})=>index===selectedLevel);
+    if(position<0||owned.length<=1)return;
+    if(position===0){window.alert("The ground floor cannot be removed here. Delete the entire building instead.");return;}
+    const attachmentCount=selected.windows.length+selected.doors.length+selected.arches.length+selected.columns.length+selected.trims.length+selected.stairs.length+selected.pediments.length;
+    if(!window.confirm(`Remove Level ${position+1} and its ${attachmentCount} attached customizations? Higher levels will move down. You can undo this.`))return;
+    setDeletedBuildingUndo({levels:[...levels],selectedLevel,message:`Level ${position+1} removed.`});
+    const next=levels.filter((_,index)=>index!==selectedLevel).map(level=>{
+      if((level.buildingId||level.id)!==owner||level.elevation<=selected.elevation)return level;
+      return {...level,elevation:level.elevation-selected.height};
+    });
+    const nextSelected=next.findIndex(level=>(level.buildingId||level.id)===owner&&level.elevation>=selected.elevation);
+    const fallback=next.findIndex(level=>(level.buildingId||level.id)===owner);
+    setLevels(next);
+    setSelectedLevel(nextSelected>=0?nextSelected:Math.max(0,fallback));
+    setSelectedFace(null);setDetailCategory("levels");
+  };
+
+  const addLevelToSelectedBuilding = () => {
+    const selected=levels[selectedLevel];if(!selected)return;
+    const owner=selected.buildingId||selected.id;
+    const owned=levels.filter(level=>(level.buildingId||level.id)===owner);
+    if(owned.length>=12)return;
+    const top=owned.reduce((highest,level)=>level.elevation+level.height>highest.elevation+highest.height?level:highest);
+    const added:BuildingLevel={...top,id:uniqueId("level"),buildingId:owner,width:Math.max(16,Math.round(top.width*.84)),depth:Math.max(16,Math.round(top.depth*.84)),roof:"flat",patio:false,x:top.x,z:top.z,rotation:top.rotation,elevation:top.elevation+top.height,windows:[],doors:[],arches:[],columns:[],trims:[],stairs:[],pediments:[]};
+    setLevels(current=>[...current,added]);setSelectedLevel(levels.length);
   };
 
   const chooseShape = (next: BuildingShape, floorWidth?: number) => {
@@ -326,6 +368,7 @@ export default function TempleBuilderPage() {
       windows:[], doors:[], arches:[], columns:[], trims:[], stairs:[], pediments:[]
     };
 
+    fresh.buildingId=fresh.id;
     // New buildings are staged, not saved, until the user confirms placement.
     if(levels.length){
       const anchor=levels[selectedLevel] || levels[0];
@@ -359,7 +402,7 @@ export default function TempleBuilderPage() {
             if(dx===0&&dz===0)return current;
             // Move vertically stacked stories together; other ground-floor buildings stay put.
             return current.map((l,i)=>{
-              const sameStack=i===index || ((l.elevation||0)>0 && Math.abs((l.x||0)-(base.x||0))<.01 && Math.abs((l.z||0)-(base.z||0))<.01);
+              const sameStack=(l.buildingId||l.id)===(base.buildingId||base.id);
               return sameStack?{...l,x:(l.x||0)+dx,z:(l.z||0)+dz}:l;
             });
           });
@@ -441,7 +484,7 @@ export default function TempleBuilderPage() {
           </div>
         )}
         {deletedBuildingUndo && <div className="flex items-center justify-between gap-3 border-t border-amber-200/20 bg-amber-950/70 px-3 py-2 text-xs">
-          <span>Building deleted.</span>
+          <span>{deletedBuildingUndo.message}</span>
           <button className="rounded-lg bg-amber-200 px-4 py-2 font-semibold text-black" onClick={()=>{
             setLevels(deletedBuildingUndo.levels);
             setSelectedLevel(deletedBuildingUndo.selectedLevel);
@@ -470,8 +513,9 @@ export default function TempleBuilderPage() {
 
             </div>}
             {detailCategory==="levels" && <div className="flex gap-2 overflow-x-auto px-3 py-3">
-              {levels.length<12 && <button onClick={()=>{const base=levels[selectedLevel];setLevels([...levels,{...base,id:`level-${levels.length+1}`,width:Math.max(16,Math.round(base.width*.84)),depth:Math.max(16,Math.round(base.depth*.84)),roof:"flat",patio:false,x:base.x,z:base.z,rotation:base.rotation,elevation:(base.elevation||0)+base.height,windows:[],doors:[],arches:[],columns:[],trims:[],stairs:[],pediments:[]}]);setSelectedLevel(levels.length);}} className="min-w-[100px] shrink-0 rounded-xl bg-white/10 p-3 text-xs">+ Add Level</button>}
-              {levels.map((_,i)=><button key={i} onClick={()=>setSelectedLevel(i)} className={`min-w-[90px] shrink-0 rounded-xl p-3 text-xs ${i===selectedLevel?"bg-amber-200 text-black":"bg-white/10"}`}>Level {i+1}</button>)}
+              {levels.filter(l=>(l.buildingId||l.id)===(levels[selectedLevel].buildingId||levels[selectedLevel].id)).length<12 && <button onClick={addLevelToSelectedBuilding} className="min-w-[100px] shrink-0 rounded-xl bg-white/10 p-3 text-xs">+ Add Level</button>}
+              <button onClick={removeSelectedLevel} disabled={(levels[selectedLevel].elevation||0)===0 || levels.filter(l=>(l.buildingId||l.id)===(levels[selectedLevel].buildingId||levels[selectedLevel].id)).length<=1} className="min-w-[120px] shrink-0 rounded-xl border border-red-300/40 bg-red-500/20 p-3 text-xs text-red-100 disabled:opacity-40">Remove Level</button>
+              {levels.map((level,i)=>({level,i})).filter(({level})=>(level.buildingId||level.id)===(levels[selectedLevel].buildingId||levels[selectedLevel].id)).sort((a,b)=>a.level.elevation-b.level.elevation).map(({level,i},position)=><button key={level.id} onClick={()=>setSelectedLevel(i)} className={`min-w-[90px] shrink-0 rounded-xl p-3 text-xs ${i===selectedLevel?"bg-amber-200 text-black":"bg-white/10"}`}>Level {position+1}</button>)}
               {([["star","Star"],["circle","Circle"],["six-star","6-Point Star"],["rectangle","Rectangle"],["square","Square"],["wide","Wide"],["l-shape","L Shape"],["t-shape","T Shape"],["u-shape","U Shape"],["cross","Cross"],["octagon","Octagon"],["rotunda","Rotunda"],["courtyard","Courtyard"],["triangle","Triangle"],["hexagon","Hexagon"],["diamond","Diamond"],["oval","Oval"],["horseshoe","Horseshoe"],["x-shape","X Shape"],["ring","Ring"]] as [BuildingShape,string][]).map(([id,name])=><button key={id} onClick={()=>setLevels(v=>v.map((l,i)=>i===selectedLevel?{...l,shape:id}:l))} className={`min-w-[100px] shrink-0 rounded-xl border p-3 text-xs ${levels[selectedLevel].shape===id?"border-amber-200 bg-amber-200/15":"border-white/10 bg-white/5"}`}>{name}</button>)}
             </div>}
             {detailCategory==="roof" && <div className="flex gap-2 overflow-x-auto px-3 py-3">{(["flat","pyramid","dome","tiered","curved","ornate","cone","steeple","none"] as RoofStyle[]).map(x=><button key={x} onClick={()=>setLevels(v=>v.map((l,i)=>i===selectedLevel?{...l,roof:x}:l))} className={`min-w-[100px] shrink-0 rounded-xl border p-3 text-xs capitalize ${levels[selectedLevel].roof===x?"border-amber-200 bg-amber-200/15":"border-white/10 bg-white/5"}`}>{x==="none"?"No roof":x}</button>)}</div>}
