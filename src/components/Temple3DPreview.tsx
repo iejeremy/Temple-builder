@@ -848,7 +848,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     }
     enableShadows(group);if(perimeterGroupRef.current)enableShadows(perimeterGroupRef.current);statueGroupsRef.current.forEach(enableShadows);
     // Structural bounds define the orbit pivot; site decorations never move it.
-    group.updateMatrixWorld(true);
+    group.updateWorldMatrix(true,true);
     const buildingBounds=new THREE.Box3();
     const renderedBounds=new THREE.Box3();
     levelGroupsRef.current.forEach((levelGroup,index)=>{
@@ -906,5 +906,5 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     if(scene&&renderer&&camera)renderCameraRef.current();
   },[selectedLevel,levels]);
 
-  return <div className="absolute inset-0"><div ref={hostRef} className="absolute inset-0" /><button type="button" onClick={()=>resetCameraRef.current()} className="absolute right-3 top-20 z-30 rounded-xl bg-black/70 px-3 py-2 text-xs font-semibold text-white shadow-lg">Center Temple</button><div className="pointer-events-none absolute bottom-[128px] left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-2 text-xs text-white/70">Drag to look around • pinch wall to resize • pinch empty space to zoom</div></div>;
+  return <div className="absolute inset-0"><div ref={hostRef} className="absolute inset-0" /><button type="button" onClick={()=>resetCameraRef.current()} className="absolute right-3 top-20 z-30 rounded-xl bg-black/70 px-3 py-2 text-xs font-semibold text-white shadow-lg">Center Temple</button><div className="pointer-events-none absolute bottom-[128px] left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-2 text-xs text-white/70">{moveMode?"Move mode: drag an object • two fingers to pan or zoom":"Swipe to orbit • two fingers to pan or zoom • tap to edit"}</div></div>;
 }
