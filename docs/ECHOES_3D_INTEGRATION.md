@@ -8,10 +8,11 @@ The Temple Builder becomes the 3D world editor and ultimately the 3D presentatio
 ## Verified code locations
 - Existing application: `iejeremy/Echoes-app`, Next.js; `src/app/page.tsx` currently renders a flat `/scene/echoes-jungle.jpg` background and routes authenticated users to `/home` or `/setup`.
 - Builder: `iejeremy/Temple-builder`; `src/app/page.tsx` owns levels, optional perimeter, statues, site columns, landscape items and localStorage persistence. `src/components/Temple3DPreview.tsx` owns Three.js scene and pointer gestures.
-- These are separate repositories. Data model and authenticated navigation integration have **not yet been verified**.
+- Existing Echoes interactions verified in `src/app/home/page.tsx`: `IntegratedSanctuary` receives `onTemplePointerDown={handleTempleTap}`; entering routes to `/temple?bg=<backgroundAssetId>` after a 1.5-second transition. The singing statue routes to `/music` on click, suppressing click after drag. The home scene reads a user temple record from Firestore collection `temples`, including `templeAssetId`, `statueAssetId`, and object positions.
+- These are separate repositories. Integration of the new 3D renderer with the existing Firestore records, authorization and navigation has **not yet been implemented**.
 
 ## Implementation sequence
-1. Inventory existing Echoes home/temple/statue pages, music playback, data records, and authorization rules. Record actual routes and data IDs before wiring events.
+1. Finish inventory of Echoes `/temple` and `/music` pages, Firestore ownership and authorization rules. The current `/home` interactions and user temple record have been identified (above).
 2. Define stable object identity and typed interactions: `temple.openPage`, `statue.openMusic`, `decoration.none`. Bind references to real existing Echoes records, never hard-code user IDs or guess URLs.
 3. Extract builder 3D renderer into a reusable, read-only `WorldViewer` and an editable `WorldEditor` sharing the same scene format. Keep builder-specific edit menus out of the visitor experience.
 4. Add opt-in 3D world behind a feature flag to Echoes-app. Preserve current 2D scenery and routes as fallback until interaction parity and mobile testing pass.
