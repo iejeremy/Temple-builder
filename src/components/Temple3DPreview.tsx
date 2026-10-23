@@ -38,11 +38,11 @@ const makeMaterial=(kind:BuilderMaterial,color=COLORS[kind],selected=false)=>{
 
 // Shared by initial framing, viewport resize, and the explicit Center Temple action.
 function templeFitDistance(radius:number,camera:THREE.PerspectiveCamera){
-  const viewportHeight=camera.view?.fullHeight||1;
-  const reserved=camera.userData.builderVerticalReserve||0;
-  const halfVertical=Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)*Math.max(.25,1-reserved/viewportHeight));
-  // The vertical reserve is already excluded above; horizontal FOV must use
-  // the full camera projection, not a second reduction from the toolbar reserve.
+  // setViewOffset already crops the viewport around the UI. Calculate the
+  // visible field of view once, rather than subtracting the toolbar twice.
+  const virtualHeight=camera.view?.fullHeight||1;
+  const visibleHeight=camera.view?.height||virtualHeight;
+  const halfVertical=Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)*visibleHeight/virtualHeight);
   const halfHorizontal=Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)*camera.aspect);
   const usableHalfAngle=Math.atan(Math.tan(Math.min(halfVertical,halfHorizontal))*.75);
   return Math.max(3,radius/Math.sin(usableHalfAngle)*1.35);
@@ -60,7 +60,7 @@ const orbitCameraPosition=(target:THREE.Vector3,theta:number,phi:number,radius:n
 
 const clampCameraRadius=(radius:number,fitRadius:number)=>{
   const min=Math.max(2,fitRadius*.18);
-  const max=Math.max(20,fitRadius*2.2);
+  const max=Math.max(45,fitRadius*3);
   return THREE.MathUtils.clamp(radius,min,max);
 };
 
@@ -293,7 +293,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
         cameraFocusRef.current={x:0,z:0};
         targetYRef.current=0.6;
         cameraPanRef.current={x:0,y:0,z:0,manual:false};
-        orbitRef.current.radius=cameraFitRef.current.fitRadius=19;
+        orbitRef.current.radius=cameraFitRef.current.fitRadius=25;
         return;
       }
       const center=bounds.getCenter(new THREE.Vector3());
@@ -886,11 +886,12 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       framingRadiusRef.current=radius;
       const needed=templeFitDistance(radius,camera);
       const firstBuild=!fit.initialized;
+      const hadNoBuilding=fit.buildingCount===0;
       fit.fitRadius=needed;
       // Scene edits update the reset target and fit distance, but never move the
       // live camera. Only first load, explicit Center Temple, or orientation reset
       // can change the camera's target and radius.
-      if(firstBuild){
+      if(firstBuild || (hadNoBuilding && !fit.userFramed)){
         cameraFocusRef.current={x:center.x,z:center.z};
         targetYRef.current=center.y;
         cameraPanRef.current={x:0,y:0,z:0,manual:false};
