@@ -45,7 +45,7 @@ function templeFitDistance(radius:number,camera:THREE.PerspectiveCamera){
   // the full camera projection, not a second reduction from the toolbar reserve.
   const halfHorizontal=Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)*camera.aspect);
   const usableHalfAngle=Math.atan(Math.tan(Math.min(halfVertical,halfHorizontal))*.75);
-  return Math.max(3,radius/Math.sin(usableHalfAngle)*1.05);
+  return Math.max(3,radius/Math.sin(usableHalfAngle)*1.35);
 }
 
 /** Camera math is pure and independent of the renderer and pointer handlers. */
@@ -112,8 +112,8 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
   const sceneRef = useRef<THREE.Scene|null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer|null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera|null>(null);
-  const orbitRef = useRef({ theta: 0, phi: 0.98, radius: 13, lastX: 0, lastY: 0, dragging: false, pinch: 0 });
-  const targetYRef = useRef(1.4);
+  const orbitRef = useRef({ theta: 0, phi: 0.90, radius: 19, lastX: 0, lastY: 0, dragging: false, pinch: 0 });
+  const targetYRef = useRef(0.6);
   const cameraPanRef = useRef({x:0,y:0,z:0,manual:false});
   const cameraFocusRef = useRef({x:0,z:0});
   const lastFacingRef=useRef<WallFace|null>(null);
@@ -291,9 +291,9 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       if(bounds.isEmpty()){
         // An empty site must not retain the orbit target of a deleted temple.
         cameraFocusRef.current={x:0,z:0};
-        targetYRef.current=1.4;
+        targetYRef.current=0.6;
         cameraPanRef.current={x:0,y:0,z:0,manual:false};
-        orbitRef.current.radius=cameraFitRef.current.fitRadius=13;
+        orbitRef.current.radius=cameraFitRef.current.fitRadius=19;
         return;
       }
       const center=bounds.getCenter(new THREE.Vector3());
@@ -371,7 +371,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     const wheel=(e:WheelEvent)=>{e.preventDefault();const o=orbitRef.current;o.radius=clampZoom(o.radius+e.deltaY*.012);cameraFitRef.current.userFramed=true;render();};
     canvas.addEventListener("pointerdown",down);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",up);canvas.addEventListener("pointercancel",up);canvas.addEventListener("wheel",wheel,{passive:false});
     window.addEventListener("resize",resize); const sizeObserver=new ResizeObserver(resize);sizeObserver.observe(host); resize();
-    resetCameraRef.current=()=>{const o=orbitRef.current;o.theta=0;o.phi=0.98;cameraFitRef.current.userFramed=false;centerTemple();render();};
+    resetCameraRef.current=()=>{const o=orbitRef.current;o.theta=0;o.phi=0.90;cameraFitRef.current.userFramed=false;centerTemple();render();};
     return()=>{sizeObserver.disconnect();window.removeEventListener("resize",resize);canvas.removeEventListener("pointerdown",down);canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerup",up);canvas.removeEventListener("pointercancel",up);canvas.removeEventListener("wheel",wheel);disposeMeshResources(scene);terrainTexture.dispose();renderer.dispose();canvas.remove();};
   },[]);
 
@@ -890,14 +890,14 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
         cameraPanRef.current={x:0,y:0,z:0,manual:false};
         orbitRef.current.radius=needed;
         orbitRef.current.theta=0;
-        orbitRef.current.phi=0.98;
+        orbitRef.current.phi=0.90;
       }
       fit.initialized=true;fit.lastSpan=radius;
     }else{
       lastBoundsRef.current.makeEmpty();framingRadiusRef.current=0;fit.initialized=false;
       // Clear stale camera framing when the last building is removed; preserve the
       // current user view until Center Temple is explicitly requested.
-      fit.fitRadius=13;
+      fit.fitRadius=19;
     }
     fit.buildingCount=levels.length;
     renderCameraRef.current();
