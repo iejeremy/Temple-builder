@@ -153,6 +153,8 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       else materials.add(assigned);
     });
     geometries.forEach(geometry=>geometry.dispose());
+    // Procedural material maps are cached and reused across scene rebuilds.
+    // Dispose mesh materials, but leave their shared texture maps alive.
     materials.forEach(material=>material.dispose());
   };
 
