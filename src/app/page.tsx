@@ -83,6 +83,7 @@ export default function TempleBuilderPage() {
   const [detailCategory, setDetailCategory] = useState<"levels"|"windows"|"doors"|"trim"|"columns"|"arches"|"stairs"|"pediments"|"roof"|"material"|null>(null);
   const [landscapeItems,setLandscapeItems] = useState<LandscapeItem[]>([]);
   const [scenery,setScenery] = useState<"garden"|"desert"|"twilight">("garden");
+  const [moveMode,setMoveMode] = useState(false);
   const [panel, setPanel] = useState<"add" | "floors" | "walls" | "buildings" | "templates" | "fountains" | "statues" | "site-columns" | "stairs" | "scenery" | "more" | "edit" | null>(null);
   // Save the complete building site on this device without requiring an account.
   const [siteLoaded,setSiteLoaded] = useState(false);
@@ -338,7 +339,7 @@ export default function TempleBuilderPage() {
 
   return (
     <main className="relative h-[100dvh] overflow-hidden bg-[#b9c4cb] text-white">
-      <TempleWorld levels={pendingBuilding?[...levels,pendingBuilding]:levels} pendingLevelIndex={pendingBuilding?levels.length:null} perimeter={perimeter} statues={statues} siteColumns={siteColumns} scenery={scenery} landscapeItems={landscapeItems} onSelectSiteColumn={(id:string)=>{setSelectedSiteColumnId(id);setActiveObject("column");setPanel("site-columns");}} onMoveSiteColumn={(id:string,x:number,z:number)=>setSiteColumns(v=>v.map(c=>c.id===id?{...c,x,z}:c))} onSelectLandscape={(id:string)=>{setSelectedLandscapeId(id);setActiveObject("landscape");setPanel("scenery");}} onMoveLandscape={(id:string,x:number,z:number)=>setLandscapeItems(v=>v.map(c=>c.id===id?{...c,x,z}:c))} selectedStatueId={selectedStatueId} selectedLevel={selectedLevel}
+      <TempleWorld moveMode={moveMode} levels={pendingBuilding?[...levels,pendingBuilding]:levels} pendingLevelIndex={pendingBuilding?levels.length:null} perimeter={perimeter} statues={statues} siteColumns={siteColumns} scenery={scenery} landscapeItems={landscapeItems} onSelectSiteColumn={(id:string)=>{setSelectedSiteColumnId(id);setActiveObject("column");setPanel("site-columns");}} onMoveSiteColumn={(id:string,x:number,z:number)=>setSiteColumns(v=>v.map(c=>c.id===id?{...c,x,z}:c))} onSelectLandscape={(id:string)=>{setSelectedLandscapeId(id);setActiveObject("landscape");setPanel("scenery");}} onMoveLandscape={(id:string,x:number,z:number)=>setLandscapeItems(v=>v.map(c=>c.id===id?{...c,x,z}:c))} selectedStatueId={selectedStatueId} selectedLevel={selectedLevel}
         onSelectLevel={(index) => { setSelectedLevel(index); setSelectedFace(null); setDetailCategory(null); setActiveObject("building");setPanel("edit"); }}
         onSelectFace={(index,face) => { setSelectedLevel(index); setSelectedFace(face); }}
         onCameraFacingChange={setViewerFace}
@@ -455,6 +456,7 @@ export default function TempleBuilderPage() {
           <div className="border-t border-white/10">
             {!detailCategory && <div className="flex gap-2 overflow-x-auto px-3 py-3">
               {(["levels","doors","windows","arches","columns","stairs","pediments","trim","roof","material"] as const).map(cat=><button key={cat} onClick={()=>{setDetailCategory(cat);setSelectedFace(null);}} className="min-w-[96px] shrink-0 rounded-2xl border border-white/10 bg-white/5 p-3 text-xs capitalize">{cat}</button>)}
+              <button onClick={()=>setMoveMode(v=>!v)} className={`min-w-[112px] shrink-0 rounded-2xl border p-3 text-xs ${moveMode?"border-amber-200 bg-amber-200 text-black":"border-white/20 bg-white/10"}`}>{moveMode?"Done Moving":"Move Objects"}</button>
               <button onClick={deleteSelectedBuilding} className="min-w-[118px] shrink-0 rounded-2xl border border-red-300/40 bg-red-500/20 p-3 text-xs text-red-100">Delete Building</button>
               <button onClick={()=>setPanel(null)} className="min-w-[78px] shrink-0 rounded-2xl bg-white/10 p-3 text-xs">Done</button>
             </div>}
