@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import type { BuildingLevel, RoofStyle, WallFace, Perimeter, BuilderMaterial, Statue, SiteColumn, LandscapeItem } from "@/app/page";
-import { getProceduralMaps } from "./builderMaterialMaps";
+import { getProceduralMaps, retainProceduralMaps } from "./builderMaterialMaps";
 
 const COLORS: Record<BuilderMaterial, number> = { marble:0xe7e2da,sandstone:0xb98b5b,limestone:0xcbbd9d,obsidian:0x17191d,granite:0x62636a,travertine:0xc7a77d,brick:0x884838,stone:0x77736b,concrete:0x92908a,stucco:0xd8ccb8,plaster:0xe0d9ca,timber:0x70472f,bronze:0x8a5b32,gold:0xc39a36 };
 
@@ -160,6 +160,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
 
   useEffect(() => {
     const host=hostRef.current; if(!host) return;
+    const releaseProceduralMaps=retainProceduralMaps();
     const scene=new THREE.Scene(); scene.background=new THREE.Color(0xb9c4cb); scene.fog=new THREE.Fog(0xb9c4cb,220,420);
     const camera=new THREE.PerspectiveCamera(42,1,.1,600);
     const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:"high-performance"});
@@ -399,7 +400,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     canvas.addEventListener("pointerdown",down);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",up);canvas.addEventListener("pointercancel",cancel);canvas.addEventListener("wheel",wheel,{passive:false});
     window.addEventListener("resize",resize); const sizeObserver=new ResizeObserver(resize);sizeObserver.observe(host); resize();
     resetCameraRef.current=()=>{const o=orbitRef.current;o.theta=0;o.phi=0.90;cameraFitRef.current.userFramed=false;centerTemple();render();};
-    return()=>{sizeObserver.disconnect();window.removeEventListener("resize",resize);canvas.removeEventListener("pointerdown",down);canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerup",up);canvas.removeEventListener("pointercancel",cancel);canvas.removeEventListener("wheel",wheel);disposeMeshResources(scene);terrainTexture.dispose();renderer.dispose();canvas.remove();};
+    return()=>{sizeObserver.disconnect();window.removeEventListener("resize",resize);canvas.removeEventListener("pointerdown",down);canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerup",up);canvas.removeEventListener("pointercancel",cancel);canvas.removeEventListener("wheel",wheel);disposeMeshResources(scene);terrainTexture.dispose();renderer.dispose();releaseProceduralMaps();canvas.remove();};
   },[]);
 
   useEffect(()=>{
