@@ -68,6 +68,7 @@ export default function TempleBuilderPage() {
   const [roof, setRoof] = useState<RoofStyle>("flat");
   const [levels, setLevels] = useState<BuildingLevel[]>([]);
   const [pendingBuilding,setPendingBuilding] = useState<BuildingLevel|null>(null);
+  const [deletedBuildingUndo,setDeletedBuildingUndo] = useState<{levels:BuildingLevel[];selectedLevel:number}|null>(null);
   const [perimeter, setPerimeter] = useState<Perimeter | null>(null);
   const [statues, setStatues] = useState<Statue[]>([]);
   const [siteColumns,setSiteColumns] = useState<SiteColumn[]>([]);
@@ -282,6 +283,30 @@ export default function TempleBuilderPage() {
     setSelectedFace(null);setDetailCategory(null);setPanel("edit");
   };
 
+  const deleteSelectedBuilding = () => {
+    const base=levels[selectedLevel];
+    if(!base)return;
+    // A selected upper story belongs to its ground-floor building.
+    const ground=base.elevation>0
+      ? [...levels].reverse().find(l=>(l.elevation||0)===0 && Math.abs((l.x||0)-(base.x||0))<.01 && Math.abs((l.z||0)-(base.z||0))<.01)
+      : base;
+    const anchor=ground||base;
+    const indices=levels.flatMap((l,i)=>(
+      (l===anchor || ((l.elevation||0)>0 && Math.abs((l.x||0)-(anchor.x||0))<.01 && Math.abs((l.z||0)-(anchor.z||0))<.01))
+        ? [i] : []
+    ));
+    if(!window.confirm(`Delete this building and its ${indices.length} level${indices.length===1?"":"s"}? You can undo this deletion.`))return;
+    setDeletedBuildingUndo({levels:[...levels],selectedLevel});
+    const removed=new Set(indices);
+    const remaining=levels.filter((_,i)=>!removed.has(i));
+    setLevels(remaining);
+    setSelectedLevel(Math.max(0,Math.min(selectedLevel,remaining.length-1)));
+    setSelectedFace(null);
+    setDetailCategory(null);
+    setPanel(remaining.length?"edit":"add");
+    if(!remaining.length)setShape(null);
+  };
+
   const chooseShape = (next: BuildingShape, floorWidth?: number) => {
     const dims: Record<BuildingShape,[number,number]> = {
       square:[28,28], rectangle:[34,26], wide:[46,24], "l-shape":[38,34], "t-shape":[40,34],
@@ -412,6 +437,17 @@ export default function TempleBuilderPage() {
             ))}
           </div>
         )}
+        {deletedBuildingUndo && <div className="flex items-center justify-between gap-3 border-t border-amber-200/20 bg-amber-950/70 px-3 py-2 text-xs">
+          <span>Building deleted.</span>
+          <button className="rounded-lg bg-amber-200 px-4 py-2 font-semibold text-black" onClick={()=>{
+            setLevels(deletedBuildingUndo.levels);
+            setSelectedLevel(deletedBuildingUndo.selectedLevel);
+            setShape(deletedBuildingUndo.levels[0]?.shape||null);
+            setPanel("edit");
+            setDetailCategory(null);
+            setDeletedBuildingUndo(null);
+          }}>Undo</button>
+        </div>}
         {panel === "floors" && <div className="flex gap-2 overflow-x-auto px-3 py-3">
           {([[36,"Square Floor"],[55,"Wide Floor"]] as const).map(([size,label])=><button key={size} onClick={()=>chooseShape("rectangle",size)} className="min-w-[110px] shrink-0 rounded-xl bg-white/10 p-3 text-xs">{label}</button>)}
         </div>}
@@ -419,6 +455,7 @@ export default function TempleBuilderPage() {
           <div className="border-t border-white/10">
             {!detailCategory && <div className="flex gap-2 overflow-x-auto px-3 py-3">
               {(["levels","doors","windows","arches","columns","stairs","pediments","trim","roof","material"] as const).map(cat=><button key={cat} onClick={()=>{setDetailCategory(cat);setSelectedFace(null);}} className="min-w-[96px] shrink-0 rounded-2xl border border-white/10 bg-white/5 p-3 text-xs capitalize">{cat}</button>)}
+              <button onClick={deleteSelectedBuilding} className="min-w-[118px] shrink-0 rounded-2xl border border-red-300/40 bg-red-500/20 p-3 text-xs text-red-100">Delete Building</button>
               <button onClick={()=>setPanel(null)} className="min-w-[78px] shrink-0 rounded-2xl bg-white/10 p-3 text-xs">Done</button>
             </div>}
             {detailCategory && <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
