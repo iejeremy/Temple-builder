@@ -287,7 +287,15 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     const clampZoom=(radius:number)=>clampCameraRadius(radius,cameraFitRef.current.fitRadius);
     // A sphere about the structural pivot encloses roofs and attached details at every orbit angle.
     const centerTemple=()=>{
-      const bounds=lastBoundsRef.current;if(bounds.isEmpty())return;
+      const bounds=lastBoundsRef.current;
+      if(bounds.isEmpty()){
+        // An empty site must not retain the orbit target of a deleted temple.
+        cameraFocusRef.current={x:0,z:0};
+        targetYRef.current=1.4;
+        cameraPanRef.current={x:0,y:0,z:0,manual:false};
+        orbitRef.current.radius=cameraFitRef.current.fitRadius=13;
+        return;
+      }
       const center=bounds.getCenter(new THREE.Vector3());
       cameraFocusRef.current={x:center.x,z:center.z};targetYRef.current=center.y;
       cameraPanRef.current={x:0,y:0,z:0,manual:false};
@@ -887,6 +895,9 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       fit.initialized=true;fit.lastSpan=radius;
     }else{
       lastBoundsRef.current.makeEmpty();framingRadiusRef.current=0;fit.initialized=false;
+      // Clear stale camera framing when the last building is removed; preserve the
+      // current user view until Center Temple is explicitly requested.
+      fit.fitRadius=13;
     }
     fit.buildingCount=levels.length;
     renderCameraRef.current();
