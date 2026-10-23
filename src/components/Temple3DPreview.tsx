@@ -195,9 +195,9 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     terrainTexture.wrapS=THREE.RepeatWrapping;terrainTexture.wrapT=THREE.RepeatWrapping;
     terrainTexture.repeat.set(10,10);terrainTexture.colorSpace=THREE.SRGBColorSpace;
     terrainTexture.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
-    const ground=new THREE.Mesh(new THREE.PlaneGeometry(40,40),new THREE.MeshStandardMaterial({color:0x878777,map:terrainTexture,roughness:1}));ground.receiveShadow=true;
+    const ground=new THREE.Mesh(new THREE.PlaneGeometry(64,64),new THREE.MeshStandardMaterial({color:0x878777,map:terrainTexture,roughness:1}));ground.receiveShadow=true;
     ground.rotation.x=-Math.PI/2; scene.add(ground);
-    const grid=new THREE.GridHelper(40,24,0x66685e,0x7b7d70); grid.position.y=.01; scene.add(grid);
+    const grid=new THREE.GridHelper(64,32,0x66685e,0x7b7d70); grid.position.y=.01; scene.add(grid);
     // Scenery sits outside the primary building area so site editing remains unobstructed.
     const landscape=new THREE.Group();scene.add(landscape);
     // Fine-grained tree crowns use instancing: hundreds of small leaf clusters per tree
