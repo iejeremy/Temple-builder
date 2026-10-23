@@ -88,3 +88,23 @@ export function getProceduralMaps(kind:BuilderMaterial){
   if(!maps){maps=create(kind);cached.set(kind,maps);}
   return maps;
 }
+
+// Keep procedural maps shared across active previews, and release their GPU
+// allocations when the last preview unmounts (including React Strict Mode).
+let activePreviewCount=0;
+export function retainProceduralMaps(){
+  activePreviewCount++;
+  let released=false;
+  return ()=>{
+    if(released)return;
+    released=true;
+    activePreviewCount=Math.max(0,activePreviewCount-1);
+    if(activePreviewCount!==0)return;
+    for(const maps of cached.values()){
+      maps.color.dispose();
+      maps.roughness.dispose();
+      maps.bump.dispose();
+    }
+    cached.clear();
+  };
+}
