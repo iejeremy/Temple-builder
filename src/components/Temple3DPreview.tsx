@@ -405,9 +405,9 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     const enableShadows=(root:THREE.Object3D)=>root.traverse(o=>{if(o instanceof THREE.Mesh){o.castShadow=true;o.receiveShadow=true;}});
     const addRoof=(parent:THREE.Group,roof:RoofStyle,rw:number,rd:number,x:number,z:number,top:number,color:number)=>{
       // Roof pieces share a single material rather than allocating one per cornice or tier.
+      if(roof==="none")return;
       const roofMaterial=new THREE.MeshStandardMaterial({color,roughness:.58,metalness:0});
       const add=(g:THREE.BufferGeometry,px:number,py:number,pz:number)=>addArchitecturalMesh(parent,g,roofMaterial,px,py,pz);
-      if(roof==="none")return;
       // Tiered stone cornices establish a visible roof silhouette from ground-level cameras.
       const lip=Math.min(.15,Math.max(.045,Math.min(rw,rd)*.025));
       const cornice=(spread:number,y:number,thickness:number)=>add(new THREE.BoxGeometry(rw+spread,thickness,rd+spread),x,y,z);
@@ -919,7 +919,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       lastBoundsRef.current.makeEmpty();framingRadiusRef.current=0;fit.initialized=false;
       // Clear stale camera framing when the last building is removed; preserve the
       // current user view until Center Temple is explicitly requested.
-      fit.fitRadius=19;
+      fit.fitRadius=25;
     }
     fit.buildingCount=levels.length;
     renderCameraRef.current();
