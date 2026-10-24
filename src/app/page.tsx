@@ -34,7 +34,7 @@ export type Perimeter = { style:PerimeterStyle; material:BuilderMaterial; margin
 export type StatueKind = "guardian"|"angel"|"lion";
 export type StatueFinish = "marble"|"bronze"|"gold"|"obsidian";
 export type LandscapeKind = "tree"|"garden"|"path"|"fountain"|"pond"|"rock"|"boulder"|"grass"|"hill"|"river"|"creek";
-export type LandscapeItem = {id:string;kind:LandscapeKind;x:number;z:number;scale:number;rotation:number};
+export type LandscapeItem = {id:string;kind:LandscapeKind;x:number;z:number;scale:number;rotation:number;treeStyle?:"broadleaf"|"pine"|"cypress"};
 export type SiteColumn = { id:string; style:ColumnStyle; material:BuilderMaterial; x:number; z:number; height:number; radius:number; rotation:number; };
 export type Statue = { id:string; kind:StatueKind; finish:StatueFinish; x:number; z:number; rotation:number; scale:number; };
 export type BuildingLevel = { architecture?: "maya"|"egyptian"|"hindu"|"greek"|"gothic"|"echoes";
@@ -628,6 +628,7 @@ export default function TempleBuilderPage() {
           {(["boulder","grass","hill","river","creek","tree","garden","path","fountain","pond","rock"] as LandscapeKind[]).map(kind=><button key={kind} className="min-h-11 rounded-lg border border-amber-200/25 bg-amber-200/10 px-3 py-2 text-xs capitalize" onClick={()=>{const id=uniqueId("land");setLandscapeItems(v=>[...v,{id,kind,x:(levels[selectedLevel]?.x||0)+(levels[selectedLevel]?.width||0)/14+2+(v.length%3)*2.5,z:(levels[selectedLevel]?.z||0)+Math.floor(v.length/3)*3,scale:1,rotation:0}]);setSelectedLandscapeId(id);setActiveObject("landscape");}}>+ {kind}</button>)}
           {landscapeItems.map(item=><div key={item.id} className="flex w-full flex-wrap items-center gap-2 rounded-xl bg-white/5 p-2 text-xs">
             <span className="capitalize">{item.kind}{selectedLandscapeId===item.id?" · selected":""}</span>
+            {item.kind==="tree"&&<div role="group" aria-label="Tree style" className="flex w-full gap-2">{(["broadleaf","pine","cypress"] as const).map(style=><button key={style} aria-pressed={(item.treeStyle||"broadleaf")===style} onClick={()=>setLandscapeItems(v=>v.map(q=>q.id===item.id?{...q,treeStyle:style}:q))} className={`min-h-11 rounded-lg border px-3 py-2 capitalize ${(item.treeStyle||"broadleaf")===style?"border-amber-200 bg-amber-200/20":"border-white/15 bg-white/5"}`}>{style}</button>)}</div>}
             {(["x","z","scale","rotation"] as const).map(axis=><label key={axis}>{axis}<input type="number" aria-label={`${item.kind} ${axis}`} step={axis==="rotation"?15:.25} min={axis==="scale"?.3:undefined} max={axis==="scale"?4:undefined} value={item[axis]} onChange={e=>{const n=Number(e.target.value);if(Number.isFinite(n))setLandscapeItems(v=>v.map(q=>q.id===item.id?{...q,[axis]:axis==="scale"?Math.max(.3,Math.min(4,n)):n}:q));}} className="ml-1 w-14 rounded bg-white/15 p-1"/></label>)}
             <button onClick={()=>setLandscapeItems(v=>[...v,{...item,id:`${uniqueId("land")}`,x:item.x+1}])}>Duplicate</button>
             <button onClick={()=>setLandscapeItems(v=>v.filter(q=>q.id!==item.id))} className="text-red-200">Delete</button>

@@ -40,7 +40,7 @@ export function addNaturalScenery(group:THREE.Group,item:LandscapeItem):boolean{
     for(let i=0;i<240;i++){
       const a=noise(i+1)*Math.PI*2,r=Math.sqrt(noise(i+511))*1.7;
       dummy.position.set(Math.cos(a)*r,.025,Math.sin(a)*r);dummy.rotation.y=noise(i+101)*Math.PI*2;dummy.scale.setScalar(.55+noise(i+305)*.9);dummy.updateMatrix();
-      grass.setMatrixAt(i,dummy.matrix);color.setHSL(.21+noise(i+33)*.06,.29,.23+noise(i+45)*.13);grass.setColorAt(i,color);
+      grass.setMatrixAt(i,dummy.matrix);color.setHSL(.21+noise(i+33)*.06,.29,.23+noise(i+45)*.13).convertSRGBToLinear();grass.setColorAt(i,color);
     }
     grass.computeBoundingSphere();group.add(grass);
     const pick=add(new THREE.CylinderGeometry(1.7,1.7,.018,32),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}),0,.012,0);
@@ -52,7 +52,7 @@ export function addNaturalScenery(group:THREE.Group,item:LandscapeItem):boolean{
       const t=ring/rings,a=i/segments*Math.PI*2,r=t*4;
       const h=Math.pow(Math.max(0,1-t*t),2)*2;
       vertices.push(Math.cos(a)*r,h+.012,Math.sin(a)*r*.8);
-      const color=new THREE.Color().setHSL(.22,.18,.32+.04*Math.sin(a*3)*t);colors.push(color.r,color.g,color.b);
+      const color=new THREE.Color().setHSL(.22,.18,.32+.04*Math.sin(a*3)*t).convertSRGBToLinear();colors.push(color.r,color.g,color.b);
       if(ring<rings&&i<segments){const k=ring*(segments+1)+i;indices.push(k,k+1,k+segments+1,k+1,k+segments+2,k+segments+1);}
     }
     const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geo.setIndex(indices);geo.computeVertexNormals();

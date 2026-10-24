@@ -106,3 +106,10 @@ test('normal mode swipe cannot move a building',()=>{
   const s=setup();s.event('pointerdown',1,100,100);s.event('pointermove',1,140,100);s.event('pointerup',1,140,100);
   assert.deepEqual(s.callbacks,[]);
 });
+test('Scenery view adds landscape context only on explicit request and leaves temple bounds unchanged',()=>{
+ const rig=new TempleCameraController(),camera=new THREE.PerspectiveCamera(42,.5,.1,600);
+ rig.resize(camera,390,844,95,120);rig.siteBounds.set(new THREE.Vector3(-6,0,-6),new THREE.Vector3(6,5,6));rig.selectedBounds.copy(rig.siteBounds);rig.selectedRadius=9;
+ const bounds=rig.siteBounds.clone();rig.center(camera,'site');const radius=rig.orbit.radius;
+ rig.center(camera,'landscape');assert.ok(rig.orbit.radius>radius*1.5);assert.ok(rig.siteBounds.equals(bounds));
+ rig.center(camera,'site');assert.equal(rig.orbit.radius,radius);
+});

@@ -5,6 +5,8 @@ import * as THREE from "three";
 import type { BuildingLevel, RoofStyle, WallFace, Perimeter, BuilderMaterial, Statue, SiteColumn, LandscapeItem } from "@/app/page";
 import { getProceduralMaps, retainProceduralMaps } from "./builderMaterialMaps";
 import { addNaturalScenery } from "./naturalScenery";
+import { addSceneryTree } from "./sceneryTrees";
+import { createEnvironmentLandscape } from "./environmentLandscape";
 import { batchBuildingShell, perimeterPlan } from "./builderGeometry";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { TempleCameraController, type TempleView } from "./TempleCameraController";
@@ -91,6 +93,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
   const snapshotRef=useRef<()=>void>(()=>{});
   const geometryCacheRef=useRef(new Map<string,{key:string;group:THREE.Group}>());
   const hostRef = useRef<HTMLDivElement|null>(null);
+  const environmentBoundsRef=useRef<((bounds:THREE.Box3)=>void)|null>(null);
   const sceneryApplyRef=useRef<((kind:"garden"|"desert"|"twilight")=>void)|null>(null);
   const groupRef = useRef<THREE.Group|null>(null);
   const sceneRef = useRef<THREE.Scene|null>(null);
@@ -125,6 +128,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     const materials=new Set<THREE.Material>();
     root.traverse(object=>{
       if(!(object instanceof THREE.Mesh)&&!(object instanceof THREE.LineSegments))return;
+      if(object instanceof THREE.InstancedMesh)object.dispose();
       geometries.add(object.geometry);
       const assigned=object.material;
       if(Array.isArray(assigned))assigned.forEach(material=>materials.add(material));
@@ -166,107 +170,61 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     const fill=new THREE.DirectionalLight(0xbfd7ff,.3);fill.position.set(-7,6,-5);scene.add(fill);
     // Low-cost hemisphere bounce keeps recesses readable without flattening the sun shadows.
     const bounce=new THREE.HemisphereLight(0xdde8f2,0x554b3e,.18);scene.add(bounce);
-    // Subtle repeating terrain variation gives the site depth without downloading textures.
-    const terrainCanvas=document.createElement("canvas");terrainCanvas.width=128;terrainCanvas.height=128;
+    // Organic ground variation across the entire site avoids a visible tiled checkerboard.
+    const terrainCanvas=document.createElement("canvas");terrainCanvas.width=512;terrainCanvas.height=512;
     const terrainCtx=terrainCanvas.getContext("2d");
     if(terrainCtx){
-      const pixels=terrainCtx.createImageData(128,128);
-      for(let y=0;y<128;y++)for(let x=0;x<128;x++){
+      const pixels=terrainCtx.createImageData(512,512);
+      for(let y=0;y<512;y++)for(let x=0;x<512;x++){
         const n=Math.sin(x*12.9898+y*78.233)*43758.5453;
         const grain=(n-Math.floor(n))-.5;
-        const broad=Math.sin(x*.14)*Math.cos(y*.11)*8;
-        const value=Math.max(0,Math.min(255,190+grain*27+broad));
-        const k=(y*128+x)*4;pixels.data[k]=value;pixels.data[k+1]=Math.min(255,value+5);pixels.data[k+2]=Math.max(0,value-8);pixels.data[k+3]=255;
+        const broad=14*Math.sin(x*.047+Math.sin(y*.028)*2)+10*Math.cos(y*.071+x*.019)+7*Math.sin(x*.19+y*.13);
+        const value=Math.max(0,Math.min(255,203+grain*19+broad));
+        const k=(y*512+x)*4;pixels.data[k]=value;pixels.data[k+1]=Math.min(255,value+5);pixels.data[k+2]=Math.max(0,value-8);pixels.data[k+3]=255;
       }
       terrainCtx.putImageData(pixels,0,0);
     }
     const terrainTexture=new THREE.CanvasTexture(terrainCanvas);
     terrainTexture.wrapS=THREE.RepeatWrapping;terrainTexture.wrapT=THREE.RepeatWrapping;
-    terrainTexture.repeat.set(40,40);terrainTexture.colorSpace=THREE.SRGBColorSpace;
+    terrainTexture.repeat.set(1,1);terrainTexture.colorSpace=THREE.SRGBColorSpace;
     terrainTexture.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
-    const ground=new THREE.Mesh(new THREE.PlaneGeometry(256,256),new THREE.MeshStandardMaterial({color:0x878777,map:terrainTexture,roughness:1}));ground.receiveShadow=true;
+    const ground=new THREE.Mesh(new THREE.PlaneGeometry(256,256),new THREE.MeshStandardMaterial({color:0x7e985e,map:terrainTexture,roughness:1}));ground.receiveShadow=true;
     ground.rotation.x=-Math.PI/2; scene.add(ground);
     const grid=new THREE.GridHelper(96,96,0xc3b49a,0xa4a394);grid.position.y=.012;
     (grid.material as THREE.Material).transparent=true;(grid.material as THREE.Material).opacity=.15;
     gridRef.current=grid;scene.add(grid);
-    // Scenery sits outside the primary building area so site editing remains unobstructed.
-    const landscape=new THREE.Group();scene.add(landscape);
-    // Fine-grained tree crowns use instancing: hundreds of small leaf clusters per tree
-    // without hundreds of draw calls. No new dependencies or builder-data changes.
-    const leafColors=[0x42683d,0x54753e,0x365b46,0x698049,0x7c8650,0x315b40];
-    const leafMats=leafColors.map(color=>new THREE.MeshStandardMaterial({color,roughness:.94,side:THREE.DoubleSide}));
-    const barkMats=[0x65503a,0x594b39,0x756044].map(color=>new THREE.MeshStandardMaterial({color,roughness:1}));
-    const leafGeometry=new THREE.IcosahedronGeometry(1,0);
-    const trunkGeometry=new THREE.CylinderGeometry(.09,.17,1.55,7);
-    const rand=(seed:number)=>{const v=Math.sin(seed*127.1+78.233)*43758.5453;return v-Math.floor(v);};
-    const leafDummy=new THREE.Object3D();
-    for(let i=0;i<26;i++){
-      const angle=i*Math.PI*2/26+(rand(i+17)-.5)*.19;
-      const radius=17+(i%4)*1.2+(rand(i+32)-.5)*1.25;
-      const tree=new THREE.Group();tree.position.set(Math.cos(angle)*radius,0,Math.sin(angle)*radius);
-      tree.rotation.y=rand(i+91)*Math.PI*2;
-      const height=.76+rand(i+51)*.7;
-      tree.scale.set(height*(.9+rand(i+6)*.2),height,height*(.9+rand(i+9)*.2));
-      landscape.add(tree);
-      const type=i%5;
-      const trunk=new THREE.Mesh(trunkGeometry,barkMats[i%barkMats.length]);
-      trunk.position.y=.775;trunk.castShadow=true;tree.add(trunk);
-      // Narrow conifers, columnar cypress, oval ornamentals and wide woodland crowns.
-      const count=type===0?170:type===2?180:260;
-      const instances=leafMats.map(mat=>new THREE.InstancedMesh(leafGeometry,mat,Math.ceil(count/leafMats.length)));
-      const counts=new Array(instances.length).fill(0);
-      for(let j=0;j<count;j++){
-        const u=rand(i*701+j*19+1),v=rand(i*701+j*19+2),w=rand(i*701+j*19+3);
-        const theta=u*Math.PI*2;
-        const radial=Math.sqrt(v);
-        let rx=1,rz=.85,cy=2.05,ry=.72;
-        if(type===0){rx=.68;rz=.68;cy=2.04;ry=1.15;}
-        if(type===2){rx=.35;rz=.35;cy=2.13;ry=1.25;}
-        if(type===3){rx=.86;rz=.8;cy=1.96;ry=.63;}
-        if(type===4){rx=1.2;rz=.94;cy=2.06;ry=.62;}
-        // Multi-lobed density variation prevents a single spherical silhouette.
-        const lobe=.82+.18*Math.sin(theta*(type===4?5:7)+i);
-        const layer=(w-.5)*2;
-        const taper=type===0||type===2?Math.max(.14,1-(layer+.8)*.48):Math.sqrt(Math.max(.12,1-layer*layer));
-        const x=Math.cos(theta)*radial*rx*lobe*taper;
-        const z=Math.sin(theta)*radial*rz*lobe*taper;
-        const y=cy+layer*ry+.10*Math.sin(theta*4+i);
-        const size=(type===2?.075:.09)*(0.7+rand(i*503+j*7)*.7);
-        leafDummy.position.set(x,y,z);
-        leafDummy.rotation.set(u*6.28,v*6.28,w*6.28);
-        leafDummy.scale.set(size*.7,size*1.2,size*.65);
-        leafDummy.updateMatrix();
-        const slot=j%instances.length;
-        instances[slot].setMatrixAt(counts[slot]++,leafDummy.matrix);
-      }
-      for(let j=0;j<instances.length;j++){
-        const mesh=instances[j];mesh.count=counts[j];mesh.instanceMatrix.needsUpdate=true;
-        mesh.castShadow=true;mesh.receiveShadow=true;mesh.computeBoundingSphere();tree.add(mesh);
-      }
-    }
+    const environmentLandscape=createEnvironmentLandscape();scene.add(environmentLandscape.root);
+    let environmentUpdate:ReturnType<typeof setTimeout>|undefined;
+    environmentBoundsRef.current=(bounds)=>{
+      if(environmentUpdate)clearTimeout(environmentUpdate);
+      const next=bounds.clone();
+      // Replant after a drag settles, rather than rebuilding thousands of instances per move.
+      environmentUpdate=setTimeout(()=>{environmentLandscape.setBounds(next);renderer.shadowMap.needsUpdate=true;renderCameraRef.current();},180);
+    };
     // Screen-space sky gradient and a single low-poly distant ridgeline add depth.
     const skyCanvas=document.createElement("canvas");skyCanvas.width=2;skyCanvas.height=128;
     const skyTexture=new THREE.CanvasTexture(skyCanvas);skyTexture.colorSpace=THREE.SRGBColorSpace;
-    const hillsGeometry=new THREE.BufferGeometry(),hillVertices:number[]=[],hillIndices:number[]=[];
+    const hillsGeometry=new THREE.BufferGeometry(),hillVertices:number[]=[],hillIndices:number[]=[],hillUvs:number[]=[];
     const sectors=96,rings=5;
     for(let ring=0;ring<rings;ring++)for(let i=0;i<=sectors;i++){
       const a=i/sectors*Math.PI*2,r=48+ring*18;
       const height=Math.sin(ring/(rings-1)*Math.PI)*(7+Math.sin(a*3+.8)*3+Math.sin(a*7)*2);
-      hillVertices.push(Math.cos(a)*r,height,Math.sin(a)*r);
+      hillVertices.push(Math.cos(a)*r,height-.04,Math.sin(a)*r);
+      hillUvs.push(Math.cos(a)*r/256+.5,.5-Math.sin(a)*r/256);
       if(ring<rings-1&&i<sectors){const k=ring*(sectors+1)+i;hillIndices.push(k,k+sectors+1,k+1,k+1,k+sectors+1,k+sectors+2);}
     }
-    hillsGeometry.setAttribute("position",new THREE.Float32BufferAttribute(hillVertices,3));hillsGeometry.setIndex(hillIndices);hillsGeometry.computeVertexNormals();
-    const hills=new THREE.Mesh(hillsGeometry,new THREE.MeshStandardMaterial({color:0x777e6c,roughness:1,side:THREE.DoubleSide}));scene.add(hills);
+    hillsGeometry.setAttribute("position",new THREE.Float32BufferAttribute(hillVertices,3));hillsGeometry.setAttribute("uv",new THREE.Float32BufferAttribute(hillUvs,2));hillsGeometry.setIndex(hillIndices);hillsGeometry.computeVertexNormals();
+    const hills=new THREE.Mesh(hillsGeometry,new THREE.MeshStandardMaterial({color:0x7e985e,map:terrainTexture,roughness:1,side:THREE.DoubleSide}));scene.add(hills);
     const applyScenery=(kind:"garden"|"desert"|"twilight")=>{
       const bg=kind==="twilight"?0x29334c:kind==="desert"?0xd8b98b:0xb9c4cb;
       const sky=skyCanvas.getContext("2d");if(sky){const gradient=sky.createLinearGradient(0,0,0,128);
         gradient.addColorStop(0,kind==="twilight"?"#101c39":kind==="desert"?"#95a7b5":"#829dad");
         gradient.addColorStop(1,kind==="twilight"?"#d79577":kind==="desert"?"#e9d0a6":"#d9ddd0");sky.fillStyle=gradient;sky.fillRect(0,0,2,128);skyTexture.needsUpdate=true;}
       scene.background=skyTexture;
-      (hills.material as THREE.MeshStandardMaterial).color.setHex(kind==="desert"?0xbda27f:kind==="twilight"?0x44475d:0x777e6c);
+      (hills.material as THREE.MeshStandardMaterial).color.setHex(kind==="desert"?0xbda079:kind==="twilight"?0x65796c:0x7e985e);
       if(scene.fog instanceof THREE.Fog)scene.fog.color.setHex(bg);
-      (ground.material as THREE.MeshStandardMaterial).color.setHex(kind==="desert"?0xbda079:kind==="twilight"?0x454d51:0x878777);
-      landscape.visible=kind==="garden";
+      (ground.material as THREE.MeshStandardMaterial).color.setHex(kind==="desert"?0xbda079:kind==="twilight"?0x65796c:0x7e985e);
+      environmentLandscape.setTheme(kind);
       sun.color.setHex(kind==="twilight"?0xffad75:kind==="desert"?0xffe4b2:0xfff4df);
       sun.intensity=kind==="twilight"?1.8:2.5;
       sun.position.set(kind==="twilight"?-14:12,kind==="twilight"?8:18,10);
@@ -432,6 +390,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     window.addEventListener("resize",resize); const sizeObserver=new ResizeObserver(resize);sizeObserver.observe(host); if(toolbar)sizeObserver.observe(toolbar); resize();
     return()=>{cancelAnimationFrame(renderFrame);geometryCacheRef.current.clear();
       canvas.removeEventListener("contextmenu",contextMenu);canvas.removeEventListener("webglcontextlost",contextLost);canvas.removeEventListener("lostpointercapture",cancel);
+      if(environmentUpdate)clearTimeout(environmentUpdate);environmentBoundsRef.current=null;
       environment.dispose();skyTexture.dispose();sizeObserver.disconnect();window.removeEventListener("resize",resize);canvas.removeEventListener("pointerdown",down);canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerup",up);canvas.removeEventListener("pointercancel",cancel);canvas.removeEventListener("wheel",wheel);disposeMeshResources(scene);terrainTexture.dispose();renderer.dispose();releaseProceduralMaps();canvas.remove();};
   },[]);
 
@@ -888,9 +847,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       const add=(geo:THREE.BufferGeometry,x:number,y:number,z:number,color:number)=>{const m=new THREE.Mesh(geo,material(color));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;g.add(m);};
       if(addNaturalScenery(g,item))continue;
       if(item.kind==="tree"){
-        add(new THREE.CylinderGeometry(.12,.19,1.6,8),0,.8,0,0x695039);
-        for(let i=0;i<4;i++)add(new THREE.ConeGeometry(.93-i*.15,1.25,12),0,1.45+i*.48,0,i%2?0x416b40:0x537d4b);
-        for(let i=0;i<6;i++){const a=i*Math.PI/3;add(new THREE.SphereGeometry(.13,8,6),Math.cos(a)*.47,1.7+(i%3)*.38,Math.sin(a)*.47,0x8f7440);}
+        addSceneryTree(g,item.treeStyle||"broadleaf",Array.from(item.id).reduce((sum,c)=>sum+c.charCodeAt(0),0));
       }else if(item.kind==="garden"){
         add(new THREE.CylinderGeometry(1.15,1.2,.16,24),0,.08,0,0x776c56);
         add(new THREE.CylinderGeometry(1.05,1.05,.04,24),0,.18,0,0x394b2f);
@@ -996,6 +953,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       cameraRigRef.current.selectedRadius=selectedRadius;
     }else cameraRigRef.current.selectedRadius=0;
     cameraRigRef.current.siteBounds.copy(new THREE.Box3().setFromObject(group));
+    environmentBoundsRef.current?.(cameraRigRef.current.siteBounds);
     const fit=cameraRigRef.current.fit;
     if(!buildingBounds.isEmpty()){
       // Frame the full rendered geometry, including roofs, cornices and trim,
@@ -1085,6 +1043,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     <div ref={hostRef} className="absolute inset-0" aria-label="Interactive 3D temple site" />
     <div className="studio-view-tools absolute right-3 top-24 z-20 flex flex-col gap-1.5" aria-label="View controls">
       <button aria-label="Center Temple" title="Frame selected building" onClick={()=>viewRef.current("temple")}>◎<span>Center Temple</span></button>
+      <button aria-label="View landscape" title="See the woodland, hills and water around your temple" onClick={()=>viewRef.current("landscape")} className="flex-col"><b className="text-base leading-none">♧</b><small className="text-[8px] leading-none">Scenery</small></button>
       <button aria-label="Whole site" title="Frame all buildings, walls and site pieces" onClick={()=>viewRef.current("site")}>▧<span>Whole site</span></button>
       <button aria-label="Front" title="Front elevation" onClick={()=>viewRef.current("front")}>▤<span>Front</span></button>
       <button aria-label="Plan" title="Overhead plan" onClick={()=>viewRef.current("plan")}>◇<span>Plan</span></button>

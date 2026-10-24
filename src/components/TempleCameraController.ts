@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-export type TempleView = "temple" | "site" | "front" | "plan";
+export type TempleView = "temple" | "site" | "front" | "plan" | "landscape";
 
 /** The only owner of camera transforms, viewport projection and navigation limits. */
 export class TempleCameraController {
@@ -53,8 +53,12 @@ export class TempleCameraController {
   }
 
   center(camera:THREE.PerspectiveCamera,view:TempleView="temple"){
-    const site=view==="site";
-    const bounds=site&&!this.siteBounds.isEmpty()?this.siteBounds:!this.selectedBounds.isEmpty()?this.selectedBounds:this.allBounds;
+    const scenic=view==="landscape",site=view==="site"||scenic;
+    let bounds=site&&!this.siteBounds.isEmpty()?this.siteBounds:!this.selectedBounds.isEmpty()?this.selectedBounds:this.allBounds;
+    if(scenic){
+      bounds=bounds.isEmpty()?new THREE.Box3(new THREE.Vector3(-5,0,-5),new THREE.Vector3(5,4,5)):bounds.clone();
+      bounds.expandByVector(new THREE.Vector3(10,0,10));
+    }
     this.pan={x:0,y:0,z:0,manual:false};
     if(bounds.isEmpty()){
       this.focus={x:0,z:0};this.targetY=.6;this.orbit.radius=this.fit.fitRadius=30;
