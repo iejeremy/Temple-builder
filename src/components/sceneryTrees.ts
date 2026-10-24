@@ -3,11 +3,14 @@ import * as THREE from "three";
 export type TreeStyle = "broadleaf" | "pine" | "cypress";
 const random=(n:number)=>{const x=Math.sin(n*127.1+78.233)*43758.5453;return x-Math.floor(x);};
 
-/** Two draw calls per tree: tapered timber and a dense, varied evergreen canopy. */
+// Approved foliage: small, numerous individual leaves, never large canopy blobs.
+const leafColors=[0x42683d,0x54753e,0x365b46,0x698049,0x7c8650,0x315b40];
+
+/** Two draw calls per tree: tapered timber and hundreds of fine instanced leaves. */
 export function addSceneryTree(group:THREE.Group,style:TreeStyle="broadleaf",seed=1){
   group.userData.treeStyle=style;
   const timber=new THREE.InstancedMesh(new THREE.CylinderGeometry(.6,1,1,7),new THREE.MeshStandardMaterial({color:0x66513b,roughness:1}),style==="broadleaf"?9:5);
-  const leaves=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,1),new THREE.MeshStandardMaterial({color:0xffffff,roughness:.92}),96);
+  const leaves=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,0),new THREE.MeshStandardMaterial({color:0xffffff,roughness:.94}),style==="broadleaf"?360:style==="pine"?320:340);
   const dummy=new THREE.Object3D(),up=new THREE.Vector3(0,1,0),color=new THREE.Color();
   const branch=(i:number,start:THREE.Vector3,end:THREE.Vector3,radius:number)=>{
     const direction=end.clone().sub(start);dummy.position.copy(start).add(end).multiplyScalar(.5);
@@ -25,18 +28,18 @@ export function addSceneryTree(group:THREE.Group,style:TreeStyle="broadleaf",see
       const layer=(v-.5)*2,taper=Math.sqrt(1-layer*layer);
       const lobe=1+.13*Math.sin(a*5+seed);
       x=Math.cos(a)*r*1.4*taper*lobe;y=3.25+layer*.9;z=Math.sin(a)*r*1.25*taper*lobe;
-      sx=.36+random(seed+i*7)*.21;sy=sx*.84;sz=sx;
+      sx=.085+random(seed+i*7)*.055;sy=sx*1.3;sz=sx*.7;
     }else if(style==="pine"){
-      const tier=Math.floor(i/16),angle=i*2.4+seed,reach=(1-tier*.145)*(.5+r*.5);
-      x=Math.cos(angle)*reach;y=1.65+tier*.48;z=Math.sin(angle)*reach;
-      sx=.57-tier*.057;sy=.36;sz=sx;
+      const height=v*2.8,angle=i*2.4+seed,reach=(1-height/3.25)*(.3+r*.85);
+      x=Math.cos(angle)*reach;y=1.5+height;z=Math.sin(angle)*reach;
+      sx=.075+random(seed+i*7)*.05;sy=sx*1.4;sz=sx*.7;
     }else{
       const layer=(v-.5)*2,taper=Math.sqrt(1-layer*layer);
       x=Math.cos(a)*r*.48*taper;y=3.2+layer*1.65;z=Math.sin(a)*r*.48*taper;
-      sx=.23+random(seed+i*7)*.11;sy=sx*1.65;sz=sx;
+      sx=.06+random(seed+i*7)*.04;sy=sx*1.65;sz=sx*.7;
     }
-    dummy.position.set(x,y,z);dummy.rotation.set(random(i+seed)*.5,a,random(i+seed+8)*.4);dummy.scale.set(sx,sy,sz);dummy.updateMatrix();leaves.setMatrixAt(i,dummy.matrix);
-    color.setHSL(style==="pine"?.34:style==="cypress"?.31:.27,.28+random(seed+i)*.16,.19+random(seed+i+41)*.13).convertSRGBToLinear();leaves.setColorAt(i,color);
+    dummy.position.set(x,y,z);dummy.rotation.set(random(i+seed)*Math.PI*2,a,random(i+seed+8)*Math.PI*2);dummy.scale.set(sx,sy,sz);dummy.updateMatrix();leaves.setMatrixAt(i,dummy.matrix);
+    color.setHex(leafColors[i%leafColors.length]);leaves.setColorAt(i,color);
   }
   for(const mesh of [timber,leaves]){mesh.castShadow=true;mesh.receiveShadow=true;mesh.computeBoundingSphere();group.add(mesh);}
   return group;

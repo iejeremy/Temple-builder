@@ -7,8 +7,12 @@ import * as THREE from 'three';
 const cache={};
 function load(name){if(cache[name])return cache[name];const module={exports:{}};vm.runInNewContext(ts.transpile(readFileSync('src/components/'+name+'.ts','utf8'),{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}),{module,exports:module.exports,require:path=>path==='three'?THREE:load(path.slice(2))});cache[name]=module.exports;return module.exports;}
 const {createEnvironmentLandscape}=load('environmentLandscape'),{addSceneryTree}=load('sceneryTrees');
-for(const style of ['broadleaf','pine','cypress'])test(style+' tree has a full canopy, finite instances and grounded timber',()=>{
- const tree=addSceneryTree(new THREE.Group(),style,4);assert.equal(tree.children.length,2);assert.equal(tree.children[1].count,96);
+for(const style of ['broadleaf','pine','cypress'])test(style+' tree preserves hundreds of small leaves, finite instances and grounded timber',()=>{
+ const tree=addSceneryTree(new THREE.Group(),style,4);assert.equal(tree.children.length,2);
+ const leaves=tree.children[1];assert.ok(leaves.count>=300);
+ assert.ok((leaves.geometry.index?.count||leaves.geometry.attributes.position.count)/3*leaves.count<=7680,'Fine foliage must fit within the previous tree triangle budget');
+ const matrix=new THREE.Matrix4(),position=new THREE.Vector3(),rotation=new THREE.Quaternion(),scale=new THREE.Vector3();
+ for(let i=0;i<leaves.count;i++){leaves.getMatrixAt(i,matrix);matrix.decompose(position,rotation,scale);assert.ok(Math.max(scale.x,scale.y,scale.z)<=.19,'Individual foliage must stay small, rather than becoming large canopy clumps');}
  const box=new THREE.Box3().setFromObject(tree);assert.ok(box.min.y>=-.02&&box.max.y>3.5);
  tree.traverse(o=>{if(o.isInstancedMesh)assert.ok(Array.from(o.instanceMatrix.array).every(Number.isFinite));});
 });
