@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import type { BuildingLevel, RoofStyle, WallFace, Perimeter, BuilderMaterial, Statue, SiteColumn, LandscapeItem } from "@/app/page";
 import { getProceduralMaps, retainProceduralMaps } from "./builderMaterialMaps";
+import { addNaturalScenery } from "./naturalScenery";
 import { batchBuildingShell, perimeterPlan } from "./builderGeometry";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { TempleCameraController, type TempleView } from "./TempleCameraController";
@@ -445,7 +446,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     levelGroupsRef.current=[];
     let baseY=0;
 
-    const enableShadows=(root:THREE.Object3D)=>root.traverse(o=>{if(o instanceof THREE.Mesh){o.castShadow=true;o.receiveShadow=true;}});
+    const enableShadows=(root:THREE.Object3D)=>root.traverse(o=>{if(o instanceof THREE.Mesh){o.castShadow=!o.userData.pickSurface;o.receiveShadow=true;}});
     const addRoof=(parent:THREE.Group,roof:RoofStyle,rw:number,rd:number,x:number,z:number,top:number,color:number)=>{
       // Roof pieces share a single material rather than allocating one per cornice or tier.
       if(roof==="none")return;
@@ -885,6 +886,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       const g=new THREE.Group();g.position.set(item.x,0,item.z);g.rotation.y=THREE.MathUtils.degToRad(item.rotation);g.scale.setScalar(Math.max(.3,Math.min(4,item.scale||1)));g.userData.siteObjectId=item.id;g.userData.siteObjectKind="landscape";siteObjectGroupsRef.current.push(g);group.add(g);
       const material=(color:number)=>new THREE.MeshStandardMaterial({color,roughness:.85});
       const add=(geo:THREE.BufferGeometry,x:number,y:number,z:number,color:number)=>{const m=new THREE.Mesh(geo,material(color));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;g.add(m);};
+      if(addNaturalScenery(g,item))continue;
       if(item.kind==="tree"){
         add(new THREE.CylinderGeometry(.12,.19,1.6,8),0,.8,0,0x695039);
         for(let i=0;i<4;i++)add(new THREE.ConeGeometry(.93-i*.15,1.25,12),0,1.45+i*.48,0,i%2?0x416b40:0x537d4b);
