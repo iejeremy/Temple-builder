@@ -86,7 +86,7 @@ export default function TempleBuilderPage() {
   const [roof, setRoof] = useState<RoofStyle>("flat");
   const [levels, setLevels] = useState<BuildingLevel[]>([]);
   const [pendingBuilding,setPendingBuilding] = useState<BuildingLevel|null>(null);
-  const [deletedBuildingUndo,setDeletedBuildingUndo] = useState<{levels:BuildingLevel[];selectedLevel:number;message:string}|null>(null);
+  const [deletedBuildingUndo,setDeletedBuildingUndo] = useState<{levels:BuildingLevel[];selectedLevel:number;message:string;site?:{perimeter:Perimeter|null;statues:Statue[];siteColumns:SiteColumn[];landscapeItems:LandscapeItem[];pendingBuilding:BuildingLevel|null;scenery:"garden"|"desert"|"twilight"}}|null>(null);
   const [perimeter, setPerimeter] = useState<Perimeter | null>(null);
   const [statues, setStatues] = useState<Statue[]>([]);
   const [siteColumns,setSiteColumns] = useState<SiteColumn[]>([]);
@@ -303,6 +303,29 @@ export default function TempleBuilderPage() {
     setSelectedFace(null);setDetailCategory(null);setPanel("edit");
   };
 
+  const hasSiteContent=levels.length>0||!!pendingBuilding||!!perimeter||statues.length>0||siteColumns.length>0||landscapeItems.length>0;
+  const clearSite=()=>{
+    if(!hasSiteContent)return;
+    if(!window.confirm("Clear the entire site? This removes all temples, levels, walls, columns, statues and placed scenery. You can Undo until you leave or reload this page."))return;
+    setDeletedBuildingUndo({levels:[...levels],selectedLevel,message:"Entire site cleared.",site:{perimeter,statues:[...statues],siteColumns:[...siteColumns],landscapeItems:[...landscapeItems],pendingBuilding,scenery}});
+    setLevels([]);setPerimeter(null);setStatues([]);setSiteColumns([]);setLandscapeItems([]);setPendingBuilding(null);
+    setShape(null);setSelectedLevel(0);setSelectedFace(null);setDetailCategory(null);setActiveObject(null);
+    setSelectedStatueId(null);setSelectedSiteColumnId(null);setSelectedLandscapeId(null);setMoveMode(false);setWallStep("main");setPanel(null);
+  };
+  const undoDeletion=()=>{
+    const undo=deletedBuildingUndo;if(!undo)return;
+    if(undo.site){
+      if(hasSiteContent&&!window.confirm("Restore the cleared site? This replaces any pieces added since clearing."))return;
+      setPerimeter(undo.site.perimeter);setStatues(undo.site.statues);setSiteColumns(undo.site.siteColumns);
+      setLandscapeItems(undo.site.landscapeItems);setPendingBuilding(undo.site.pendingBuilding);setScenery(undo.site.scenery);
+      setSelectedFace(null);setActiveObject(undo.levels.length?"building":null);setMoveMode(false);
+      setSelectedStatueId(null);setSelectedSiteColumnId(null);setSelectedLandscapeId(null);
+    }
+    setLevels(undo.levels);setSelectedLevel(undo.selectedLevel);
+    setShape(undo.levels[0]?.shape||undo.site?.pendingBuilding?.shape||null);
+    setPanel(undo.levels.length?"edit":null);setDetailCategory(null);setDeletedBuildingUndo(null);
+  };
+
   const deleteSelectedBuilding = () => {
     const base=levels[selectedLevel];
     if(!base)return;
@@ -461,7 +484,7 @@ export default function TempleBuilderPage() {
       </div>}
       {/* Improved bottom menu from supplied design; existing builder actions remain intact. */}
       <div data-builder-bottom-toolbar className="studio-dock absolute inset-x-0 bottom-0 z-30 flex max-h-[38dvh] flex-col overflow-y-auto overscroll-contain rounded-t-[24px] border-t border-white/10 pb-[max(8px,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(0,0,0,0.25)] backdrop-blur-xl sm:inset-x-6 sm:bottom-4 sm:rounded-[24px]">
-        <div className="flex items-center justify-between px-4 pb-1 pt-3"><p className="studio-eyebrow">{moveMode?"POSITION OBJECTS":panel?"CRAFT YOUR SANCTUARY":"YOUR BUILDING SITE"}</p><span role="status" className="text-[10px] text-slate-400">{saveState==="saved"?"● Saved on device":saveState==="error"?"Save unavailable · download a copy":"Opening design…"}</span></div>
+        <div className="flex items-center justify-between px-4 pb-1 pt-3"><p className="studio-eyebrow">{moveMode?"POSITION OBJECTS":panel?"CRAFT YOUR SANCTUARY":"YOUR BUILDING SITE"}</p><div className="flex items-center gap-3"><button type="button" onClick={clearSite} disabled={!hasSiteContent} className="rounded-lg border border-red-200/25 px-2 py-1 text-[10px] text-red-100 disabled:opacity-40">Clear site</button><span role="status" className="text-[10px] text-slate-400">{saveState==="saved"?"● Saved on device":saveState==="error"?"Save unavailable · download a copy":"Opening design…"}</span></div></div>
         <div className="flex items-center gap-2 px-3 pb-2">
           {panel===null ? <>
             <button onClick={()=>{setPanel("add");setDetailCategory(null);}} className="flex-1 rounded-xl bg-amber-200 px-3 py-3 text-sm font-bold text-black">+ Add</button>
@@ -501,14 +524,7 @@ export default function TempleBuilderPage() {
         )}
         {deletedBuildingUndo && <div className="flex items-center justify-between gap-3 border-t border-amber-200/20 bg-amber-950/70 px-3 py-2 text-xs">
           <span>{deletedBuildingUndo.message}</span>
-          <button className="rounded-lg bg-amber-200 px-4 py-2 font-semibold text-black" onClick={()=>{
-            setLevels(deletedBuildingUndo.levels);
-            setSelectedLevel(deletedBuildingUndo.selectedLevel);
-            setShape(deletedBuildingUndo.levels[0]?.shape||null);
-            setPanel("edit");
-            setDetailCategory(null);
-            setDeletedBuildingUndo(null);
-          }}>Undo</button>
+          <button className="rounded-lg bg-amber-200 px-4 py-2 font-semibold text-black" onClick={undoDeletion}>Undo</button>
         </div>}
         {panel === "floors" && <div className="flex gap-2 overflow-x-auto px-3 py-3">
           {([[36,"Square Floor"],[55,"Wide Floor"]] as const).map(([size,label])=><button key={size} onClick={()=>chooseShape("rectangle",size)} className="min-w-[110px] shrink-0 rounded-xl bg-white/10 p-3 text-xs">{label}</button>)}
