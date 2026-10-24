@@ -304,27 +304,29 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       cameraPanRef.current={x:0,y:0,z:0,manual:false};
       orbitRef.current.radius=cameraFitRef.current.fitRadius=templeFitDistance(framingRadiusRef.current,camera);
     };
-    let previousWidth=0,previousHeight=0;
+    let previousWidth=0,previousHeight=0,previousTop=-1,previousBottom=-1;
     let previousOrientation: "portrait"|"landscape"|null=null;
+    const toolbar=document.querySelector<HTMLElement>('[data-builder-bottom-toolbar]');
     const resize=()=>{
       const w=Math.max(1,host.clientWidth),h=Math.max(1,host.clientHeight);
-      if(w===previousWidth&&h===previousHeight)return;
-      previousWidth=w;previousHeight=h;
+      const hostRect=host.getBoundingClientRect();
+      const toolbarRect=toolbar?.getBoundingClientRect();
+      // Measure the actual overlay, including its expanded editor and safe-area padding.
+      const bottom=toolbarRect?Math.max(0,Math.min(h,hostRect.bottom-Math.max(hostRect.top,toolbarRect.top))):Math.min(235,h*.34);
+      const top=Math.min(65,h*.10);
+      if(w===previousWidth&&h===previousHeight&&Math.abs(top-previousTop)<1&&Math.abs(bottom-previousBottom)<1)return;
+      previousWidth=w;previousHeight=h;previousTop=top;previousBottom=bottom;
       const orientation: "portrait"|"landscape"=w>=h?"landscape":"portrait";
       const orientationChanged=previousOrientation!==null&&orientation!==previousOrientation;
       previousOrientation=orientation;
-      const bottom=Math.min(235,h*.34),top=Math.min(65,h*.10);
       camera.userData.builderVerticalReserve=top+bottom;
-      // Positive vertical offset moves the projected temple upward, away from the bottom controls.
-      // Use a genuinely larger virtual viewport so the visible crop is valid.
-      // Cropping from the bottom shifts the scene's optical center upward into
-      // the space above the toolbar without moving the orbit target itself.
+      // The visible optical center must lie halfway between the top reserved area
+      // and the toolbar's actual top edge: (h + top - bottom) / 2.
+      // Three.js view offset is measured from the TOP of the virtual viewport.
+      // Therefore cropping at y=bottom (not top) shifts the subject UP.
       const virtualHeight=h+top+bottom;
       camera.aspect=w/virtualHeight;
-      // setViewOffset's y offset is the TOP of the visible crop, not the
-      // bottom reserve. Using bottom here shifted the scene DOWN on phones.
-      // Keep the optical center above the bottom toolbar instead.
-      camera.setViewOffset(w,virtualHeight,0,top,w,h);
+      camera.setViewOffset(w,virtualHeight,0,bottom,w,h);
       camera.updateProjectionMatrix();renderer.setSize(w,h,false);
       // Reframe on an actual portrait/landscape rotation; ordinary resize preserves manual orbit.
       // The old logic retained stale pan/zoom across orientation changes, hiding the temple.
@@ -401,7 +403,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       orbitRef.current.dragging=false;orbitRef.current.pinch=0;
     };
     canvas.addEventListener("pointerdown",down);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",up);canvas.addEventListener("pointercancel",cancel);canvas.addEventListener("wheel",wheel,{passive:false});
-    window.addEventListener("resize",resize); const sizeObserver=new ResizeObserver(resize);sizeObserver.observe(host); resize();
+    window.addEventListener("resize",resize); const sizeObserver=new ResizeObserver(resize);sizeObserver.observe(host); if(toolbar)sizeObserver.observe(toolbar); resize();
     resetCameraRef.current=()=>{const o=orbitRef.current;o.theta=0;o.phi=0.90;cameraFitRef.current.userFramed=false;centerTemple();render();};
     return()=>{sizeObserver.disconnect();window.removeEventListener("resize",resize);canvas.removeEventListener("pointerdown",down);canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerup",up);canvas.removeEventListener("pointercancel",cancel);canvas.removeEventListener("wheel",wheel);disposeMeshResources(scene);terrainTexture.dispose();renderer.dispose();releaseProceduralMaps();canvas.remove();};
   },[]);
