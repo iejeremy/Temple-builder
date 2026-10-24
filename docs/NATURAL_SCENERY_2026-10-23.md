@@ -20,3 +20,11 @@ Validation:
 - `npm test`: 20 checks, including seven new checks for finite geometry, ground placement, instanced grass, upward water normals and distinct river/creek dimensions.
 - `node scripts/verify-scenery.cjs`: actual browser placement of all five kinds; transform edits; duplication/deletion; reload persistence; rendered instanced grass and multi-part water geometry; landscape framing; exact Clear Site/Undo restoration; and runtime error checks.
 - Physical-device GPU performance is not measured by these browser tests.
+
+## Visibility correction
+
+The production bundle at `13a74ce` contained all five kinds, but the 360×640 browser check reproduced clipped Hill, River and Creek buttons below the backdrop presets and older pieces. The previous browser checks clicked controls with automatic scrolling, which did not catch this discoverability problem.
+
+Moved the five new choices to the beginning of Scenery, ahead of older pieces and backdrop presets, made placement buttons at least 44px high, updated the Add menu description, and reset Scenery to the top when opened. Existing object data and renderers are unchanged.
+
+Validation: the new no-scroll visibility assertion fails on the previous build and passes on the corrected build at 360×640; the full scenery browser flow, production build and all 20 automated checks pass. Screenshot reviewed to confirm the first five choices are visible.

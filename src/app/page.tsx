@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { TempleGlyph } from "@/components/TempleGlyph";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const TempleWorld = dynamic(() => import("@/components/Temple3DPreview"), {
   ssr: false,
@@ -103,6 +103,8 @@ export default function TempleBuilderPage() {
   const [scenery,setScenery] = useState<"garden"|"desert"|"twilight">("garden");
   const [moveMode,setMoveMode] = useState(false);
   const [panel, setPanel] = useState<"add" | "floors" | "walls" | "buildings" | "templates" | "fountains" | "statues" | "site-columns" | "stairs" | "scenery" | "more" | "edit" | null>(null);
+  const dockRef=useRef<HTMLDivElement>(null);
+  useEffect(()=>{if(panel==="scenery")dockRef.current?.scrollTo({top:0});},[panel]);
   // Save the complete building site on this device without requiring an account.
   const [saveState,setSaveState]=useState<"loading"|"saved"|"error">("loading");
   const [siteLoaded,setSiteLoaded] = useState(false);
@@ -483,7 +485,7 @@ export default function TempleBuilderPage() {
         <button aria-label="Confirm placement" onClick={()=>{setLevels(current=>[...current,pendingBuilding]);setPendingBuilding(null);setActiveObject("building");setPanel(null);}} className="rounded-xl bg-blue-500 px-4 py-2 text-lg font-bold text-white">✓</button>
       </div>}
       {/* Improved bottom menu from supplied design; existing builder actions remain intact. */}
-      <div data-builder-bottom-toolbar className="studio-dock absolute inset-x-0 bottom-0 z-30 flex max-h-[38dvh] flex-col overflow-y-auto overscroll-contain rounded-t-[24px] border-t border-white/10 pb-[max(8px,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(0,0,0,0.25)] backdrop-blur-xl sm:inset-x-6 sm:bottom-4 sm:rounded-[24px]">
+      <div ref={dockRef} data-builder-bottom-toolbar className="studio-dock absolute inset-x-0 bottom-0 z-30 flex max-h-[38dvh] flex-col overflow-y-auto overscroll-contain rounded-t-[24px] border-t border-white/10 pb-[max(8px,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(0,0,0,0.25)] backdrop-blur-xl sm:inset-x-6 sm:bottom-4 sm:rounded-[24px]">
         <div className="flex items-center justify-between px-4 pb-1 pt-3"><p className="studio-eyebrow">{moveMode?"POSITION OBJECTS":panel?"CRAFT YOUR SANCTUARY":"YOUR BUILDING SITE"}</p><div className="flex items-center gap-3"><button type="button" onClick={clearSite} disabled={!hasSiteContent} className="rounded-lg border border-red-200/25 px-2 py-1 text-[10px] text-red-100 disabled:opacity-40">Clear site</button><span role="status" className="text-[10px] text-slate-400">{saveState==="saved"?"● Saved on device":saveState==="error"?"Save unavailable · download a copy":"Opening design…"}</span></div></div>
         <div className="flex items-center gap-2 px-3 pb-2">
           {panel===null ? <>
@@ -508,7 +510,7 @@ export default function TempleBuilderPage() {
               ["floors","Floors","▱","Square & wide floors"],
               ["statues","Statue","♟","Guardians & figures"],
               ["site-columns","Columns","▥","Swipe styles"],
-              ["scenery","Scenery","◈","Garden, desert & dusk"],
+              ["scenery","Scenery","◈","Boulders, grass & water"],
               ["scenery","Fountain","◉","Place a fountain"],
               ["edit","Stairs","▤","Add entrance stairs"],
               ["edit","Roofs","⌂","Crown your temple"],
@@ -622,9 +624,8 @@ export default function TempleBuilderPage() {
             <button onClick={()=>{setPerimeter(null);setWallStep("main");}} className="min-w-[100px] rounded-2xl bg-red-500/15 p-3 text-sm text-red-200">Remove</button>
           </div>
         )}
-        {panel === "scenery" && <div className="grid grid-cols-3 gap-2 border-t border-white/10 p-3">{([["garden","Garden","Green landscape"],["desert","Desert","Warm sandstone"],["twilight","Twilight","Evening light"]] as const).map(([id,name,sub])=><button key={id} aria-pressed={scenery===id} onClick={()=>setScenery(id)} className={`rounded-xl border p-3 text-left ${scenery===id?"border-amber-200 bg-amber-200/20":"border-white/10 bg-white/5"}`}><span className="block text-sm font-semibold">{name}</span><span className="text-[10px] text-white/60">{sub}</span></button>)}</div>}
         {panel === "scenery" && <div className="flex flex-wrap gap-2 border-t border-white/10 p-3">
-          {(["tree","garden","path","fountain","pond","rock","boulder","grass","hill","river","creek"] as LandscapeKind[]).map(kind=><button key={kind} className="rounded-lg bg-white/10 px-3 py-2 text-xs capitalize" onClick={()=>{const id=uniqueId("land");setLandscapeItems(v=>[...v,{id,kind,x:(levels[selectedLevel]?.x||0)+(levels[selectedLevel]?.width||0)/14+2+(v.length%3)*2.5,z:(levels[selectedLevel]?.z||0)+Math.floor(v.length/3)*3,scale:1,rotation:0}]);setSelectedLandscapeId(id);setActiveObject("landscape");}}>+ {kind}</button>)}
+          {(["boulder","grass","hill","river","creek","tree","garden","path","fountain","pond","rock"] as LandscapeKind[]).map(kind=><button key={kind} className="min-h-11 rounded-lg border border-amber-200/25 bg-amber-200/10 px-3 py-2 text-xs capitalize" onClick={()=>{const id=uniqueId("land");setLandscapeItems(v=>[...v,{id,kind,x:(levels[selectedLevel]?.x||0)+(levels[selectedLevel]?.width||0)/14+2+(v.length%3)*2.5,z:(levels[selectedLevel]?.z||0)+Math.floor(v.length/3)*3,scale:1,rotation:0}]);setSelectedLandscapeId(id);setActiveObject("landscape");}}>+ {kind}</button>)}
           {landscapeItems.map(item=><div key={item.id} className="flex w-full flex-wrap items-center gap-2 rounded-xl bg-white/5 p-2 text-xs">
             <span className="capitalize">{item.kind}{selectedLandscapeId===item.id?" · selected":""}</span>
             {(["x","z","scale","rotation"] as const).map(axis=><label key={axis}>{axis}<input type="number" aria-label={`${item.kind} ${axis}`} step={axis==="rotation"?15:.25} min={axis==="scale"?.3:undefined} max={axis==="scale"?4:undefined} value={item[axis]} onChange={e=>{const n=Number(e.target.value);if(Number.isFinite(n))setLandscapeItems(v=>v.map(q=>q.id===item.id?{...q,[axis]:axis==="scale"?Math.max(.3,Math.min(4,n)):n}:q));}} className="ml-1 w-14 rounded bg-white/15 p-1"/></label>)}
@@ -632,6 +633,7 @@ export default function TempleBuilderPage() {
             <button onClick={()=>setLandscapeItems(v=>v.filter(q=>q.id!==item.id))} className="text-red-200">Delete</button>
           </div>)}
         </div>}
+        {panel === "scenery" && <div className="grid grid-cols-3 gap-2 border-t border-white/10 p-3">{([["garden","Garden","Green landscape"],["desert","Desert","Warm sandstone"],["twilight","Twilight","Evening light"]] as const).map(([id,name,sub])=><button key={id} aria-pressed={scenery===id} onClick={()=>setScenery(id)} className={`rounded-xl border p-3 text-left ${scenery===id?"border-amber-200 bg-amber-200/20":"border-white/10 bg-white/5"}`}><span className="block text-sm font-semibold">{name}</span><span className="text-[10px] text-white/60">{sub}</span></button>)}</div>}
         {panel === "site-columns" && (
           <div className="border-t border-white/10 px-3 py-3">
             <p className="mb-2 text-xs text-white/65">Swipe to choose a column. Tap one to add it, then drag it on the site.</p>

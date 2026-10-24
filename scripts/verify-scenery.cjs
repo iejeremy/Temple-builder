@@ -6,10 +6,13 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||process.env.CODEX_PRIMAR
  try{
   await new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error(logs)),15000);server.stdout.on('data',d=>{logs+=d;if(String(d).includes('Ready')){clearTimeout(t);resolve()}});server.on('exit',c=>reject(Error('Server exit '+c+logs)))});
   browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/tmp/chromium',headless:true,args:['--no-sandbox','--disable-dev-shm-usage','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
-  const page=await browser.newPage({viewport:{width:390,height:844}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const page=await browser.newPage({viewport:{width:360,height:640}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto('http://127.0.0.1:3003');await page.locator('canvas').waitFor();
   const saved=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('echoes-temple-builder-v1')));
   await page.getByRole('button',{name:'+ Add',exact:true}).click();await page.getByRole('button',{name:/Scenery/}).click();
+  const visibility=await page.evaluate(()=>{const dock=document.querySelector('[data-builder-bottom-toolbar]'),bounds=dock.getBoundingClientRect();return [...dock.querySelectorAll('button')].filter(b=>['+ boulder','+ grass','+ hill','+ river','+ creek'].includes(b.textContent.trim())).map(b=>{const r=b.getBoundingClientRect();return {label:b.textContent.trim(),visible:r.top>=bounds.top&&r.bottom<=bounds.bottom&&r.left>=0&&r.right<=innerWidth};});});
+  assert.equal(visibility.length,5);assert.ok(visibility.every(b=>b.visible),'All five new scenery choices must be visible without scrolling: '+JSON.stringify(visibility));console.log('PASS: all five new scenery choices visible immediately on a 360×640 phone viewport');
+  await page.screenshot({path:'/tmp/echoes-scenery-menu.png'});
   for(const kind of ['boulder','grass','hill','river','creek'])await page.getByRole('button',{name:'+ '+kind,exact:true}).click();
   await page.waitForTimeout(200);let design=await saved();assert.deepEqual(design.landscapeItems.map(i=>i.kind),['boulder','grass','hill','river','creek']);assert.equal(await page.getByText('YOUR WORLD BEGINS HERE',{exact:true}).count(),0);console.log('PASS: all five scenery pieces place and save without welcome text obscuring the site');
   await page.getByRole('spinbutton',{name:'river rotation',exact:true}).fill('45');await page.getByRole('spinbutton',{name:'river scale',exact:true}).fill('1.5');await page.getByRole('spinbutton',{name:'river x',exact:true}).fill('-4');
