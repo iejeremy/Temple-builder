@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { addSceneryTree } from "./sceneryTrees";
 import { addNaturalScenery } from "./naturalScenery";
+import { contactShadowTexture } from "./naturalLighting";
 
 const random=(n:number)=>{const x=Math.sin(n*127.1+41.7)*43758.5453;return x-Math.floor(x);};
 type Course={curve:THREE.CatmullRomCurve3;width:number;bank:THREE.Mesh;water:THREE.Mesh};
@@ -17,6 +18,11 @@ function ribbon(curve:THREE.CatmullRomCurve3,width:number,height:number){
 /** Decorative environment only: never participates in selection, saving or camera fitting. */
 export function createEnvironmentLandscape(){
   const root=new THREE.Group();root.name="environment-landscape";
+  const contactMap=contactShadowTexture();
+  const contactMaterial=new THREE.MeshBasicMaterial({color:0x27281d,map:contactMap,transparent:true,opacity:.28,depthWrite:false});
+  const contactGeometry=new THREE.PlaneGeometry(1,1);contactGeometry.rotateX(-Math.PI/2);
+  const treeContacts=new THREE.InstancedMesh(contactGeometry,contactMaterial,54),rockContacts=new THREE.InstancedMesh(contactGeometry,contactMaterial,64);
+  treeContacts.name="tree-contact-shadows";rockContacts.name="rock-contact-shadows";root.add(treeContacts,rockContacts);
   const woodland=new THREE.Group();woodland.name="environment-trees";root.add(woodland);
   for(let i=0;i<54;i++){
     const tree=addSceneryTree(new THREE.Group(),(["broadleaf","broadleaf","pine","cypress"] as const)[i%4],i*101+1);
@@ -60,12 +66,14 @@ export function createEnvironmentLandscape(){
     const wet=(p:THREE.Vector3,extra:number)=>wetSamples.some(c=>c.points.some(q=>q.distanceToSquared(p)<Math.pow(c.width*.5+extra,2)));
     woodland.children.forEach((tree,i)=>{
       let p=point(i,4,17);if(wet(p,2))p=point(i+102,6,19);tree.position.copy(p);tree.visible=!wet(p,2);
+      dummy.position.set(p.x,.018,p.z);dummy.rotation.set(0,tree.rotation.y,0);dummy.scale.setScalar(tree.visible?tree.scale.x*1.65:0);dummy.updateMatrix();treeContacts.setMatrixAt(i,dummy.matrix);
     });
     for(let i=0;i<64;i++){
       let p=point(i+72,2,15);
       if(i<32){const c=courses[i%2],t=(Math.floor(i/2)+.5)/16;p=c.curve.getPoint(t);const tangent=c.curve.getTangent(t);p.add(new THREE.Vector3(tangent.z,0,-tangent.x).multiplyScalar((i%3?1:-1)*(c.width*.5+.6)));}
       const scale=.26+random(i+19)*.9;dummy.position.copy(p);dummy.position.y=scale*.7;dummy.rotation.set(random(i)*.3,random(i+6)*6.28,random(i+7)*.25);dummy.scale.set(scale*1.3,scale*.65,scale);dummy.updateMatrix();rocks.setMatrixAt(i,dummy.matrix);
       color.setHSL(.12+random(i+20)*.05,.07,.3+random(i+3)*.19).convertSRGBToLinear();rocks.setColorAt(i,color);
+      dummy.position.set(p.x,.019,p.z);dummy.rotation.set(0,random(i+6)*6.28,0);dummy.scale.set(scale*2,1,scale*1.6);dummy.updateMatrix();rockContacts.setMatrixAt(i,dummy.matrix);
     }
     for(let i=0;i<5600;i++){
       // Small clumps leave open soil between patches instead of carpeting the whole site.
@@ -82,13 +90,13 @@ export function createEnvironmentLandscape(){
       const c=courses[i%2],t=(Math.floor(i/2)+.5)/22,p=c.curve.getPoint(t),d=c.curve.getTangent(t);
       dummy.position.set(p.x,.075,p.z);dummy.rotation.set(0,Math.atan2(-d.x,d.z),0);dummy.scale.set(c.width*(.22+random(i)*.28),1,1);dummy.updateMatrix();ripples.setMatrixAt(i,dummy.matrix);
     }
-    for(const mesh of [rocks,grass,hills,ripples]){mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;mesh.computeBoundingSphere();}
+    for(const mesh of [rocks,grass,hills,ripples,treeContacts,rockContacts]){mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;mesh.computeBoundingSphere();}
   };
   const setTheme=(theme:"garden"|"desert"|"twilight")=>{
-    woodland.visible=theme!=="desert";grass.visible=theme!=="desert";
+    woodland.visible=theme!=="desert";treeContacts.visible=woodland.visible;grass.visible=theme!=="desert";
     for(const c of courses){c.bank.visible=theme!=="desert";c.water.visible=theme!=="desert";}ripples.visible=theme!=="desert";
     waterMaterial.color.setHex(theme==="twilight"?0x53758a:0x458d93);
     (hills.material as THREE.MeshStandardMaterial).color.setHex(theme==="desert"?0xd5b78a:0xffffff);
   };
-  setBounds(new THREE.Box3());return {root,setBounds,setTheme};
+  setBounds(new THREE.Box3());return {root,setBounds,setTheme,dispose(){contactMap.dispose();}};
 }
