@@ -446,7 +446,7 @@ export default function TempleBuilderPage() {
         <button aria-label="Confirm placement" onClick={()=>{setLevels(current=>[...current,pendingBuilding]);setPendingBuilding(null);setActiveObject("building");setPanel(null);}} className="rounded-xl bg-blue-500 px-4 py-2 text-lg font-bold text-white">✓</button>
       </div>}
       {/* Improved bottom menu from supplied design; existing builder actions remain intact. */}
-      <div className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[24px] border-t border-white/10 bg-[#0c1118]/96 max-h-[34dvh] overflow-y-auto overscroll-contain pb-[max(8px,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+      <div data-builder-bottom-toolbar className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[24px] border-t border-white/10 bg-[#0c1118]/96 max-h-[34dvh] overflow-y-auto overscroll-contain pb-[max(8px,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl">
         <div className="flex justify-center pb-1 pt-2.5"><div className="h-1 w-10 rounded-full bg-white/20" /></div>
         <div className="flex items-center gap-2 px-3 pb-2">
           {panel===null ? <>
