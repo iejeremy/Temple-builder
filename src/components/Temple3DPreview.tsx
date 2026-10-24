@@ -119,6 +119,8 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
   const lastFacingRef=useRef<WallFace|null>(null);
   const cameraFitRef = useRef({initialized:false,lastSpan:0,fitRadius:13,buildingCount:0,userFramed:false});
   const lastBoundsRef=useRef(new THREE.Box3());
+  const selectedBoundsRef=useRef(new THREE.Box3());
+  const selectedFramingRadiusRef=useRef(0);
   const framingRadiusRef=useRef(0);
   const resetCameraRef = useRef<()=>void>(()=>{});
   const gestureRef = useRef({midX:0,midY:0});
@@ -290,7 +292,8 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     const clampZoom=(radius:number)=>clampCameraRadius(radius,cameraFitRef.current.fitRadius);
     // A sphere about the structural pivot encloses roofs and attached details at every orbit angle.
     const centerTemple=()=>{
-      const bounds=lastBoundsRef.current;
+      // Center on the selected building, not the midpoint of unrelated buildings.
+      const bounds=selectedBoundsRef.current.isEmpty()?lastBoundsRef.current:selectedBoundsRef.current;
       if(bounds.isEmpty()){
         // An empty site must not retain the orbit target of a deleted temple.
         cameraFocusRef.current={x:0,z:0};
@@ -302,7 +305,8 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       const center=bounds.getCenter(new THREE.Vector3());
       cameraFocusRef.current={x:center.x,z:center.z};targetYRef.current=center.y;
       cameraPanRef.current={x:0,y:0,z:0,manual:false};
-      orbitRef.current.radius=cameraFitRef.current.fitRadius=templeFitDistance(framingRadiusRef.current,camera);
+      const radius=selectedBoundsRef.current.isEmpty()?framingRadiusRef.current:selectedFramingRadiusRef.current;
+      orbitRef.current.radius=cameraFitRef.current.fitRadius=templeFitDistance(radius,camera);
     };
     let previousWidth=0,previousHeight=0,previousTop=-1,previousBottom=-1;
     let previousOrientation: "portrait"|"landscape"|null=null;
@@ -892,6 +896,10 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     group.updateWorldMatrix(true,true);
     const buildingBounds=new THREE.Box3();
     const renderedBounds=new THREE.Box3();
+    const selectedBounds=new THREE.Box3();
+    const selectedRenderedBounds=new THREE.Box3();
+    const activeLevel=levels[selectedLevel]||levels[0];
+    const activeBuildingId=activeLevel?.buildingId||activeLevel?.id;
     levelGroupsRef.current.forEach((levelGroup,index)=>{
       const level=levels[index],bottom=(level.elevation||0)/7;
       const shell=new THREE.Box3(
@@ -899,8 +907,23 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
         new THREE.Vector3(level.width/14,bottom+level.height/7,level.depth/14)
       ).applyMatrix4(levelGroup.matrixWorld);
       buildingBounds.union(shell);
-      renderedBounds.union(new THREE.Box3().setFromObject(levelGroup));
+      const rendered=new THREE.Box3().setFromObject(levelGroup);
+      renderedBounds.union(rendered);
+      if(activeBuildingId && (level.buildingId||level.id)===activeBuildingId){
+        selectedBounds.union(shell);
+        selectedRenderedBounds.union(rendered);
+      }
     });
+    selectedBoundsRef.current.copy(selectedBounds);
+    if(!selectedBounds.isEmpty()){
+      const pivot=selectedBounds.getCenter(new THREE.Vector3());
+      let selectedRadius=0;
+      for(const x of [selectedRenderedBounds.min.x,selectedRenderedBounds.max.x])
+        for(const y of [selectedRenderedBounds.min.y,selectedRenderedBounds.max.y])
+          for(const z of [selectedRenderedBounds.min.z,selectedRenderedBounds.max.z])
+            selectedRadius=Math.max(selectedRadius,pivot.distanceTo(new THREE.Vector3(x,y,z)));
+      selectedFramingRadiusRef.current=selectedRadius;
+    }else selectedFramingRadiusRef.current=0;
     const fit=cameraFitRef.current;
     if(!buildingBounds.isEmpty()){
       // Frame the full rendered geometry, including roofs, cornices and trim,
@@ -921,16 +944,19 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       // live camera. Only first load, explicit Center Temple, or orientation reset
       // can change the camera's target and radius.
       if(firstBuild || hadNoBuilding){
-        cameraFocusRef.current={x:center.x,z:center.z};
-        targetYRef.current=center.y;
+        // The first frame should target the actual selected building geometry.
+        const initialBounds=selectedBounds.isEmpty()?buildingBounds:selectedBounds;
+        const initialCenter=initialBounds.getCenter(new THREE.Vector3());
+        cameraFocusRef.current={x:initialCenter.x,z:initialCenter.z};
+        targetYRef.current=initialCenter.y;
         cameraPanRef.current={x:0,y:0,z:0,manual:false};
-        orbitRef.current.radius=needed;
+        orbitRef.current.radius=templeFitDistance(selectedBounds.isEmpty()?radius:selectedFramingRadiusRef.current,camera);
         orbitRef.current.theta=0;
         orbitRef.current.phi=0.90;
       }
       fit.initialized=true;fit.lastSpan=radius;
     }else{
-      lastBoundsRef.current.makeEmpty();framingRadiusRef.current=0;fit.initialized=false;
+      lastBoundsRef.current.makeEmpty();selectedBoundsRef.current.makeEmpty();framingRadiusRef.current=0;selectedFramingRadiusRef.current=0;fit.initialized=false;
       // Clear stale camera framing when the last building is removed; preserve the
       // current user view until Center Temple is explicitly requested.
       fit.fitRadius=30;
