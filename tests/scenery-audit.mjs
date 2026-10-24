@@ -4,9 +4,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import ts from 'typescript';
 import * as THREE from 'three';
-const module={exports:{}};
-vm.runInNewContext(ts.transpile(readFileSync('src/components/naturalScenery.ts','utf8'),{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}),{module,exports:module.exports,require:()=>THREE});
-const {addNaturalScenery,waterRibbon}=module.exports;
+const cache={};
+function load(name){if(cache[name])return cache[name];const module={exports:{}};vm.runInNewContext(ts.transpile(readFileSync('src/components/'+name+'.ts','utf8'),{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}),{module,exports:module.exports,require:path=>path==='three'?THREE:load(path.slice(2))});cache[name]=module.exports;return module.exports;}
+const {addNaturalScenery,waterRibbon}=load('naturalScenery');
 for(const kind of ['boulder','grass','hill','river','creek'])test(kind+' creates finite selectable geometry above ground',()=>{
  const g=new THREE.Group();g.userData.siteObjectId=kind;
  assert.equal(addNaturalScenery(g,{id:kind,kind}),true);assert.ok(g.children.length>0);

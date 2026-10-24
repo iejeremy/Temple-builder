@@ -393,7 +393,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     levelGroupsRef.current=[];
     let baseY=0;
 
-    const enableShadows=(root:THREE.Object3D)=>root.traverse(o=>{if(o instanceof THREE.Mesh){o.castShadow=!o.userData.pickSurface;o.receiveShadow=true;}});
+    const enableShadows=(root:THREE.Object3D)=>root.traverse(o=>{if(o instanceof THREE.Mesh){o.castShadow=!o.userData.pickSurface&&!o.userData.noShadow;o.receiveShadow=true;}});
     const addRoof=(parent:THREE.Group,roof:RoofStyle,rw:number,rd:number,x:number,z:number,top:number,color:number)=>{
       // Roof pieces share a single material rather than allocating one per cornice or tier.
       if(roof==="none")return;

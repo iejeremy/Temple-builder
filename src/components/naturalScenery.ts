@@ -1,20 +1,12 @@
 import * as THREE from "three";
 import type { LandscapeItem } from "@/app/page";
+import { placedWaterCurve, waterGeometry, bankGeometry, createWaterMaterials, rippleGeometry } from "./sceneryWater";
 
 const noise=(n:number)=>{const x=Math.sin(n*127.1+41.7)*43758.5453;return x-Math.floor(x);};
 
-/** A winding ribbon with stable upward normals, shared by the water and its banks. */
+/** Compatibility helper for the established placed-water ribbon API. */
 export function waterRibbon(width:number,length:number,height:number){
-  const positions:number[]=[],uvs:number[]=[],indices:number[]=[],steps=64;
-  for(let i=0;i<=steps;i++){
-    const t=i/steps,z=(t-.5)*length;
-    const x=Math.sin(t*Math.PI*2)*length*.11+Math.sin(t*Math.PI*4)*length*.025;
-    const dx=Math.cos(t*Math.PI*2)*length*.11*Math.PI*2+Math.cos(t*Math.PI*4)*length*.025*Math.PI*4;
-    const normal=new THREE.Vector2(length,-dx).normalize();
-    for(const side of [-1,1]){positions.push(x+normal.x*width*.5*side,height,z+normal.y*width*.5*side);uvs.push((side+1)/2,t);}
-    if(i<steps){const k=i*2;indices.push(k,k+2,k+1,k+1,k+2,k+3);}
-  }
-  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));g.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));g.setIndex(indices);g.computeVertexNormals();return g;
+  return waterGeometry(placedWaterCurve(length),width,height,64);
 }
 
 /** Deterministic scenery assets. No downloads or continuous animation loop. */
@@ -60,15 +52,16 @@ export function addNaturalScenery(group:THREE.Group,item:LandscapeItem):boolean{
   }
   if(item.kind==='river'||item.kind==='creek'){
     const width=item.kind==='river'?1.6:.55,length=item.kind==='river'?14:10;
-    add(waterRibbon(width+.4,length,.035),material(0x8b8571));
-    const water=new THREE.MeshStandardMaterial({color:item.kind==='river'?0x438d9f:0x689e9d,roughness:.23,metalness:.22});
-    add(waterRibbon(width,length,.065),water);
-    // Shallow ripples provide visible highlights without transparency/sorting problems.
-    const ripples=material(0xb0d2cd,.32);
+    const curve=placedWaterCurve(length),materials=createWaterMaterials();
+    const bank=add(bankGeometry(curve,width,.035,64),materials.bank);bank.name="water-bank";bank.userData.noShadow=true;
+    const water=add(waterGeometry(curve,width,.065,64),materials.water);water.name="water-surface";water.userData.noShadow=true;
+    const ripples=new THREE.InstancedMesh(rippleGeometry(),materials.ripple,10),dummy=new THREE.Object3D();
+    ripples.name="water-ripples";ripples.userData.noShadow=true;
     for(let i=0;i<10;i++){
-      const t=(i+.5)/10,z=(t-.5)*length,x=Math.sin(t*Math.PI*2)*length*.11+Math.sin(t*Math.PI*4)*length*.025;
-      const ripple=add(new THREE.BoxGeometry(width*.35,.008,.018),ripples,x,.075,z);ripple.rotation.y=Math.sin(t*6.28)*.4;
+      const t=(i+.5)/10,p=curve.getPoint(t),d=curve.getTangent(t);
+      dummy.position.set(p.x,.075,p.z);dummy.rotation.y=Math.atan2(-d.x,d.z);dummy.scale.set(width*(.22+noise(i+3)*.2),1,1);dummy.updateMatrix();ripples.setMatrixAt(i,dummy.matrix);
     }
+    ripples.computeBoundingSphere();group.add(ripples);
     const stone=material(0x777d74);
     for(let i=0;i<12;i++){
       const t=(i+.5)/12,z=(t-.5)*length,x=Math.sin(t*Math.PI*2)*length*.11+Math.sin(t*Math.PI*4)*length*.025;

@@ -2,19 +2,10 @@ import * as THREE from "three";
 import { addSceneryTree } from "./sceneryTrees";
 import { addNaturalScenery } from "./naturalScenery";
 import { contactShadowTexture } from "./naturalLighting";
+import { waterGeometry, bankGeometry, createWaterMaterials, rippleGeometry } from "./sceneryWater";
 
 const random=(n:number)=>{const x=Math.sin(n*127.1+41.7)*43758.5453;return x-Math.floor(x);};
 type Course={curve:THREE.CatmullRomCurve3;width:number;bank:THREE.Mesh;water:THREE.Mesh};
-function ribbon(curve:THREE.CatmullRomCurve3,width:number,height:number){
-  const vertices:number[]=[],uv:number[]=[],indices:number[]=[];
-  for(let i=0;i<=128;i++){
-    const t=i/128,p=curve.getPoint(t),d=curve.getTangent(t),normal=new THREE.Vector3(d.z,0,-d.x).normalize();
-    for(const side of [-1,1]){vertices.push(p.x+normal.x*width*.5*side,height,p.z+normal.z*width*.5*side);uv.push((side+1)/2,t);}
-    if(i<128){const k=i*2;indices.push(k,k+2,k+1,k+1,k+2,k+3);}
-  }
-  const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.Float32BufferAttribute(vertices,3));g.setAttribute("uv",new THREE.Float32BufferAttribute(uv,2));g.setIndex(indices);g.computeVertexNormals();return g;
-}
-
 /** Decorative environment only: never participates in selection, saving or camera fitting. */
 export function createEnvironmentLandscape(){
   const root=new THREE.Group();root.name="environment-landscape";
@@ -35,8 +26,7 @@ export function createEnvironmentLandscape(){
   const hillSource=new THREE.Group();addNaturalScenery(hillSource,{id:"environment-hill",kind:"hill",x:0,z:0,scale:1,rotation:0});
   const hillMesh=hillSource.children[0] as THREE.Mesh;
   const hills=new THREE.InstancedMesh(hillMesh.geometry,hillMesh.material,8);hills.name="environment-near-hills";hills.receiveShadow=true;root.add(hills);
-  const bankMaterial=new THREE.MeshStandardMaterial({color:0x989779,roughness:1});
-  const waterMaterial=new THREE.MeshStandardMaterial({color:0x458d93,roughness:.2,metalness:.28});
+  const waterMaterials=createWaterMaterials(),bankMaterial=waterMaterials.bank,waterMaterial=waterMaterials.water;
   const courses:Course[]=[];
   for(const width of [2.6,1.05]){
     const bank=new THREE.Mesh(new THREE.BufferGeometry(),bankMaterial),water=new THREE.Mesh(new THREE.BufferGeometry(),waterMaterial);
@@ -44,7 +34,7 @@ export function createEnvironmentLandscape(){
     courses.push({curve:new THREE.CatmullRomCurve3(),width,bank,water});
   }
   courses[0].water.name="environment-river";courses[1].water.name="environment-creek";
-  const ripples=new THREE.InstancedMesh(new THREE.BoxGeometry(1,.008,.025),new THREE.MeshStandardMaterial({color:0xb8dad0,roughness:.35}),44);root.add(ripples);
+  const ripples=new THREE.InstancedMesh(rippleGeometry(),waterMaterials.ripple,44);root.add(ripples);
   const dummy=new THREE.Object3D(),color=new THREE.Color();let lastLayout="";
   const setBounds=(bounds:THREE.Box3)=>{
     const center=bounds.isEmpty()?new THREE.Vector3():bounds.getCenter(new THREE.Vector3());
@@ -61,7 +51,7 @@ export function createEnvironmentLandscape(){
     const junction=new THREE.Vector3(-hx-5,0,hz+3.5);
     courses[0].curve=new THREE.CatmullRomCurve3([new THREE.Vector3(-hx-8,0,-58),new THREE.Vector3(-hx-5,0,-28),new THREE.Vector3(-hx-6,0,-8),junction,new THREE.Vector3(-hx-9,0,hz+28),new THREE.Vector3(-hx-7,0,hz+54)]);
     courses[1].curve=new THREE.CatmullRomCurve3([junction,new THREE.Vector3(-hx-1,0,hz+3),new THREE.Vector3(3,0,hz+4),new THREE.Vector3(hx+17,0,hz+3),new THREE.Vector3(hx+35,0,hz+18)]);
-    for(const [index,course] of courses.entries()){course.bank.geometry.dispose();course.water.geometry.dispose();course.bank.geometry=ribbon(course.curve,course.width+.7,.035+index*.003);course.water.geometry=ribbon(course.curve,course.width,.065+index*.003);}
+    for(const [index,course] of courses.entries()){course.bank.geometry.dispose();course.water.geometry.dispose();course.bank.geometry=bankGeometry(course.curve,course.width,.035+index*.003);course.water.geometry=waterGeometry(course.curve,course.width,.065+index*.003);}
     const wetSamples=courses.map(c=>({points:c.curve.getPoints(100),width:c.width}));
     const wet=(p:THREE.Vector3,extra:number)=>wetSamples.some(c=>c.points.some(q=>q.distanceToSquared(p)<Math.pow(c.width*.5+extra,2)));
     woodland.children.forEach((tree,i)=>{
@@ -95,7 +85,7 @@ export function createEnvironmentLandscape(){
   const setTheme=(theme:"garden"|"desert"|"twilight")=>{
     woodland.visible=theme!=="desert";treeContacts.visible=woodland.visible;grass.visible=theme!=="desert";
     for(const c of courses){c.bank.visible=theme!=="desert";c.water.visible=theme!=="desert";}ripples.visible=theme!=="desert";
-    waterMaterial.color.setHex(theme==="twilight"?0x53758a:0x458d93);
+    waterMaterial.color.setHex(theme==="twilight"?0xc5d0de:0xffffff);
     (hills.material as THREE.MeshStandardMaterial).color.setHex(theme==="desert"?0xd5b78a:0xffffff);
   };
   setBounds(new THREE.Box3());return {root,setBounds,setTheme,dispose(){contactMap.dispose();}};
