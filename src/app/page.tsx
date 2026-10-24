@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { TempleGlyph } from "@/components/TempleGlyph";
 import { useEffect, useState } from "react";
 
 const TempleWorld = dynamic(() => import("@/components/Temple3DPreview"), {
@@ -103,6 +104,7 @@ export default function TempleBuilderPage() {
   const [moveMode,setMoveMode] = useState(false);
   const [panel, setPanel] = useState<"add" | "floors" | "walls" | "buildings" | "templates" | "fountains" | "statues" | "site-columns" | "stairs" | "scenery" | "more" | "edit" | null>(null);
   // Save the complete building site on this device without requiring an account.
+  const [saveState,setSaveState]=useState<"loading"|"saved"|"error">("loading");
   const [siteLoaded,setSiteLoaded] = useState(false);
   useEffect(()=>{
     try {
@@ -121,8 +123,8 @@ export default function TempleBuilderPage() {
   },[]);
   useEffect(()=>{
     if(!siteLoaded)return;
-    try{window.localStorage.setItem("echoes-temple-builder-v1",JSON.stringify({levels,perimeter,siteColumns,statues,landscapeItems,scenery}));}
-    catch(err){console.warn("Could not save local temple design",err);}
+    try{window.localStorage.setItem("echoes-temple-builder-v1",JSON.stringify({levels,perimeter,siteColumns,statues,landscapeItems,scenery}));setSaveState("saved");}
+    catch(err){setSaveState("error");console.warn("Could not save local temple design",err);}
   },[siteLoaded,levels,perimeter,siteColumns,statues,landscapeItems,scenery]);
 
 
@@ -382,9 +384,18 @@ export default function TempleBuilderPage() {
     setDetailCategory(null);
   };
 
+  const saveCopy=()=>{
+    const data={format:"echoes-temple",version:1,exportedAt:new Date().toISOString(),levels,perimeter,siteColumns,statues,landscapeItems,scenery};
+    const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));
+    const link=document.createElement("a");link.href=url;link.download="Echoes-Temple-Design.json";link.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  };
+  const buildingCount=new Set(levels.map(l=>l.buildingId||l.id)).size;
+  const pieceCount=levels.reduce((n,l)=>n+l.windows.length+l.doors.length+l.columns.length+l.arches.length+l.trims.length+l.stairs.length+l.pediments.length,0)+siteColumns.length+statues.length+landscapeItems.length;
+
   return (
     <main className="relative h-[100dvh] overflow-hidden bg-[#b9c4cb] text-white">
-      <TempleWorld moveMode={moveMode} levels={pendingBuilding?[...levels,pendingBuilding]:levels} pendingLevelIndex={pendingBuilding?levels.length:null} perimeter={perimeter} statues={statues} siteColumns={siteColumns} scenery={scenery} landscapeItems={landscapeItems} onSelectSiteColumn={(id:string)=>{setSelectedSiteColumnId(id);setActiveObject("column");setPanel("site-columns");}} onMoveSiteColumn={(id:string,x:number,z:number)=>setSiteColumns(v=>v.map(c=>c.id===id?{...c,x,z}:c))} onSelectLandscape={(id:string)=>{setSelectedLandscapeId(id);setActiveObject("landscape");setPanel("scenery");}} onMoveLandscape={(id:string,x:number,z:number)=>setLandscapeItems(v=>v.map(c=>c.id===id?{...c,x,z}:c))} selectedStatueId={selectedStatueId} selectedLevel={selectedLevel}
+      <TempleWorld moveMode={moveMode||!!pendingBuilding} levels={pendingBuilding?[...levels,pendingBuilding]:levels} pendingLevelIndex={pendingBuilding?levels.length:null} perimeter={perimeter} statues={statues} siteColumns={siteColumns} scenery={scenery} landscapeItems={landscapeItems} onSelectSiteColumn={(id:string)=>{setSelectedSiteColumnId(id);setActiveObject("column");setPanel("site-columns");}} onMoveSiteColumn={(id:string,x:number,z:number)=>setSiteColumns(v=>v.map(c=>c.id===id?{...c,x,z}:c))} onSelectLandscape={(id:string)=>{setSelectedLandscapeId(id);setActiveObject("landscape");setPanel("scenery");}} onMoveLandscape={(id:string,x:number,z:number)=>setLandscapeItems(v=>v.map(c=>c.id===id?{...c,x,z}:c))} selectedStatueId={selectedStatueId} selectedLevel={selectedLevel}
         onSelectLevel={(index) => { setSelectedLevel(index); setSelectedFace(null); setDetailCategory(null); setActiveObject("building");setPanel("edit"); }}
         onSelectFace={(index,face) => { setSelectedLevel(index); setSelectedFace(face); }}
         onCameraFacingChange={setViewerFace}
@@ -425,39 +436,43 @@ export default function TempleBuilderPage() {
         onSelectStatue={(id)=>{setSelectedStatueId(id);setActiveObject("statue");setPanel("statues");}}
         onMoveStatue={(id,x,z)=>setStatues(v=>v.map(s=>s.id===id?{...s,x,z}:s))} />
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between p-3">
-        <div className="rounded-2xl bg-black/50 px-4 py-2 backdrop-blur">
-          <div className="text-[10px] uppercase tracking-[.22em] text-amber-200/80">Echoes</div>
-          <div className="text-sm font-semibold">Temple Builder</div>
+      <header data-builder-top-toolbar className="studio-header pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-3 p-4 sm:p-6">
+        <div>
+          <p className="studio-eyebrow">ECHOES <span> / </span> CREATION STUDIO</p>
+          <h1 className="studio-title">Temple Builder<span className="text-amber-300">.</span></h1>
+          <p className="mt-1 text-[11px] text-slate-100/70">{buildingCount} {buildingCount===1?"temple":"temples"} <span className="mx-1.5 text-amber-200/40">/</span> {levels.length} levels <span className="mx-1.5 text-amber-200/40">/</span> {pieceCount} details</p>
         </div>
-        
-      </div>
-
-      {!shape && (
-        <div className="pointer-events-none absolute inset-x-5 top-[20%] z-10 rounded-3xl bg-black/40 p-5 text-center backdrop-blur-sm">
-          <div className="text-xl font-semibold">Choose your starting building</div>
-          <div className="mt-1 text-sm text-white/70">It will be placed directly on the building site.</div>
+        <button onClick={saveCopy} title="Download a portable copy of your design" className="studio-backup pointer-events-auto rounded-full border border-white/20 px-3 py-2 text-[11px] backdrop-blur-xl">↧ Save copy</button>
+      </header>
+      {!shape&&!pendingBuilding&&<div className="studio-welcome pointer-events-none absolute left-6 right-16 top-[25%] z-10 sm:left-12 sm:max-w-md">
+        <p className="studio-eyebrow">YOUR WORLD BEGINS HERE</p>
+        <h2 className="mt-3 font-serif text-4xl leading-tight text-white sm:text-6xl">Build something<br/><em className="text-amber-100">worth remembering.</em></h2>
+        <p className="mt-4 max-w-xs text-sm leading-relaxed text-slate-100/80">Shape a sanctuary. Layer its story. Make every detail yours.</p>
+        <div className="pointer-events-auto mt-5 flex flex-wrap gap-2">
+          <button onClick={()=>setPanel("templates")} className="rounded-full bg-amber-200 px-5 py-3 text-xs font-semibold text-slate-950">Explore six designs ↗</button>
+          <button onClick={()=>setPanel("buildings")} className="rounded-full border border-white/30 bg-slate-950/30 px-5 py-3 text-xs backdrop-blur">Start from a foundation</button>
         </div>
-      )}
+      </div>}
 
-      {pendingBuilding && <div className="absolute right-3 top-16 z-40 flex items-center gap-2 rounded-2xl bg-[#0c1118]/90 p-2 shadow-xl">
+      {pendingBuilding && <div className="absolute left-3 right-16 top-[108px] z-40 flex items-center gap-2 rounded-2xl bg-[#0c1118]/90 p-2 shadow-xl">
         <span className="px-2 text-xs text-blue-100">Drag blue building to position</span>
         <button aria-label="Cancel placement" onClick={()=>{setPendingBuilding(null);setSelectedLevel(Math.max(0,levels.length-1));}} className="rounded-xl bg-white/15 px-3 py-2 text-lg">✕</button>
         <button aria-label="Confirm placement" onClick={()=>{setLevels(current=>[...current,pendingBuilding]);setPendingBuilding(null);setActiveObject("building");setPanel(null);}} className="rounded-xl bg-blue-500 px-4 py-2 text-lg font-bold text-white">✓</button>
       </div>}
       {/* Improved bottom menu from supplied design; existing builder actions remain intact. */}
-      <div data-builder-bottom-toolbar className="absolute inset-x-0 bottom-0 z-30 flex flex-col rounded-t-[24px] border-t border-white/10 bg-[#0c1118]/96 max-h-[34dvh] overflow-y-auto overscroll-contain pb-[max(8px,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl">
-        <div className="flex justify-center pb-1 pt-2.5"><div className="h-1 w-10 rounded-full bg-white/20" /></div>
+      <div data-builder-bottom-toolbar className="studio-dock absolute inset-x-0 bottom-0 z-30 flex max-h-[38dvh] flex-col overflow-y-auto overscroll-contain rounded-t-[24px] border-t border-white/10 pb-[max(8px,env(safe-area-inset-bottom))] shadow-[0_-12px_40px_rgba(0,0,0,0.25)] backdrop-blur-xl sm:inset-x-6 sm:bottom-4 sm:rounded-[24px]">
+        <div className="flex items-center justify-between px-4 pb-1 pt-3"><p className="studio-eyebrow">{moveMode?"POSITION OBJECTS":panel?"CRAFT YOUR SANCTUARY":"YOUR BUILDING SITE"}</p><span role="status" className="text-[10px] text-slate-400">{saveState==="saved"?"● Saved on device":saveState==="error"?"Save unavailable · download a copy":"Opening design…"}</span></div>
         <div className="flex items-center gap-2 px-3 pb-2">
           {panel===null ? <>
             <button onClick={()=>{setPanel("add");setDetailCategory(null);}} className="flex-1 rounded-xl bg-amber-200 px-3 py-3 text-sm font-bold text-black">+ Add</button>
             {levels.length>0&&<button onClick={()=>{setActiveObject("building");setSelectedLevel(Math.min(selectedLevel,levels.length-1));setPanel("edit");setDetailCategory("levels");}} className="flex-1 rounded-xl bg-amber-200/20 border border-amber-200/30 px-2 py-3 text-sm font-semibold">Levels ({levels.length})</button>}
             <button onClick={()=>{if(!activeObject&&levels.length){setActiveObject("building");setSelectedLevel(Math.min(selectedLevel,levels.length-1));}if(activeObject==="building"||(!activeObject&&levels.length))setPanel("edit");else if(activeObject==="column")setPanel("site-columns");else if(activeObject==="statue")setPanel("statues");else if(activeObject==="landscape")setPanel("scenery");}} className="flex-1 rounded-xl bg-white/15 px-3 py-3 text-sm font-semibold">Edit</button>
-            <button onClick={()=>{setPanel(null);setDetailCategory(null);setActiveObject(null);setSelectedSiteColumnId(null);setSelectedStatueId(null);setSelectedLandscapeId(null);}} className="flex-1 rounded-xl bg-white/15 px-3 py-3 text-sm font-semibold">Done</button>
+            <button aria-pressed={moveMode} onClick={()=>setMoveMode(v=>!v)} className={`flex-1 rounded-xl border px-3 py-3 text-sm font-semibold ${moveMode?"border-amber-200 bg-amber-200 text-black":"border-white/15 bg-white/5"}`}>{moveMode?"Moving":"Move"}</button>
+            <button onClick={()=>{setMoveMode(false);setPanel(null);setDetailCategory(null);setActiveObject(null);setSelectedSiteColumnId(null);setSelectedStatueId(null);setSelectedLandscapeId(null);}} className="flex-1 rounded-xl bg-white/15 px-3 py-3 text-sm font-semibold">Done</button>
           </> : <>
             <button onClick={()=>{setPanel(null);setDetailCategory(null);}} className="rounded-xl bg-white/15 px-4 py-2.5 text-xs">‹ Back</button>
             <div className="flex-1 text-center text-sm font-semibold capitalize">{panel==="site-columns"?"Columns":panel==="buildings"?"Temples":panel}</div>
-            <button onClick={()=>{setPanel(null);setDetailCategory(null);}} className="rounded-xl bg-amber-200 px-4 py-2.5 text-xs font-bold text-black">Done</button>
+            <button onClick={()=>{setMoveMode(false);setPanel(null);setDetailCategory(null);}} className="rounded-xl bg-amber-200 px-4 py-2.5 text-xs font-bold text-black">Done</button>
           </>}
         </div>
         {panel===null&&activeObject&&<div className="px-3 pb-2 text-center text-xs text-white/65">Selected: {activeObject==="building"?(levels[selectedLevel]?.shape||"building"):activeObject==="column"?siteColumns.find(c=>c.id===selectedSiteColumnId)?.style||"column":activeObject==="statue"?"statue":"scenery"} · Tap Edit for its controls</div>}
@@ -473,9 +488,10 @@ export default function TempleBuilderPage() {
               ["scenery","Scenery","◈","Garden, desert & dusk"],
               ["scenery","Fountain","◉","Place a fountain"],
               ["edit","Stairs","▤","Add entrance stairs"],
-              ["more","More","＋","Coming soon"]
+              ["edit","Roofs","⌂","Crown your temple"],
+              ["more","Studio","✧","Views & design backup"]
             ] as const).map(([id,name,icon,sub])=>(
-              <button key={name} onClick={()=>{setPanel(id);setActiveObject(null);if(id==="walls")setWallStep(perimeter?"features":"main");}} className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.06] px-1 py-2 text-center transition active:bg-white/10">
+              <button key={name} onClick={()=>{setPanel(id==="edit"&&!levels.length?"buildings":id);setActiveObject(id==="edit"?"building":null);if(id==="edit")setDetailCategory(name==="Roofs"?"roof":"stairs");if(id==="walls")setWallStep(perimeter?"features":"main");}} className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.06] px-1 py-2 text-center transition active:bg-white/10">
                 <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-200/15 text-lg text-amber-100">{icon}</span>
                 <span className="text-xs font-semibold text-white">{name}</span>
                 <span className="text-[10px] leading-tight text-white/45">{sub}</span>
@@ -547,6 +563,7 @@ export default function TempleBuilderPage() {
             {(["Temple of the Sun","Eternal Courtyard","Celestial Shrine","Marble Pantheon","Cathedral of Echoes","Temple of Unity"] as const).map((name,index)=>(
               <button key={name} onClick={()=>{addTemplate(index);setActiveObject("building");}}
                 className="min-w-[155px] shrink-0 rounded-2xl border border-amber-200/30 bg-white/10 p-3 text-left">
+                <TempleGlyph kind="template" variant={index}/>
                 <span className="block text-sm font-semibold text-amber-100">{name}</span>
                 <span className="mt-1 block text-[11px] text-white/65">Add complete design</span>
               </button>
@@ -557,7 +574,7 @@ export default function TempleBuilderPage() {
           <div className="flex gap-2 overflow-x-auto border-t border-white/10 px-3 py-3">
             {[["star","5-Point Star"],["circle","Circle"],["six-star","6-Point Star"],["rectangle","Rectangle"],["square","Square"],["wide","Wide Hall"],["l-shape","L Shape"],["t-shape","T Shape"],["u-shape","U Shape"],["cross","Cross"],["octagon","Octagon"],["rotunda","Rotunda"],["courtyard","Courtyard"],["triangle","Triangle"],["hexagon","Hexagon"],["diamond","Diamond"],["oval","Oval"],["horseshoe","Horseshoe"],["x-shape","X Shape"],["ring","Ring"]].map(([id,name])=>(
               <button key={id} onClick={()=>{chooseShape(id as BuildingShape);setActiveObject("building");setPanel(null);}} className="min-w-[118px] rounded-2xl border border-white/10 bg-white/5 p-3 text-left">
-                <div className="mb-2 h-10 rounded-md border-2 border-amber-100/60 bg-amber-100/10"/>
+                <TempleGlyph kind={id}/>
                 <div className="text-sm font-medium">{name}</div>
               </button>
             ))}
@@ -631,11 +648,11 @@ export default function TempleBuilderPage() {
             </>})()}
           </div>
         )}
-        {panel && panel !== "buildings" && panel !== "walls" && panel !== "statues" && panel !== "site-columns" && panel !== "scenery" && panel !== "edit" && (
+        {panel && panel !== "buildings" && panel !== "walls" && panel !== "statues" && panel !== "site-columns" && panel !== "scenery" && panel !== "edit" && panel !== "templates" && panel !== "floors" && panel !== "add" && (
           <div className="border-t border-white/10 px-4 py-4 text-center text-sm text-white/55">
             {panel === "fountains" ? "Place fountains as separate site pieces." :
              panel === "stairs" ? "Place stairs and entrances." :
-             "More separate pieces will live here."}
+             <div className="flex flex-wrap items-center justify-center gap-3 text-xs"><span>Use the view tools to frame your temple, see the whole site, or capture an image.</span><button onClick={saveCopy} className="rounded-xl bg-amber-200 px-4 py-3 font-semibold text-slate-950">Download design backup</button></div>}
           </div>
         )}
       </div>
