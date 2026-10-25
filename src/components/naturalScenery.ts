@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { LandscapeItem } from "@/app/page";
 import { placedWaterCurve, waterGeometry, bankGeometry, createWaterMaterials, rippleGeometry } from "./sceneryWater";
 import { groundColor } from "./naturalLighting";
+import { shadeBoulderSurface, shadeGrassSurface } from "./scenerySurfaces";
 
 const noise=(n:number)=>{const x=Math.sin(n*127.1+41.7)*43758.5453;return x-Math.floor(x);};
 
@@ -22,13 +23,14 @@ export function addNaturalScenery(group:THREE.Group,item:LandscapeItem):boolean{
       const bump=1+.12*Math.sin(x*5+z*3)*Math.cos(y*6);
       position.setXYZ(i,x*bump*1.3,Math.max(0,(y+1)*.76)*bump,z*bump*.95);
     }
-    geo.computeVertexNormals();add(geo,material(0x858378));
+    geo.computeVertexNormals();shadeBoulderSurface(geo);const stone=material(0x858378);stone.vertexColors=true;add(geo,stone);
     const moss=add(new THREE.IcosahedronGeometry(.45,1),material(0x626f48),-.3,1.32,.05);moss.scale.set(1.3,.14,.8);
     return true;
   }
   if(item.kind==='grass'){
     const blade=new THREE.BufferGeometry();blade.setAttribute('position',new THREE.Float32BufferAttribute([-.035,0,0,.035,0,0,.07,.38,0],3));blade.computeVertexNormals();
-    const mat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,side:THREE.DoubleSide});
+    shadeGrassSurface(blade);
+    const mat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,side:THREE.DoubleSide,vertexColors:true});
     const grass=new THREE.InstancedMesh(blade,mat,240),dummy=new THREE.Object3D(),color=new THREE.Color();
     for(let i=0;i<240;i++){
       const a=noise(i+1)*Math.PI*2,r=Math.sqrt(noise(i+511))*1.7;

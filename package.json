@@ -7,8 +7,9 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/interaction-audit.cjs tests/geometry-audit.mjs tests/scenery-audit.mjs tests/environment-audit.mjs tests/lighting-ground-audit.mjs tests/water-audit.mjs",
-    "verify:browser": "node scripts/verify-studio.cjs"
+    "test": "node --test tests/interaction-audit.cjs tests/geometry-audit.mjs tests/scenery-audit.mjs tests/environment-audit.mjs tests/lighting-ground-audit.mjs tests/water-audit.mjs tests/visual-surface-audit.mjs",
+    "verify:browser": "node scripts/verify-studio.cjs",
+    "verify:appearance": "node scripts/verify-appearance.cjs"
   },
   "dependencies": {
     "next": "15.5.28",

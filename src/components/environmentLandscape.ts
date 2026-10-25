@@ -3,6 +3,7 @@ import { addSceneryTree } from "./sceneryTrees";
 import { addNaturalScenery } from "./naturalScenery";
 import { contactShadowTexture } from "./naturalLighting";
 import { waterGeometry, bankGeometry, createWaterMaterials, rippleGeometry } from "./sceneryWater";
+import { shadeBoulderSurface, shadeGrassSurface } from "./scenerySurfaces";
 
 const random=(n:number)=>{const x=Math.sin(n*127.1+41.7)*43758.5453;return x-Math.floor(x);};
 type Course={curve:THREE.CatmullRomCurve3;width:number;bank:THREE.Mesh;water:THREE.Mesh};
@@ -19,10 +20,11 @@ export function createEnvironmentLandscape(){
     const tree=addSceneryTree(new THREE.Group(),(["broadleaf","broadleaf","pine","cypress"] as const)[i%4],i*101+1);
     tree.rotation.y=random(i+91)*Math.PI*2;tree.scale.setScalar(.74+random(i+51)*.6);woodland.add(tree);
   }
-  const stoneMaterial=new THREE.MeshStandardMaterial({color:0xffffff,roughness:1});
-  const rocks=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,1),stoneMaterial,64);rocks.name="environment-boulders";rocks.castShadow=true;rocks.receiveShadow=true;root.add(rocks);
+  const stoneMaterial=new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,vertexColors:true});
+  const rocks=new THREE.InstancedMesh(shadeBoulderSurface(new THREE.IcosahedronGeometry(1,1)),stoneMaterial,64);rocks.name="environment-boulders";rocks.castShadow=true;rocks.receiveShadow=true;root.add(rocks);
   const blade=new THREE.BufferGeometry();blade.setAttribute("position",new THREE.Float32BufferAttribute([-.035,0,0,.035,0,0,.075,.45,.025],3));blade.computeVertexNormals();
-  const grass=new THREE.InstancedMesh(blade,new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,side:THREE.DoubleSide}),5600);grass.name="environment-grass";grass.receiveShadow=true;root.add(grass);
+  shadeGrassSurface(blade);
+  const grass=new THREE.InstancedMesh(blade,new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,side:THREE.DoubleSide,vertexColors:true}),5600);grass.name="environment-grass";grass.receiveShadow=true;root.add(grass);
   const hillSource=new THREE.Group();addNaturalScenery(hillSource,{id:"environment-hill",kind:"hill",x:0,z:0,scale:1,rotation:0});
   const hillMesh=hillSource.children[0] as THREE.Mesh;
   const hills=new THREE.InstancedMesh(hillMesh.geometry,hillMesh.material,8);hills.name="environment-near-hills";hills.receiveShadow=true;root.add(hills);

@@ -14,6 +14,7 @@ export function batchBuildingShell(group:THREE.Group,material:THREE.Material){
     const geometries=meshes.map(mesh=>{mesh.updateMatrix();return mesh.geometry.clone().applyMatrix4(mesh.matrix);});
     const merged=mergeGeometries(geometries,false);geometries.forEach(g=>g.dispose());
     if(!merged)continue;
+    merged.userData.architecturalSurface=meshes.every(mesh=>mesh.geometry.userData.architecturalSurface);
     for(const mesh of meshes){group.remove(mesh);mesh.geometry.dispose();}
     const mesh=new THREE.Mesh(merged,material);mesh.userData.levelIndex=group.userData.levelIndex;
     group.add(mesh);

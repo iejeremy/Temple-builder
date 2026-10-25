@@ -10,6 +10,7 @@ import { createEnvironmentLandscape } from "./environmentLandscape";
 import { batchBuildingShell, perimeterPlan } from "./builderGeometry";
 import { createGroundSurface, outdoorRadiance, naturalLight, type LandscapeTheme } from "./naturalLighting";
 import { TempleCameraController, type TempleView } from "./TempleCameraController";
+import { finishArchitecturalSurfaces } from "./architecturalSurfaces";
 
 const COLORS: Record<BuilderMaterial, number> = { marble:0xe7e2da,sandstone:0xb98b5b,limestone:0xcbbd9d,obsidian:0x17191d,granite:0x62636a,travertine:0xc7a77d,brick:0x884838,stone:0x77736b,concrete:0x92908a,stucco:0xd8ccb8,plaster:0xe0d9ca,timber:0x70472f,bronze:0x8a5b32,gold:0xc39a36 };
 
@@ -31,7 +32,7 @@ const addArchitecturalMesh=(parent:THREE.Group,geometry:THREE.BufferGeometry,mat
 const makeMaterial=(kind:BuilderMaterial,color=COLORS[kind],selected=false)=>{
   const p=MATERIAL_PROPS[kind];
   const maps=getProceduralMaps(kind);
-  return new THREE.MeshStandardMaterial({
+  const material=new THREE.MeshStandardMaterial({
     color:maps?0xffffff:(selected?new THREE.Color(color).offsetHSL(0,0,.06):color),
     map:maps?.color||null,
     roughnessMap:maps?.roughness||null,
@@ -40,6 +41,8 @@ const makeMaterial=(kind:BuilderMaterial,color=COLORS[kind],selected=false)=>{
     roughness:p.roughness, metalness:p.metalness,
     emissive:selected?0x211b08:0x000000, emissiveIntensity:selected?.1:0
   });
+  material.userData.architecturalSurface=true;
+  return material;
 };
 
 /** Convert pointer coordinates into normalized device coordinates for scene picking. */
@@ -424,7 +427,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     const addRoof=(parent:THREE.Group,roof:RoofStyle,rw:number,rd:number,x:number,z:number,top:number,color:number)=>{
       // Roof pieces share a single material rather than allocating one per cornice or tier.
       if(roof==="none")return;
-      const roofMaterial=new THREE.MeshStandardMaterial({color,roughness:.58,metalness:0});
+      const roofMaterial=makeMaterial(levels[parent.userData.levelIndex].material,color);
       const add=(g:THREE.BufferGeometry,px:number,py:number,pz:number)=>{
         const mesh=addArchitecturalMesh(parent,g,roofMaterial,px,py,pz);
         mesh.userData={levelIndex:parent.userData.levelIndex,detailCategory:"roof"};return mesh;
@@ -538,7 +541,8 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
         const top:[number,number,number][]=[[-upperW/2,baseY+h,-upperD/2],[upperW/2,baseY+h,-upperD/2],[upperW/2,baseY+h,upperD/2],[-upperW/2,baseY+h,upperD/2]];
         for(let i=0;i<4;i++){const j=(i+1)%4;verts.push(...bottom[i],...bottom[j],...top[i],...bottom[j],...top[j],...top[i]);}
         const geom=new THREE.BufferGeometry();geom.setAttribute("position",new THREE.Float32BufferAttribute(verts,3));geom.computeVertexNormals();
-        const tapered=new THREE.Mesh(geom,new THREE.MeshStandardMaterial({color:COLORS[level.material],side:THREE.DoubleSide,roughness:.95}));lg.add(tapered);
+        const taperedMaterial=makeMaterial(level.material);taperedMaterial.side=THREE.DoubleSide;
+        const tapered=new THREE.Mesh(geom,taperedMaterial);lg.add(tapered);
         for(const t of [.12,.88])structural(new THREE.BoxGeometry(w*(1-t*.12),.09,d*(1-t*.12)),0,baseY+h*t,0);
       }
       if(level.architecture==="hindu" && level.roof==="tiered" && level.width<=26){
@@ -553,7 +557,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       }
       if(level.architecture==="gothic" && level.shape==="wide"){
         // Exterior flying buttresses: solid piers plus curved stone arch ribs.
-        const stone=new THREE.MeshStandardMaterial({color:COLORS[level.material],roughness:.88});
+        const stone=makeMaterial(level.material);
         for(const side of [-1,1])for(const fraction of [-.36,-.12,.12,.36]){
           const z=fraction*d*2,wallX=side*w*.5,pierX=wallX+side*1.2;
           structural(new THREE.BoxGeometry(.36,h*.73,.45),pierX,baseY+h*.365,z);
@@ -644,6 +648,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       }
       // Visible connecting course at the junction between stacked levels.
       // Use the same material maps as the level so this reads as architecture, not a pasted-on shape.
+      finishArchitecturalSurfaces(lg);
       batchBuildingShell(lg,shellMaterial);
       if((level.elevation||0)>0){
         const transition=mat();
@@ -711,7 +716,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
         if(win.style!=="round"&&win.style!=="rose"&&win.style!=="arched"){
           const casing=new THREE.Group();
           casing.position.copy(frame.position);casing.rotation.copy(frame.rotation);
-          const trimMaterial=new THREE.MeshStandardMaterial({color:0xc5b9a4,roughness:.78});
+          const trimMaterial=makeMaterial(level.material);
           const rail=(width:number,height:number,px:number,py:number)=>{
             const piece=new THREE.Mesh(new THREE.BoxGeometry(width,height,.085),trimMaterial);
             piece.position.set(px,py,.012);piece.castShadow=true;casing.add(piece);
@@ -738,15 +743,15 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
           dg=new THREE.ExtrudeGeometry(profile,{depth:.08,bevelEnabled:false});
           dg.translate(0,0,-.04);
         }else dg=new THREE.BoxGeometry(dw,dh,.08);
-        const dc=door.style==="bronze"||door.style==="metal-gate"?0x7b552e:door.style==="stone-arch"||door.style==="carved-stone"?0x77736b:door.style==="temple"||door.style==="portico"||door.style==="grand-arch"?0x6b4a2d:0x4b3527;
-        const mesh=new THREE.Mesh(dg,new THREE.MeshStandardMaterial({color:dc,roughness:.72,metalness:door.style==="bronze"||door.style==="metal-gate"?.5:.08}));
+        const doorMaterial:BuilderMaterial=door.style==="bronze"||door.style==="metal-gate"?"bronze":door.style==="stone-arch"||door.style==="carved-stone"?"stone":"timber";
+        const mesh=new THREE.Mesh(dg,makeMaterial(doorMaterial));
         const y=arched?baseY:baseY+dh/2;
         if(door.face==="front"||door.face==="back"){mesh.position.set((door.u||0)*(w*.38),y,door.face==="front"?d/2+edge:-d/2-edge);if(door.face==="back")mesh.rotation.y=Math.PI;}
         else{mesh.position.set(door.face==="right"?w/2+edge:-w/2-edge,y,(door.u||0)*(d*.38));mesh.rotation.y=Math.PI/2;}
         // A shallow stone sill and lintel visually anchor rectangular doors in the wall.
         if(!arched){
           const surround=new THREE.Group();surround.position.copy(mesh.position);surround.rotation.copy(mesh.rotation);
-          const trimMaterial=new THREE.MeshStandardMaterial({color:0xaaa092,roughness:.83});
+          const trimMaterial=makeMaterial(level.material);
           for(const side of [-1,1]){
             const jamb=new THREE.Mesh(new THREE.BoxGeometry(.09,dh+.12,.1),trimMaterial);
             jamb.position.set(side*(dw/2+.045),0,.01);jamb.castShadow=true;surround.add(jamb);
@@ -757,7 +762,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
         }
         mesh.userData.levelIndex=index;mesh.userData.doorId=door.id;mesh.userData.doorFace=door.face;mesh.userData.detailCategory="doors";mesh.userData.detailFace=door.face;lg.add(mesh);
         if(door.style==="portico"){
-          const colMat=new THREE.MeshStandardMaterial({color:0xd9d4cc,roughness:.75});
+          const colMat=makeMaterial(level.material);
           for(const side of [-1,1]){const col=new THREE.Mesh(new THREE.CylinderGeometry(.08,.1,dh,10),colMat.clone());if(door.face==="front"||door.face==="back")col.position.set(mesh.position.x+side*(dw*.72),baseY+dh/2,mesh.position.z+(door.face==="front"?.08:-.08));else col.position.set(mesh.position.x+(door.face==="right"?.08:-.08),baseY+dh/2,mesh.position.z+side*(dw*.72));lg.add(col);}
         }
               tagParts(attachmentStart,"doors",door);
@@ -829,6 +834,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
         else {for(const side of [-1,1]){const bar=new THREE.Mesh(new THREE.BoxGeometry(pw*.58,.11,.13),detailMat());bar.position.set(pos.x+(ped.face==="front"||ped.face==="back"?side*.34:0),pos.y+.22,pos.z+(ped.face==="left"||ped.face==="right"?side*.34:0));bar.rotation.y=pos.rot;bar.rotation.z=side*.5;bar.userData.levelIndex=index;bar.userData.detailCategory="pediments";bar.userData.detailId=ped.id;bar.userData.detailFace=ped.face;lg.add(bar);}}
               tagParts(attachmentStart,"pediments",ped);
       }
+      finishArchitecturalSurfaces(lg);
       batchBuildingShell(lg,shellMaterial);
       if((level.elevation||0)>0){
         const below=levels.filter((candidate,i)=>i!==index && (candidate.elevation||0)<(level.elevation||0) && (candidate.buildingId||candidate.id)===(level.buildingId||level.id)).sort((a,b)=>(b.elevation||0)-(a.elevation||0))[0];
@@ -934,6 +940,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       });
       oldMaterials.forEach(m=>m.dispose());if(pendingGroup)pendingGroup.userData.ghost=true;
     }
+    finishArchitecturalSurfaces(group);if(perimeterGroupRef.current)finishArchitecturalSurfaces(perimeterGroupRef.current);
     enableShadows(group);if(perimeterGroupRef.current)enableShadows(perimeterGroupRef.current);statueGroupsRef.current.forEach(enableShadows);
     // Structural bounds define the orbit pivot; site decorations never move it.
     group.updateWorldMatrix(true,true);

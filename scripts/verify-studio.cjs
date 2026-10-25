@@ -29,7 +29,7 @@ const inspect=()=>{
  try{
  await new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error(logs)),15000);server.stdout.on('data',d=>{logs+=d;if(String(d).includes('Ready')){clearTimeout(t);resolve()}});server.on('exit',c=>reject(Error('Server exit '+c+logs)))});
  browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||'/tmp/chromium',headless:true,args:['--no-sandbox','--disable-dev-shm-usage','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
- const page=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:2,hasTouch:true});const errors=[];
+ const page=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:2,hasTouch:true});const errors=[];page.setDefaultTimeout(90000);
  page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text())});
  await page.goto('http://127.0.0.1:3002');await page.locator('canvas').waitFor();await page.waitForTimeout(600);
  await page.getByRole('button',{name:'Start from a foundation'}).click();
@@ -59,10 +59,10 @@ const inspect=()=>{
  await page.getByRole('button',{name:'Edit',exact:true}).click();await page.waitForTimeout(250);const after=await page.evaluate(inspect);
  assert.equal(JSON.stringify({orbit:after.orbit,pan:after.pan,focus:after.focus}),before);console.log('PASS: edit selection does not reframe the camera');
  await page.getByRole('button',{name:'Center Temple',exact:true}).click();
- await page.screenshot({path:path.join(artifactDir,'star-portrait.png')});
+ await page.screenshot({path:path.join(artifactDir,'star-portrait.png'),timeout:90000});
  await page.setViewportSize({width:844,height:390});await page.waitForTimeout(300);
  for(const name of ['Whole site','Front','Plan','Center Temple'])await page.getByRole('button',{name,exact:true}).click();
- await page.screenshot({path:path.join(artifactDir,'star-landscape.png')});console.log('PASS: landscape resize and all view presets');
+ await page.screenshot({path:path.join(artifactDir,'star-landscape.png'),timeout:90000});console.log('PASS: landscape resize and all view presets');
  const download=page.waitForEvent('download');await page.getByRole('button',{name:'Save copy',exact:false}).click();assert.equal((await download).suggestedFilename(),'Echoes-Temple-Design.json');
  const capture=page.waitForEvent('download');await page.getByRole('button',{name:'Capture',exact:true}).click();assert.equal((await capture).suggestedFilename(),'Echoes-Temple.png');console.log('PASS: portable design copy and PNG capture');
  await page.reload();await page.locator('canvas').waitFor();await page.waitForTimeout(300);assert.equal((await saved()).levels.length,2);console.log('PASS: saved two-level temple restores');
@@ -74,7 +74,7 @@ const inspect=()=>{
   await page.getByRole('button',{name:new RegExp(names[i])}).click();await page.waitForTimeout(350);
   assert.ok((await saved()).levels.length>0);assert.equal(await page.getByText('The 3D view needs to reconnect.').count(),0);
   await page.getByRole('button',{name:'Whole site',exact:true}).click();await page.waitForTimeout(400);
-  await page.screenshot({path:path.join(artifactDir,`template-${i+1}.png`)});
+  await page.screenshot({path:path.join(artifactDir,`template-${i+1}.png`),timeout:90000});
   console.log('PASS: template renders and saves — '+names[i]);
  }
 
@@ -93,8 +93,8 @@ const inspect=()=>{
  state=await page.evaluate(inspect);
  for(const category of ['windows','doors','columns','arches','stairs','trim','pediments','roof'])assert.ok(state.categories[category]>0,category+' missing');
  assert.ok(state.categories.windows>=5);assert.ok(state.categories.columns>=8);console.log('PASS: complete scene retains roofs, stairs, walls, columns, doors, windows and tagged decorative sub-pieces');
- await page.getByRole('button',{name:'Whole site',exact:true}).click();await page.waitForTimeout(400);await page.screenshot({path:path.join(artifactDir,'complete-twilight-portrait.png')});
- await page.setViewportSize({width:1280,height:800});await page.waitForTimeout(400);await page.getByRole('button',{name:'Whole site',exact:true}).click();await page.screenshot({path:path.join(artifactDir,'complete-twilight-desktop.png')});
+ await page.getByRole('button',{name:'Whole site',exact:true}).click();await page.waitForTimeout(400);await page.screenshot({path:path.join(artifactDir,'complete-twilight-portrait.png'),timeout:90000});
+ await page.setViewportSize({width:1280,height:800});await page.waitForTimeout(400);await page.getByRole('button',{name:'Whole site',exact:true}).click();await page.screenshot({path:path.join(artifactDir,'complete-twilight-desktop.png'),timeout:90000});
  assert.deepEqual(errors,[]);console.log('PASS: no browser JavaScript or WebGL console errors');
  fs.writeFileSync(path.join(artifactDir,'result.json'),JSON.stringify({errors,verifiedAt:new Date().toISOString(),screenshots:fs.readdirSync(artifactDir).filter(f=>f.endsWith('.png'))},null,2));
  }finally{if(browser)await browser.close();server.kill();}

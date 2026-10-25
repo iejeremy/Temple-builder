@@ -1,0 +1,18 @@
+[
+  {
+    "path": "src/components/TempleCameraController.ts",
+    "sha256": "f298ffe57d4e1838afad1630ad38e5126718eff0206006c318004481e3cc210e"
+  },
+  {
+    "path": "src/components/Temple3DPreview.tsx",
+    "start": "    const host=hostRef.current; if(!host) return;",
+    "end": "    // Keep architectural meshes alive",
+    "sha256": "e278559674e7f64bd01a4e40f53845cd729a176958a4e5c7dab82602f92aee77"
+  },
+  {
+    "path": "src/components/Temple3DPreview.tsx",
+    "start": "    // Structural bounds define the orbit pivot;",
+    "end": "  return <div className=\"absolute inset-0\">",
+    "sha256": "a9cefb7477e060681e0e627599d7fb6209510ee4de19e7b449e88e8b07d59aec"
+  }
+]
