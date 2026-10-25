@@ -285,7 +285,9 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       // Three.js view offset is measured from the TOP of the virtual viewport.
       // Therefore cropping at y=bottom (not top) shifts the subject UP.
       cameraRigRef.current.resize(camera,w,h,top,bottom);
-      renderer.setSize(w,h,false);
+      // Keep CSS pixels equal to the host. The backing buffer may be denser,
+      // but must never enlarge the displayed canvas on high-DPI phones.
+      renderer.setSize(w,h);
       // Reframe on an actual portrait/landscape rotation; ordinary resize preserves manual orbit.
       // The old logic retained stale pan/zoom across orientation changes, hiding the temple.
       // Only a real orientation change may reframe automatically after first load.
@@ -302,13 +304,17 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     // that resolve to the same snapped object position.
     let lastDragKey="";
     let gestureMoved=false;
+    let pinchStart:{midX:number;midY:number;distance:number;radius:number;pan:{x:number;y:number;z:number;manual:boolean};right:THREE.Vector3;up:THREE.Vector3;scale:number}|null=null;
     const clearObjectDrag=()=>{
       movingLevelRef.current=null;movingStatueRef.current=null;movingSiteObjectRef.current=null;
       movingDoorRef.current=null;movingArchRef.current=null;movingDetailRef.current=null;resizingPerimeterRef.current=null;
     };
-    const rebasePinch=()=>{const pts=[...pointers.values()];if(pts.length!==2)return;
+    const rebasePinch=()=>{const pts=[...pointers.values()];if(pts.length!==2){pinchStart=null;return;}
       gestureRef.current.midX=(pts[0].x+pts[1].x)/2;gestureRef.current.midY=(pts[0].y+pts[1].y)/2;
-      cameraRigRef.current.orbit.pinch=pointerSeparation(pts);
+      const rig=cameraRigRef.current;rig.orbit.pinch=pointerSeparation(pts);
+      pinchStart={...gestureRef.current,distance:rig.orbit.pinch,radius:rig.orbit.radius,pan:{...rig.pan},
+        right:new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0),up:new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,1),
+        scale:2*rig.orbit.radius*Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)/Math.max(1,camera.view?.fullHeight||canvas.clientHeight)};
     };
     const emitSnappedDrag=(key:string,apply:()=>void)=>{if(key!==lastDragKey){lastDragKey=key;apply();}};
     const distance=()=>pointerSeparation(pointers.values());
@@ -341,7 +347,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
             buildingDragOffsetRef.current.set((level.x||0)-intersection.x,(level.z||0)-intersection.z);
           }else buildingDragOffsetRef.current.set(0,0);
         }
-      }}pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const o=cameraRigRef.current.orbit;if(pointers.size===1){o.dragging=movingLevelRef.current===null && movingDoorRef.current===null && movingArchRef.current===null && movingDetailRef.current===null && movingStatueRef.current===null && movingSiteObjectRef.current===null;o.lastX=e.clientX;o.lastY=e.clientY;}else if(pointers.size===2){pointerDownRef.current=null;o.dragging=false;o.pinch=distance();{const ps=[...pointers.values()];gestureRef.current.midX=(ps[0].x+ps[1].x)/2;gestureRef.current.midY=(ps[0].y+ps[1].y)/2;}if(liveRef.current.moveMode&&perimeterGroupRef.current&&liveRef.current.perimeter){const rect=canvas.getBoundingClientRect();const cx=[...pointers.values()].reduce((s,p)=>s+p.x,0)/2,cy=[...pointers.values()].reduce((s,p)=>s+p.y,0)/2;const mouse=new THREE.Vector2(((cx-rect.left)/rect.width)*2-1,-((cy-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);if(visibleHits(perimeterGroupRef.current.children,true).length)resizingPerimeterRef.current={pinch:o.pinch,margin:liveRef.current.perimeter.margin};}}if(pointers.size>1){movingLevelRef.current=null;movingStatueRef.current=null;movingSiteObjectRef.current=null;movingDoorRef.current=null;movingArchRef.current=null;movingDetailRef.current=null;
+      }}pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const o=cameraRigRef.current.orbit;if(pointers.size===1){o.dragging=movingLevelRef.current===null && movingDoorRef.current===null && movingArchRef.current===null && movingDetailRef.current===null && movingStatueRef.current===null && movingSiteObjectRef.current===null;o.lastX=e.clientX;o.lastY=e.clientY;}else if(pointers.size===2){pointerDownRef.current=null;o.dragging=false;rebasePinch();if(liveRef.current.moveMode&&perimeterGroupRef.current&&liveRef.current.perimeter){const rect=canvas.getBoundingClientRect();const cx=[...pointers.values()].reduce((s,p)=>s+p.x,0)/2,cy=[...pointers.values()].reduce((s,p)=>s+p.y,0)/2;const mouse=new THREE.Vector2(((cx-rect.left)/rect.width)*2-1,-((cy-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);if(visibleHits(perimeterGroupRef.current.children,true).length)resizingPerimeterRef.current={pinch:o.pinch,margin:liveRef.current.perimeter.margin};}}if(pointers.size>1){movingLevelRef.current=null;movingStatueRef.current=null;movingSiteObjectRef.current=null;movingDoorRef.current=null;movingArchRef.current=null;movingDetailRef.current=null;
       pointerDownRef.current=null;gestureMoved=true;o.dragging=false;if(pointers.size>2)resizingPerimeterRef.current=null;
     }canvas.setPointerCapture?.(e.pointerId);};
     const wallTransform=(level:BuildingLevel)=>new THREE.Matrix4().makeRotationY(THREE.MathUtils.degToRad(level.rotation||0)).setPosition(level.x||0,0,level.z||0);
@@ -354,14 +360,27 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     const move=(e:PointerEvent)=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const o=cameraRigRef.current.orbit;
       if(pointers.size>2)return;
       const start=pointerDownRef.current;if(start&&Math.hypot(e.clientX-start.x,e.clientY-start.y)>=8)gestureMoved=true;
-      if(pointers.size===2){movingLevelRef.current=null;movingDoorRef.current=null;movingArchRef.current=null;movingDetailRef.current=null;movingStatueRef.current=null;movingSiteObjectRef.current=null;const pts=[...pointers.values()];const midX=(pts[0].x+pts[1].x)/2,midY=(pts[0].y+pts[1].y)/2;const dx=midX-gestureRef.current.midX,dy=midY-gestureRef.current.midY;gestureRef.current.midX=midX;gestureRef.current.midY=midY;const panScale=2*o.radius*Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)/Math.max(1,camera.view?.fullHeight||canvas.clientHeight);
-      const right=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0);
-      const upAxis=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,1);
-      const pan=cameraRigRef.current.pan;
-      pan.x+=(-right.x*dx+upAxis.x*dy)*panScale;
-      pan.y+=(-right.y*dx+upAxis.y*dy)*panScale;
-      pan.z+=(-right.z*dx+upAxis.z*dy)*panScale;
-      if(Math.abs(dx)+Math.abs(dy)>0){pan.manual=true;cameraRigRef.current.fit.userFramed=true;}const next=distance();if(resizingPerimeterRef.current&&next>0){const ratio=next/Math.max(1,resizingPerimeterRef.current.pinch);const margin=Math.max(.25,Math.min(10,resizingPerimeterRef.current.margin*ratio));liveRef.current.onResizePerimeter?.(Math.round(margin*4)/4);}else if(o.pinch>0){const scale=o.pinch/Math.max(1,next);o.radius=clampZoom(o.radius*scale);cameraRigRef.current.fit.userFramed=true;}o.pinch=next;render();return;}// A tap selects an object; only an intentional drag may reposition it.
+      if(pointers.size===2){
+        movingLevelRef.current=null;movingDoorRef.current=null;movingArchRef.current=null;movingDetailRef.current=null;movingStatueRef.current=null;movingSiteObjectRef.current=null;
+        if(!pinchStart)rebasePinch();const base=pinchStart;if(!base)return;
+        const pts=[...pointers.values()],midX=(pts[0].x+pts[1].x)/2,midY=(pts[0].y+pts[1].y)/2;
+        const dx=midX-base.midX,dy=midY-base.midY,pan=cameraRigRef.current.pan;
+        // Absolute displacement from one shared gesture snapshot prevents the
+        // first finger's zoom scale from changing the second finger's pan scale.
+        pan.x=base.pan.x+(-base.right.x*dx+base.up.x*dy)*base.scale;
+        pan.y=base.pan.y+(-base.right.y*dx+base.up.y*dy)*base.scale;
+        pan.z=base.pan.z+(-base.right.z*dx+base.up.z*dy)*base.scale;
+        pan.manual=base.pan.manual||Math.abs(dx)+Math.abs(dy)>0;
+        gestureRef.current.midX=midX;gestureRef.current.midY=midY;
+        const next=distance();
+        if(resizingPerimeterRef.current&&next>0){
+          const ratio=next/Math.max(1,resizingPerimeterRef.current.pinch);
+          const margin=Math.max(.25,Math.min(10,resizingPerimeterRef.current.margin*ratio));liveRef.current.onResizePerimeter?.(Math.round(margin*4)/4);
+        }else if(base.distance>1)o.radius=clampZoom(base.radius*base.distance/Math.max(1,next));
+        else if(next>1)rebasePinch();
+        if(dx!==0||dy!==0||next!==base.distance)cameraRigRef.current.fit.userFramed=true;
+        o.pinch=next;render();return;
+      }// A tap selects an object; only an intentional drag may reposition it.
       // Apply the same movement threshold to doors, details, statues and site
       // objects as to buildings, so slight finger movement cannot shift them.
       const dragStart=pointerDownRef.current;

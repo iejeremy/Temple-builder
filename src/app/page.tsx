@@ -120,7 +120,11 @@ export default function TempleBuilderPage() {
         if(Array.isArray(saved.landscapeItems))setLandscapeItems(saved.landscapeItems);
         if(["garden","desert","twilight"].includes(saved.scenery))setScenery(saved.scenery);
       }
-    }catch(err){console.warn("Could not restore local temple design",err);}
+    }catch(err){
+      // An unreadable design must remain intact for recovery. Do not enable
+      // autosave with the empty initial state after a failed restore.
+      setSaveState("error");console.warn("Could not restore local temple design",err);return;
+    }
     setSiteLoaded(true);
   },[]);
   useEffect(()=>{

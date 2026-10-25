@@ -70,6 +70,29 @@ test('coincident pinch points keep zoom finite',()=>{
   const s=setup();s.event('pointerdown',1,100,100);s.event('pointerdown',2,200,100);s.event('pointermove',2,100,100);
   assert.ok(Number.isFinite(s.context.cameraRigRef.current.orbit.radius));
 });
+test('closed pinch cycles cannot accumulate pan or zoom drift in either event order',()=>{
+ for(const order of [[1,2],[2,1]]){
+  const s=setup();s.context.cameraRigRef.current.pan={x:.4,y:.2,z:-.7,manual:true};
+  s.event('pointerdown',1,100,200);s.event('pointerdown',2,220,200);
+  for(let i=0;i<12;i++)for(const positions of [{1:[40,160],2:[280,240]},{1:[100,200],2:[220,200]}])for(const id of order)s.event('pointermove',id,...positions[id]);
+  const rig=s.context.cameraRigRef.current;assert.deepEqual({...rig.pan},{x:.4,y:.2,z:-.7,manual:true});assert.equal(rig.orbit.radius,19);
+  assert.deepEqual(s.callbacks,[]);
+ }
+});
+test('two-finger translation pans without zoom drift and returns exactly to its start',()=>{
+ const s=setup();s.event('pointerdown',1,100,200);s.event('pointerdown',2,220,200);
+ s.event('pointermove',1,140,220);s.event('pointermove',2,260,220);
+ const rig=s.context.cameraRigRef.current;assert.notEqual(rig.pan.x,0);assert.equal(rig.pan.manual,true);assert.equal(rig.orbit.radius,19);
+ s.event('pointermove',2,220,200);s.event('pointermove',1,100,200);
+ assert.deepEqual({...rig.pan},{x:0,y:0,z:0,manual:false});assert.equal(rig.orbit.radius,19);
+});
+test('Move-mode wall pinch still resizes the perimeter instead of zooming',()=>{
+ const s=setup(true),wall=new THREE.Mesh(new THREE.BoxGeometry(4,1,.2),new THREE.MeshBasicMaterial()),perimeter=new THREE.Group();perimeter.add(wall);
+ s.context.perimeterGroupRef.current=perimeter;s.context.liveRef.current.perimeter={margin:1};s.context.liveRef.current.onResizePerimeter=m=>s.callbacks.push(['resize',m]);
+ s.context.raycasterRef.current.intersectObjects=()=>[{object:wall,distance:1}];
+ s.event('pointerdown',1,100,200);s.event('pointerdown',2,220,200);s.event('pointermove',1,40,200);s.event('pointermove',2,280,200);
+ assert.deepEqual(s.callbacks.at(-1),['resize',2]);assert.equal(s.context.cameraRigRef.current.orbit.radius,19);assert.deepEqual({...s.context.cameraRigRef.current.pan},{x:0,y:0,z:0,manual:false});
+});
 test('camera fits above measured UI in portrait and landscape',()=>{
   for(const [w,h,top,bottom] of [[390,844,85,260],[844,390,54,140],[1200,800,80,240]]){
     const rig=new TempleCameraController(),camera=new THREE.PerspectiveCamera(42,1,.1,600);
