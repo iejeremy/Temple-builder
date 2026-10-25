@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { LandscapeItem } from "@/app/page";
 import { placedWaterCurve, waterGeometry, bankGeometry, createWaterMaterials, rippleGeometry } from "./sceneryWater";
+import { groundColor } from "./naturalLighting";
 
 const noise=(n:number)=>{const x=Math.sin(n*127.1+41.7)*43758.5453;return x-Math.floor(x);};
 
@@ -42,13 +43,16 @@ export function addNaturalScenery(group:THREE.Group,item:LandscapeItem):boolean{
     const segments=48,rings=16,vertices:number[]=[],colors:number[]=[],indices:number[]=[];
     for(let ring=0;ring<=rings;ring++)for(let i=0;i<=segments;i++){
       const t=ring/rings,a=i/segments*Math.PI*2,r=t*4;
-      const h=Math.pow(Math.max(0,1-t*t),2)*2;
+      // Broad, asymmetric slopes ease to a level edge instead of a perfect mound.
+      const h=Math.pow(Math.max(0,1-t*t),3)*2*(1+.24*t*Math.cos(a)+.12*t*t*Math.sin(a*2));
       vertices.push(Math.cos(a)*r,h+.012,Math.sin(a)*r*.8);
-      const color=new THREE.Color().setHSL(.22,.18,.32+.04*Math.sin(a*3)*t).convertSRGBToLinear();colors.push(color.r,color.g,color.b);
+      const rgb=groundColor(Math.cos(a)*r,Math.sin(a)*r*.8,"garden");
+      const color=new THREE.Color().setRGB(rgb[0]/255,rgb[1]/255,rgb[2]/255,THREE.SRGBColorSpace).multiplyScalar(1-h*.025);
+      const fade=THREE.MathUtils.smoothstep(t,.68,1);colors.push(color.r,color.g,color.b,1-fade);
       if(ring<rings&&i<segments){const k=ring*(segments+1)+i;indices.push(k,k+1,k+segments+1,k+1,k+segments+2,k+segments+1);}
     }
-    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));geo.setIndex(indices);geo.computeVertexNormals();
-    add(geo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:1}));return true;
+    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,4));geo.setIndex(indices);geo.computeVertexNormals();
+    add(geo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,transparent:true,depthWrite:false}));return true;
   }
   if(item.kind==='river'||item.kind==='creek'){
     const width=item.kind==='river'?1.6:.55,length=item.kind==='river'?14:10;
