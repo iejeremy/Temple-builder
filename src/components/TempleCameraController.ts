@@ -8,6 +8,7 @@ export class TempleCameraController {
   pan={x:0,y:0,z:0,manual:false};
   focus={x:0,z:0};
   targetY=.6;
+  focusedBuildingId:string|null=null;
   fit={initialized:false,lastSpan:0,fitRadius:30,buildingCount:0,userFramed:false};
   allBounds=new THREE.Box3();
   selectedBounds=new THREE.Box3();
@@ -52,8 +53,19 @@ export class TempleCameraController {
     return settling;
   }
 
-  center(camera:THREE.PerspectiveCamera,view:TempleView="temple"){
+  /** Follow structural changes to the building already framed, without zooming
+   * or switching focus merely because a different object was selected. */
+  followBuilding(owner:string,bounds:THREE.Box3){
+    if(owner!==this.focusedBuildingId||bounds.isEmpty())return false;
+    const center=bounds.getCenter(new THREE.Vector3());
+    if(this.focus.x===center.x&&this.focus.z===center.z&&this.targetY===center.y)return false;
+    this.focus={x:center.x,z:center.z};this.targetY=center.y;
+    return true;
+  }
+
+  center(camera:THREE.PerspectiveCamera,view:TempleView="temple",buildingId:string|null=null){
     const scenic=view==="landscape",site=view==="site"||scenic;
+    this.focusedBuildingId=site?null:buildingId;
     let bounds=site&&!this.siteBounds.isEmpty()?this.siteBounds:!this.selectedBounds.isEmpty()?this.selectedBounds:this.allBounds;
     if(scenic){
       bounds=bounds.isEmpty()?new THREE.Box3(new THREE.Vector3(-5,0,-5),new THREE.Vector3(5,4,5)):bounds.clone();
@@ -76,7 +88,10 @@ export class TempleCameraController {
 
   resize(camera:THREE.PerspectiveCamera,width:number,height:number,top:number,bottom:number){
     width=Math.max(1,width);height=Math.max(1,height);
-    top=Math.max(0,Math.min(top,height*.2));bottom=Math.max(0,Math.min(bottom,height*.55));
+    // Respect measured overlays in short landscape viewports as well. A fixed
+    // percentage cap can put the optical center below the actual usable area.
+    bottom=Math.max(0,Math.min(bottom,Math.max(0,height-24)));
+    top=Math.max(0,Math.min(top,Math.max(0,height-bottom-24)));
     this.viewport={width,height,top,bottom};
     camera.setViewOffset(width,height+top+bottom,0,bottom,width,height);
     camera.updateProjectionMatrix();

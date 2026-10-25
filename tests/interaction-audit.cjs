@@ -19,7 +19,7 @@ function setup(moveMode=false){
   const root=new THREE.Group();root.userData.levelIndex=0;
   const mesh=new THREE.Mesh(new THREE.BoxGeometry(4,4,4),new THREE.MeshBasicMaterial());root.add(mesh);
   const context={THREE,requestAnimationFrame:()=>1,setRenderError(){},renderer:{domElement:canvas},camera,render(){},clampZoom:r=>Math.max(2,Math.min(100,r))};
-  const ref=value=>({current:value});context.cameraRigRef=ref(new TempleCameraController());context.cameraRigRef.current.orbit.radius=19;
+  const ref=value=>({current:value});context.syncFocusedBuildingRef=ref(()=>{});context.cameraRigRef=ref(new TempleCameraController());context.cameraRigRef.current.orbit.radius=19;
   for(const name of ['movingLevelRef','movingDoorRef','movingArchRef','movingDetailRef','movingStatueRef','movingSiteObjectRef','resizingPerimeterRef','pointerDownRef'])context[name]=ref(null);
   Object.assign(context,{
     levelGroupsRef:ref([root]),statueGroupsRef:ref([]),siteObjectGroupsRef:ref([]),perimeterGroupRef:ref(null),
@@ -112,4 +112,39 @@ test('Scenery view adds landscape context only on explicit request and leaves te
  const bounds=rig.siteBounds.clone();rig.center(camera,'site');const radius=rig.orbit.radius;
  rig.center(camera,'landscape');assert.ok(rig.orbit.radius>radius*1.5);assert.ok(rig.siteBounds.equals(bounds));
  rig.center(camera,'site');assert.equal(rig.orbit.radius,radius);
+});
+
+test('framed building follows completed moves and new levels without changing user navigation',()=>{
+ const rig=new TempleCameraController(),camera=new THREE.PerspectiveCamera(42,1,.1,600);
+ rig.resize(camera,390,724,90,115);
+ rig.selectedBounds.set(new THREE.Vector3(-2,0,-2),new THREE.Vector3(2,3,2));rig.selectedRadius=4;
+ rig.center(camera,'temple','owner-a');rig.orbit.theta=1.8;rig.orbit.phi=.9;rig.orbit.radius=12;
+ rig.pan={x:.4,y:.2,z:-.8,manual:true};const orbit={...rig.orbit},pan={...rig.pan};
+ const moved=new THREE.Box3(new THREE.Vector3(6,0,-7),new THREE.Vector3(10,6,-3));
+ assert.equal(rig.followBuilding('owner-a',moved),true);
+ assert.deepEqual({...rig.focus},{x:8,z:-5});assert.equal(rig.targetY,3);assert.deepEqual({...rig.orbit},orbit);assert.deepEqual({...rig.pan},pan);
+ for(let i=0;i<12;i++){rig.orbit.theta+=.5;rig.apply(camera);const target=new THREE.Vector3(8.4,3.2,-5.8).project(camera);assert.ok(Math.abs(target.x)<1e-10);}
+});
+
+test('other buildings, empty bounds and site views never steal the orbit target',()=>{
+ const rig=new TempleCameraController(),camera=new THREE.PerspectiveCamera();
+ rig.selectedBounds.set(new THREE.Vector3(-2,0,-2),new THREE.Vector3(2,3,2));rig.selectedRadius=4;
+ rig.center(camera,'temple','owner-a');const focus={...rig.focus},targetY=rig.targetY;
+ const other=new THREE.Box3(new THREE.Vector3(20,0,20),new THREE.Vector3(24,8,24));
+ assert.equal(rig.followBuilding('owner-b',other),false);assert.equal(rig.followBuilding('owner-a',new THREE.Box3()),false);
+ assert.deepEqual({...rig.focus},focus);assert.equal(rig.targetY,targetY);
+ rig.siteBounds.copy(other);rig.center(camera,'site','owner-a');assert.equal(rig.focusedBuildingId,null);assert.equal(rig.followBuilding('owner-a',other),false);
+ rig.pan={x:20,y:2,z:-7,manual:true};rig.selectedBounds.copy(other);rig.center(camera,'temple','owner-b');assert.equal(rig.focusedBuildingId,'owner-b');assert.deepEqual({...rig.pan},{x:0,y:0,z:0,manual:false});
+});
+
+test('Center puts the complete stacked-building midpoint halfway between header and dock',()=>{
+ for(const [w,h,top,bottom] of [[360,669,90,115],[390,724,90,115],[390,844,95,300],[844,390,95,110]]){
+  const rig=new TempleCameraController(),camera=new THREE.PerspectiveCamera(42,1,.1,600);
+  rig.resize(camera,w,h,top,bottom);rig.selectedBounds.set(new THREE.Vector3(6,0,-7),new THREE.Vector3(10,6,-3));rig.selectedRadius=5;
+  rig.center(camera,'temple','owner');const midpoint=rig.selectedBounds.getCenter(new THREE.Vector3());
+  for(let i=0;i<24;i++){
+   rig.orbit.theta=i*Math.PI/12;rig.apply(camera);const ndc=midpoint.clone().project(camera);
+   assert.ok(Math.abs((ndc.x+1)*w/2-w/2)<1e-6);assert.ok(Math.abs((1-ndc.y)*h/2-(h+top-bottom)/2)<1e-6);
+  }
+ }
 });
