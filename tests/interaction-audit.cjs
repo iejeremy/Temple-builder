@@ -12,7 +12,7 @@ const controllerModule={exports:{}};
 vm.runInNewContext(ts.transpile(readFileSync('src/components/TempleCameraController.ts','utf8'),{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}),{require,exports:controllerModule.exports,module:controllerModule});
 const {TempleCameraController}=controllerModule.exports;
 const handlers=source.slice(source.indexOf('    const canvas=renderer.domElement;'),source.indexOf('    window.addEventListener("resize",resize);'));
-function setup(moveMode=false){
+function setup(moveMode=false,pendingLevelIndex=null){
   const callbacks=[],listeners={};
   const canvas={style:{},clientHeight:800,getBoundingClientRect:()=>({left:0,top:0,width:400,height:800}),setPointerCapture(){},addEventListener:(name,fn)=>listeners[name]=fn};
   const camera=new THREE.PerspectiveCamera(42,.5,.1,600);camera.position.set(0,8,12);camera.lookAt(0,0,0);camera.updateMatrixWorld();
@@ -26,7 +26,7 @@ function setup(moveMode=false){
     orbitRef:ref({theta:0,phi:.9,radius:19,lastX:0,lastY:0,dragging:false,pinch:0}),
     cameraPanRef:ref({x:0,y:0,z:0,manual:false}),cameraFitRef:ref({userFramed:false}),gestureRef:ref({midX:0,midY:0}),
     buildingDragOffsetRef:ref(new THREE.Vector2()),siteDragOffsetRef:ref(new THREE.Vector2()),dragPlaneRef:ref(new THREE.Plane(new THREE.Vector3(0,1,0),0)),
-    liveRef:ref({moveMode,levels:[{x:0,z:0,elevation:0,width:28,depth:28,height:28}],onMoveLevel:(...args)=>callbacks.push(['move',...args]),onSelectLevel:()=>callbacks.push(['select'])}),
+    liveRef:ref({moveMode,pendingLevelIndex,levels:[{x:0,z:0,elevation:0,width:28,depth:28,height:28}],onMoveLevel:(...args)=>callbacks.push(['move',...args]),onSelectLevel:()=>callbacks.push(['select'])}),
     raycasterRef:ref({setFromCamera(){},intersectObjects:()=>[{object:mesh,point:new THREE.Vector3(),distance:1}],ray:{intersectPlane:(_plane,hit)=>hit.set(2,0,2)}})
   });
   vm.runInNewContext(ts.transpile(helpers+handlers,{target:ts.ScriptTarget.ES2020}),context);
@@ -170,4 +170,28 @@ test('Center puts the complete stacked-building midpoint halfway between header 
    assert.ok(Math.abs((ndc.x+1)*w/2-w/2)<1e-6);assert.ok(Math.abs((1-ndc.y)*h/2-(h+top-bottom)/2)<1e-6);
   }
  }
+});
+
+const swipe=s=>{s.event('pointerdown',1,100,100);s.event('pointermove',1,140,100);s.event('pointerup',1,140,100);};
+test('placing a floor: swiping existing buildings rotates without moving or selecting them',()=>{
+ const s=setup(true,1);swipe(s);assert.deepEqual(s.callbacks,[]);assert.notEqual(s.context.cameraRigRef.current.orbit.theta,0);
+});
+test('placing a floor: only the pending floor remains draggable',()=>{
+ const s=setup(true,0);swipe(s);assert.equal(s.callbacks[0][0],'move');assert.equal(s.context.cameraRigRef.current.orbit.theta,0);
+});
+test('placing a floor: existing attachments, statues, columns and scenery cannot steal a swipe',()=>{
+ for(const category of ['doors','arches','windows','columns','stairs','pediments','trim','statue','column','landscape']){
+  const s=setup(true,1);s.mesh.userData={levelIndex:0,detailCategory:category,detailId:'keep',detailFace:'front'};
+  if(category==='doors')Object.assign(s.mesh.userData,{doorId:'keep',doorFace:'front'});
+  if(category==='arches')Object.assign(s.mesh.userData,{archId:'keep',archFace:'front'});
+  if(category==='statue'){s.context.levelGroupsRef.current=[];s.context.statueGroupsRef.current=[s.root];s.root.userData={statueId:'keep'};}
+  if(['column','landscape'].includes(category)){s.context.levelGroupsRef.current=[];s.context.siteObjectGroupsRef.current=[s.root];s.root.userData={siteObjectKind:category,siteObjectId:'keep'};}
+  swipe(s);assert.deepEqual(s.callbacks,[],category);assert.notEqual(s.context.cameraRigRef.current.orbit.theta,0,category);
+ }
+});
+test('placing a floor: pinching an existing wall zooms without resizing it',()=>{
+ const s=setup(true,1),wall=new THREE.Mesh(new THREE.BoxGeometry(),new THREE.MeshBasicMaterial()),perimeter=new THREE.Group();perimeter.add(wall);
+ s.context.perimeterGroupRef.current=perimeter;s.context.liveRef.current.perimeter={margin:1};s.context.liveRef.current.onResizePerimeter=m=>s.callbacks.push(['resize',m]);s.context.raycasterRef.current.intersectObjects=()=>[{object:wall,distance:1}];
+ s.event('pointerdown',1,100,200);s.event('pointerdown',2,220,200);s.event('pointermove',1,40,200);s.event('pointermove',2,280,200);
+ assert.deepEqual(s.callbacks,[]);assert.notEqual(s.context.cameraRigRef.current.orbit.radius,19);
 });

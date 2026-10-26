@@ -406,6 +406,7 @@ export default function TempleBuilderPage() {
       fresh.x=(anchor.x||0)+(anchor.width+nextWidth)/14+.35;
       fresh.z=anchor.z||0;
     }
+    setMoveMode(false);
     setPendingBuilding(fresh);
     setSelectedLevel(levels.length);
     setSelectedFace(null);
@@ -493,7 +494,7 @@ export default function TempleBuilderPage() {
         <div className="flex items-center justify-between px-4 pb-1 pt-3"><p className="studio-eyebrow">{moveMode?"POSITION OBJECTS":panel?"CRAFT YOUR SANCTUARY":"YOUR BUILDING SITE"}</p><div className="flex items-center gap-3"><button type="button" onClick={clearSite} disabled={!hasSiteContent} className="rounded-lg border border-red-200/25 px-2 py-1 text-[10px] text-red-100 disabled:opacity-40">Clear site</button><span role="status" className="text-[10px] text-slate-400">{saveState==="saved"?"● Saved on device":saveState==="error"?"Save unavailable · download a copy":"Opening design…"}</span></div></div>
         <div className="flex items-center gap-2 px-3 pb-2">
           {panel===null ? <>
-            <button onClick={()=>{setPanel("add");setDetailCategory(null);}} className="flex-1 rounded-xl bg-amber-200 px-3 py-3 text-sm font-bold text-black">+ Add</button>
+            <button onClick={()=>{setMoveMode(false);setPanel("add");setDetailCategory(null);}} className="flex-1 rounded-xl bg-amber-200 px-3 py-3 text-sm font-bold text-black">+ Add</button>
             {levels.length>0&&<button onClick={()=>{setActiveObject("building");setSelectedLevel(Math.min(selectedLevel,levels.length-1));setPanel("edit");setDetailCategory("levels");}} className="flex-1 rounded-xl bg-amber-200/20 border border-amber-200/30 px-2 py-3 text-sm font-semibold">Levels ({levels.length})</button>}
             <button onClick={()=>{if(!activeObject&&levels.length){setActiveObject("building");setSelectedLevel(Math.min(selectedLevel,levels.length-1));}if(activeObject==="building"||(!activeObject&&levels.length))setPanel("edit");else if(activeObject==="column")setPanel("site-columns");else if(activeObject==="statue")setPanel("statues");else if(activeObject==="landscape")setPanel("scenery");}} className="flex-1 rounded-xl bg-white/15 px-3 py-3 text-sm font-semibold">Edit</button>
             <button aria-pressed={moveMode} onClick={()=>setMoveMode(v=>!v)} className={`flex-1 rounded-xl border px-3 py-3 text-sm font-semibold ${moveMode?"border-amber-200 bg-amber-200 text-black":"border-white/15 bg-white/5"}`}>{moveMode?"Moving":"Move"}</button>

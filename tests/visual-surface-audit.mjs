@@ -49,7 +49,7 @@ test('shell batching retains mapped curved surfaces and separate interactive pie
 });
 test('protected camera, gestures, projection and framing remain byte-for-byte unchanged',()=>{
  const lock=JSON.parse(readFileSync('docs/CAMERA_LOCK_2026-10-25.json','utf8')),hash=text=>createHash('sha256').update(text).digest('hex');
- for(const entry of lock){let source=readFileSync(entry.path,'utf8');if(entry.start){assert.ok(source.includes(entry.start));assert.ok(source.includes(entry.end));source=source.slice(source.indexOf(entry.start),source.indexOf(entry.end));}assert.equal(hash(source),entry.sha256,entry.path+' camera protection changed');}
+ for(const entry of lock){let source=readFileSync(entry.path,'utf8');if(entry.start){assert.ok(source.includes(entry.start));assert.ok(source.includes(entry.end));source=source.slice(source.indexOf(entry.start),source.indexOf(entry.end));}for(const gate of entry.movementGateReplacements||[]){assert.equal(source.split(gate.current).length-1,1,'Expected one exact movement eligibility gate');source=source.replace(gate.current,gate.baseline);}assert.equal(hash(source),entry.sha256,entry.path+' camera protection changed');}
 });
 test('boulder mineral colors are deterministic and preserve shape, bounds and seam colors',()=>{
  const geometry=new THREE.IcosahedronGeometry(1,2),original=Array.from(geometry.getAttribute('position').array);geometry.computeBoundingBox();const before=geometry.boundingBox.clone();

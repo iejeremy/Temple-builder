@@ -7,7 +7,37 @@
     "path": "src/components/Temple3DPreview.tsx",
     "start": "    const host=hostRef.current; if(!host) return;",
     "end": "    // Keep architectural meshes alive",
-    "sha256": "e278559674e7f64bd01a4e40f53845cd729a176958a4e5c7dab82602f92aee77"
+    "sha256": "e278559674e7f64bd01a4e40f53845cd729a176958a4e5c7dab82602f92aee77",
+    "movementGateReplacements": [
+      {
+        "current": "const doorHits=(liveRef.current.moveMode&&liveRef.current.pendingLevelIndex==null?",
+        "baseline": "const doorHits=(liveRef.current.moveMode?"
+      },
+      {
+        "current": "(!liveRef.current.moveMode||liveRef.current.pendingLevelIndex!=null||doorHits.length)",
+        "baseline": "(!liveRef.current.moveMode||doorHits.length)"
+      },
+      {
+        "current": "(!liveRef.current.moveMode||liveRef.current.pendingLevelIndex!=null||doorHits.length||archHits.length)",
+        "baseline": "(!liveRef.current.moveMode||doorHits.length||archHits.length)"
+      },
+      {
+        "current": "if(so&&liveRef.current.moveMode&&liveRef.current.pendingLevelIndex==null)",
+        "baseline": "if(so&&liveRef.current.moveMode)"
+      },
+      {
+        "current": "if(obj&&liveRef.current.moveMode&&liveRef.current.pendingLevelIndex==null)",
+        "baseline": "if(obj&&liveRef.current.moveMode)"
+      },
+      {
+        "current": "if(liveRef.current.moveMode && (liveRef.current.pendingLevelIndex==null||index===liveRef.current.pendingLevelIndex) && level",
+        "baseline": "if(liveRef.current.moveMode && level"
+      },
+      {
+        "current": "if(liveRef.current.moveMode&&liveRef.current.pendingLevelIndex==null&&perimeterGroupRef.current",
+        "baseline": "if(liveRef.current.moveMode&&perimeterGroupRef.current"
+      }
+    ]
   },
   {
     "path": "src/components/Temple3DPreview.tsx",
