@@ -11,6 +11,7 @@ import { batchBuildingShell, perimeterPlan } from "./builderGeometry";
 import { createGroundSurface, outdoorRadiance, naturalLight, type LandscapeTheme } from "./naturalLighting";
 import { TempleCameraController, type TempleView } from "./TempleCameraController";
 import { finishArchitecturalSurfaces } from "./architecturalSurfaces";
+import { createBuildingTrim } from "./buildingTrim";
 
 const COLORS: Record<BuilderMaterial, number> = { marble:0xe7e2da,sandstone:0xb98b5b,limestone:0xcbbd9d,obsidian:0x17191d,granite:0x62636a,travertine:0xc7a77d,brick:0x884838,stone:0x77736b,concrete:0x92908a,stucco:0xd8ccb8,plaster:0xe0d9ca,timber:0x70472f,bronze:0x8a5b32,gold:0xc39a36 };
 
@@ -814,11 +815,9 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       }
       for(const trim of level.trims||[]){
         const attachmentStart=lg.children.length;
-        const pos=facePlace(trim.face,trim.u||0,trim.style==="base"?baseY+.12:trim.style==="crown"||trim.style==="dentils"||trim.style==="frieze"?baseY+h-.16:baseY+h*.72,.11);
-        const len=(trim.face==="front"||trim.face==="back")?w:d;
-        const tg=new THREE.BoxGeometry(len,trim.style==="frieze"?.28:.12,.12);
-        const tm=new THREE.Mesh(tg,detailMat());tm.position.set(pos.x,pos.y,pos.z);tm.rotation.y=pos.rot;tm.userData.levelIndex=index;tm.userData.detailCategory="trim";tm.userData.detailId=trim.id;tm.userData.detailFace=trim.face;lg.add(tm);
-        if(["dentils","greek-fret","acanthus","rosette"].includes(trim.style)){for(let k=-4;k<=4;k++){const deco=new THREE.Mesh(new THREE.BoxGeometry(.12,.12,.08),detailMat());const du=k*len/10;if(trim.face==="front"||trim.face==="back")deco.position.set(du,pos.y-.13,pos.z);else deco.position.set(pos.x,pos.y-.13,du);lg.add(deco);}}
+        const y=trim.style==="base"?baseY+.12:trim.style==="crown"||trim.style==="dentils"||trim.style==="frieze"?baseY+h-.16:baseY+h*.72;
+        const tm=new THREE.Mesh(createBuildingTrim(level.shape,w,d,trim),detailMat());tm.position.y=y;
+        tm.userData={levelIndex:index,detailCategory:"trim",detailId:trim.id,detailFace:trim.face};lg.add(tm);
               tagParts(attachmentStart,"trim",trim);
       }
       for(const stair of level.stairs||[]){
