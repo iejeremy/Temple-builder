@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { getHostedStudio, readStudioDraft, writeStudioDraft, type HostedStudio } from "@/components/hostedStudio";
 import { TempleGlyph } from "@/components/TempleGlyph";
 import { useEffect, useRef, useState } from "react";
 
@@ -33,8 +34,9 @@ export type TowerShape = "round"|"square"|"octagon"|"hexagon"|"star"|"spire";
 export type Perimeter = { style:PerimeterStyle; material:BuilderMaterial; margin:number; height:number; thickness:number; towerShape:TowerShape; towers:boolean; gate:boolean; arches:boolean; columns:boolean; };
 export type StatueKind = "guardian"|"angel"|"lion";
 export type StatueFinish = "marble"|"bronze"|"gold"|"obsidian";
-export type LandscapeKind = "tree"|"garden"|"path"|"fountain"|"pond"|"rock"|"boulder"|"grass"|"hill"|"river"|"creek";
-export type LandscapeItem = {id:string;kind:LandscapeKind;x:number;z:number;scale:number;rotation:number;treeStyle?:"broadleaf"|"pine"|"cypress"};
+export type CompanionStyle = "dog"|"cat"|"rabbit"|"fox"|"bird"|"tortoise";
+export type LandscapeKind = "tree"|"garden"|"path"|"fountain"|"pond"|"rock"|"boulder"|"grass"|"hill"|"river"|"creek"|"companion";
+export type LandscapeItem = {id:string;kind:LandscapeKind;x:number;z:number;scale:number;rotation:number;treeStyle?:"broadleaf"|"pine"|"cypress";companionStyle?:CompanionStyle};
 export type SiteColumn = { id:string; style:ColumnStyle; material:BuilderMaterial; x:number; z:number; height:number; radius:number; rotation:number; };
 export type Statue = { id:string; kind:StatueKind; finish:StatueFinish; x:number; z:number; rotation:number; scale:number; };
 export type BuildingLevel = { architecture?: "maya"|"egyptian"|"hindu"|"greek"|"gothic"|"echoes";
@@ -78,6 +80,8 @@ function ensureBuildingIds(levels:BuildingLevel[]):BuildingLevel[]{
 }
 
 export default function TempleBuilderPage() {
+  const [hosted,setHosted] = useState<HostedStudio|null>(null);
+  const hostedView=hosted?.mode==="view";
   const [shape, setShape] = useState<BuildingShape | null>(null);
   const [material, setMaterial] = useState<BuilderMaterial>("marble");
   const [width, setWidth] = useState(32);
@@ -110,7 +114,8 @@ export default function TempleBuilderPage() {
   const [siteLoaded,setSiteLoaded] = useState(false);
   useEffect(()=>{
     try {
-      const raw=window.localStorage.getItem("echoes-temple-builder-v1");
+      setHosted(getHostedStudio());
+      const raw=readStudioDraft();
       if(raw){
         const saved=JSON.parse(raw);
         if(Array.isArray(saved.levels)){setLevels(ensureBuildingIds(saved.levels));if(saved.levels.length)setShape(saved.levels[0].shape);}
@@ -129,7 +134,7 @@ export default function TempleBuilderPage() {
   },[]);
   useEffect(()=>{
     if(!siteLoaded)return;
-    try{window.localStorage.setItem("echoes-temple-builder-v1",JSON.stringify({levels,perimeter,siteColumns,statues,landscapeItems,scenery}));setSaveState("saved");}
+    try{writeStudioDraft(JSON.stringify({levels,perimeter,siteColumns,statues,landscapeItems,scenery}));setSaveState("saved");}
     catch(err){setSaveState("error");console.warn("Could not save local temple design",err);}
   },[siteLoaded,levels,perimeter,siteColumns,statues,landscapeItems,scenery]);
 
@@ -425,11 +430,11 @@ export default function TempleBuilderPage() {
 
   return (
     <main className="relative h-[100dvh] overflow-hidden bg-[#b9c4cb] text-white">
-      <TempleWorld moveMode={moveMode||!!pendingBuilding} levels={pendingBuilding?[...levels,pendingBuilding]:levels} pendingLevelIndex={pendingBuilding?levels.length:null} perimeter={perimeter} statues={statues} siteColumns={siteColumns} scenery={scenery} landscapeItems={landscapeItems} onSelectSiteColumn={(id:string)=>{setSelectedSiteColumnId(id);setActiveObject("column");setPanel("site-columns");}} onMoveSiteColumn={(id:string,x:number,z:number)=>setSiteColumns(v=>v.map(c=>c.id===id?{...c,x,z}:c))} onSelectLandscape={(id:string)=>{setSelectedLandscapeId(id);setActiveObject("landscape");setPanel("scenery");}} onMoveLandscape={(id:string,x:number,z:number)=>setLandscapeItems(v=>v.map(c=>c.id===id?{...c,x,z}:c))} selectedStatueId={selectedStatueId} selectedLevel={selectedLevel}
-        onSelectLevel={(index) => { setSelectedLevel(index); setSelectedFace(null); setDetailCategory(null); setActiveObject("building");setPanel("edit"); }}
-        onSelectFace={(index,face) => { setSelectedLevel(index); setSelectedFace(face); }}
+      <TempleWorld moveMode={!hostedView&&(moveMode||!!pendingBuilding)} levels={pendingBuilding?[...levels,pendingBuilding]:levels} pendingLevelIndex={pendingBuilding?levels.length:null} perimeter={perimeter} statues={statues} siteColumns={siteColumns} scenery={scenery} landscapeItems={landscapeItems} onSelectSiteColumn={(id:string)=>{if(hostedView){hosted.select("scenery",id);return;}setSelectedSiteColumnId(id);setActiveObject("column");setPanel("site-columns");}} onMoveSiteColumn={(id:string,x:number,z:number)=>setSiteColumns(v=>v.map(c=>c.id===id?{...c,x,z}:c))} onSelectLandscape={(id:string)=>{if(hostedView){const item=landscapeItems.find(item=>item.id===id);hosted.select(item?.kind==="companion"?"companion":item?.kind==="tree"||item?.kind==="garden"?"people":"scenery",id);return;}setSelectedLandscapeId(id);setActiveObject("landscape");setPanel("scenery");}} onMoveLandscape={(id:string,x:number,z:number)=>setLandscapeItems(v=>v.map(c=>c.id===id?{...c,x,z}:c))} selectedStatueId={selectedStatueId} selectedLevel={selectedLevel}
+        onSelectLevel={(index) => { if(hostedView){hosted.select("temple",levels[index]?.buildingId||levels[index]?.id);return;}setSelectedLevel(index); setSelectedFace(null); setDetailCategory(null); setActiveObject("building");setPanel("edit"); }}
+        onSelectFace={(index,face) => { if(hostedView)return;setSelectedLevel(index); setSelectedFace(face); }}
         onCameraFacingChange={setViewerFace}
-        onSelectDetail={(index,face,category) => { setSelectedLevel(index); setSelectedFace(face); setDetailCategory(category); setActiveObject("building");setPanel("edit"); }}
+        onSelectDetail={(index,face,category) => { if(hostedView){hosted.select("temple",levels[index]?.buildingId||levels[index]?.id);return;}setSelectedLevel(index); setSelectedFace(face); setDetailCategory(category); setActiveObject("building");setPanel("edit"); }}
         onMoveLevel={(index,x,z) => {
           if(pendingBuilding && index===levels.length){setPendingBuilding(p=>p?{...p,x,z}:p);return;}
           const currentLevel=levels[index];
@@ -448,7 +453,7 @@ export default function TempleBuilderPage() {
             });
           });
         }}
-        onPatioChange={(index,patio) => setLevels(current => current.map((l,i)=>i===index?{...l,patio}:l))}
+        onPatioChange={(index,patio) => !hostedView&&setLevels(current => current.map((l,i)=>i===index?{...l,patio}:l))}
         onMoveWindow={(levelIndex,id,u,v) => setLevels(current => current.map((l,i)=>i===levelIndex?{...l,windows:l.windows.map(win=>win.id===id?{...win,u,v}:win)}:l))}
         onMoveDoor={(levelIndex,id,u) => setLevels(current => current.map((l,i)=>i===levelIndex?{...l,doors:l.doors.map(door=>door.id===id?{...door,u}:door)}:l))}
         onMoveArch={(levelIndex,id,u) => setLevels(current => current.map((l,i)=>i===levelIndex?{...l,arches:l.arches.map(arch=>arch.id===id?{...arch,u}:arch)}:l))}
@@ -463,9 +468,10 @@ export default function TempleBuilderPage() {
         }))}
         onResizePerimeter={(margin)=>setPerimeter(p=>p?{...p,margin}:p)}
         onSelectPerimeter={()=>{setPanel("walls");setWallStep("features");}}
-        onSelectStatue={(id)=>{setSelectedStatueId(id);setActiveObject("statue");setPanel("statues");}}
+        onSelectStatue={(id)=>{if(hostedView){hosted.select("music",id);return;}setSelectedStatueId(id);setActiveObject("statue");setPanel("statues");}}
         onMoveStatue={(id,x,z)=>setStatues(v=>v.map(s=>s.id===id?{...s,x,z}:s))} />
 
+      {!hostedView&&<>
       <header data-builder-top-toolbar className="studio-header pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-3 p-4 sm:p-6">
         <div>
           <p className="studio-eyebrow">ECHOES <span> / </span> CREATION STUDIO</p>
@@ -680,6 +686,7 @@ export default function TempleBuilderPage() {
           </div>
         )}
       </div>
+      </>}
     </main>
   );
 }

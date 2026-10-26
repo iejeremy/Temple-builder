@@ -22,3 +22,5 @@ test('water ribbon has upward normals and distinct river/creek widths',()=>{
  const a=new THREE.Box3().setFromObject(river),b=new THREE.Box3().setFromObject(creek);assert.ok(a.getSize(new THREE.Vector3()).z>b.getSize(new THREE.Vector3()).z);
 });
 test('legacy scenery continues through the established render path',()=>{assert.equal(addNaturalScenery(new THREE.Group(),{kind:'tree'}),false);});
+
+test('all six companion counterparts have finite grounded 3D geometry and retain site picking identity',()=>{for(const companionStyle of ['dog','cat','rabbit','fox','bird','tortoise']){const g=new THREE.Group();g.userData.siteObjectId='owned-pet';assert.equal(addNaturalScenery(g,{kind:'companion',companionStyle}),true);const b=new THREE.Box3().setFromObject(g);assert.ok(b.min.y>=-.001&&b.max.y>0);assert.equal(g.userData.siteObjectId,'owned-pet');g.traverse(o=>{if(o.geometry)assert.ok([...o.geometry.getAttribute('position').array].every(Number.isFinite));});}});

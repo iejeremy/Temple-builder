@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { addCompanion } from "./companionModels";
 import type { LandscapeItem } from "@/app/page";
 import { placedWaterCurve, waterGeometry, bankGeometry, createWaterMaterials, rippleGeometry } from "./sceneryWater";
 import { groundColor } from "./naturalLighting";
@@ -15,6 +16,7 @@ export function waterRibbon(width:number,length:number,height:number){
 export function addNaturalScenery(group:THREE.Group,item:LandscapeItem):boolean{
   const material=(color:number,roughness=.95)=>new THREE.MeshStandardMaterial({color,roughness});
   const add=(geometry:THREE.BufferGeometry,mat:THREE.Material,x=0,y=0,z=0)=>{const mesh=new THREE.Mesh(geometry,mat);mesh.position.set(x,y,z);group.add(mesh);return mesh;};
+  if(item.kind==='companion'){addCompanion(group,item.companionStyle||'dog');return true;}
   if(item.kind==='boulder'){
     const geo=new THREE.IcosahedronGeometry(1,2),position=geo.getAttribute('position');
     for(let i=0;i<position.count;i++){
