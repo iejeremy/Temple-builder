@@ -12,6 +12,8 @@ import { createGroundSurface, createTerrainMaterial, distantTerrainGeometry, out
 import { TempleCameraController, type TempleView } from "./TempleCameraController";
 import { finishArchitecturalSurfaces } from "./architecturalSurfaces";
 import { createBuildingTrim } from "./buildingTrim";
+import { createStoneSurface } from "./stoneSurface";
+import { attachPreviewDiagnostics } from "./previewDiagnostics";
 
 const COLORS: Record<BuilderMaterial, number> = { marble:0xe7e2da,sandstone:0xb98b5b,limestone:0xcbbd9d,obsidian:0x17191d,granite:0x62636a,travertine:0xc7a77d,brick:0x884838,stone:0x77736b,concrete:0x92908a,stucco:0xd8ccb8,plaster:0xe0d9ca,timber:0x70472f,bronze:0x8a5b32,gold:0xc39a36 };
 
@@ -43,6 +45,7 @@ const makeMaterial=(kind:BuilderMaterial,color=COLORS[kind],selected=false)=>{
     emissive:selected?0x211b08:0x000000, emissiveIntensity:selected?.1:0
   });
   material.userData.architecturalSurface=true;
+  material.userData.surfaceKind=kind;
   return material;
 };
 
@@ -91,6 +94,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
   const [showGrid,setShowGrid]=useState(false);
   const [renderError,setRenderError]=useState(false);
   const [quality,setQuality]=useState<"auto"|"detail">("auto");
+  const stoneSurfaceRef=useRef<ReturnType<typeof createStoneSurface>|null>(null);
   const gridRef=useRef<THREE.GridHelper|null>(null);
   const viewRef=useRef<(view:TempleView)=>void>(()=>{});
   const selectionBoundsRef=useRef<()=>void>(()=>{});
@@ -144,6 +148,22 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     // Dispose mesh materials, but leave their shared texture maps alive.
     materials.forEach(material=>material.dispose());
   };
+
+  // Start optional surface/diagnostic work after the mounted scene has finished
+  // its synchronous setup. Keep the approved camera setup block unchanged.
+  useEffect(()=>{
+    let cancelled=false,cleanup:(()=>void)|undefined;
+    queueMicrotask(()=>{
+      if(cancelled)return;
+      const renderer=rendererRef.current,host=hostRef.current;if(!renderer||!host)return;
+      const surface=createStoneSurface(renderer,()=>renderCameraRef.current());
+      stoneSurfaceRef.current=surface;
+      if(groupRef.current)surface.bind(groupRef.current);
+      const detachDiagnostics=attachPreviewDiagnostics(host,renderer);
+      cleanup=()=>{stoneSurfaceRef.current=null;surface.dispose();detachDiagnostics();};
+    });
+    return ()=>{cancelled=true;cleanup?.();};
+  },[]);
 
   useEffect(() => {
     const host=hostRef.current; if(!host) return;
@@ -932,6 +952,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     }
     finishArchitecturalSurfaces(group);if(perimeterGroupRef.current)finishArchitecturalSurfaces(perimeterGroupRef.current);
     enableShadows(group);if(perimeterGroupRef.current)enableShadows(perimeterGroupRef.current);statueGroupsRef.current.forEach(enableShadows);
+    stoneSurfaceRef.current?.bind(group);
     // Structural bounds define the orbit pivot; site decorations never move it.
     group.updateWorldMatrix(true,true);
     const buildingBounds=new THREE.Box3();
