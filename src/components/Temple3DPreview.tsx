@@ -8,7 +8,7 @@ import { addNaturalScenery } from "./naturalScenery";
 import { addSceneryTree } from "./sceneryTrees";
 import { createEnvironmentLandscape } from "./environmentLandscape";
 import { batchBuildingShell, perimeterPlan } from "./builderGeometry";
-import { createGroundSurface, outdoorRadiance, naturalLight, type LandscapeTheme } from "./naturalLighting";
+import { createGroundSurface, createTerrainMaterial, distantTerrainGeometry, outdoorRadiance, naturalLight, type LandscapeTheme } from "./naturalLighting";
 import { TempleCameraController, type TempleView } from "./TempleCameraController";
 import { finishArchitecturalSurfaces } from "./architecturalSurfaces";
 import { createBuildingTrim } from "./buildingTrim";
@@ -88,7 +88,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
   onSelectLandscape?: (id:string)=>void;
   onMoveLandscape?: (id:string,x:number,z:number)=>void;
 }) {
-  const [showGrid,setShowGrid]=useState(true);
+  const [showGrid,setShowGrid]=useState(false);
   const [renderError,setRenderError]=useState(false);
   const [quality,setQuality]=useState<"auto"|"detail">("auto");
   const gridRef=useRef<THREE.GridHelper|null>(null);
@@ -178,7 +178,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     // Low-cost hemisphere bounce keeps recesses readable without flattening the sun shadows.
     const bounce=new THREE.HemisphereLight(0xdde8f2,0x554b3e,.08);scene.add(bounce);
     const groundSurface=createGroundSurface(renderer.capabilities.getMaxAnisotropy());
-    const terrainMaterial=new THREE.MeshStandardMaterial({color:0xffffff,map:groundSurface.map("garden"),roughnessMap:groundSurface.roughness,bumpMap:groundSurface.bump,bumpScale:.035,roughness:1});
+    const terrainMaterial=createTerrainMaterial(groundSurface);
     terrainMaterial.name="natural-terrain";
     const ground=new THREE.Mesh(new THREE.PlaneGeometry(256,256),terrainMaterial);ground.name="terrain-ground";ground.receiveShadow=true;
     ground.rotation.x=-Math.PI/2;scene.add(ground);
@@ -196,17 +196,8 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     // Screen-space sky gradient and a single low-poly distant ridgeline add depth.
     const skyCanvas=document.createElement("canvas");skyCanvas.width=2;skyCanvas.height=128;
     const skyTexture=new THREE.CanvasTexture(skyCanvas);skyTexture.colorSpace=THREE.SRGBColorSpace;
-    const hillsGeometry=new THREE.BufferGeometry(),hillVertices:number[]=[],hillIndices:number[]=[],hillUvs:number[]=[];
-    const sectors=96,rings=5;
-    for(let ring=0;ring<rings;ring++)for(let i=0;i<=sectors;i++){
-      const a=i/sectors*Math.PI*2,r=48+ring*18;
-      const height=Math.sin(ring/(rings-1)*Math.PI)*(7+Math.sin(a*3+.8)*3+Math.sin(a*7)*2);
-      hillVertices.push(Math.cos(a)*r,height-.04,Math.sin(a)*r);
-      hillUvs.push(Math.cos(a)*r/256+.5,.5-Math.sin(a)*r/256);
-      if(ring<rings-1&&i<sectors){const k=ring*(sectors+1)+i;hillIndices.push(k,k+sectors+1,k+1,k+1,k+sectors+1,k+sectors+2);}
-    }
-    hillsGeometry.setAttribute("position",new THREE.Float32BufferAttribute(hillVertices,3));hillsGeometry.setAttribute("uv",new THREE.Float32BufferAttribute(hillUvs,2));hillsGeometry.setIndex(hillIndices);hillsGeometry.computeVertexNormals();
-    const hillMaterial=terrainMaterial.clone();hillMaterial.side=THREE.DoubleSide;
+    const hillsGeometry=distantTerrainGeometry();
+    const hillMaterial=createTerrainMaterial(groundSurface);hillMaterial.side=THREE.DoubleSide;
     const hills=new THREE.Mesh(hillsGeometry,hillMaterial);scene.add(hills);
     const applyScenery=(kind:"garden"|"desert"|"twilight")=>{
       const light=naturalLight[kind],bg=light.sky;

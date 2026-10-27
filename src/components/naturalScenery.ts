@@ -37,7 +37,7 @@ export function addNaturalScenery(group:THREE.Group,item:LandscapeItem):boolean{
     for(let i=0;i<240;i++){
       const a=noise(i+1)*Math.PI*2,r=Math.sqrt(noise(i+511))*1.7;
       dummy.position.set(Math.cos(a)*r,.025,Math.sin(a)*r);dummy.rotation.y=noise(i+101)*Math.PI*2;dummy.scale.setScalar(.55+noise(i+305)*.9);dummy.updateMatrix();
-      grass.setMatrixAt(i,dummy.matrix);color.setHSL(.21+noise(i+33)*.06,.29,.23+noise(i+45)*.13).convertSRGBToLinear();grass.setColorAt(i,color);
+      grass.setMatrixAt(i,dummy.matrix);color.setHSL(.21+noise(i+33)*.06,.29,.33+noise(i+45)*.13).convertSRGBToLinear();grass.setColorAt(i,color);
     }
     grass.computeBoundingSphere();group.add(grass);
     const pick=add(new THREE.CylinderGeometry(1.7,1.7,.018,32),new THREE.MeshBasicMaterial({transparent:true,opacity:0,depthWrite:false}),0,.012,0);

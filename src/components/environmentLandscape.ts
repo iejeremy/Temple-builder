@@ -112,7 +112,7 @@ export function createEnvironmentLandscape(){
       outsideClearing(p,scale*1.6+.25);
       rockPositions.push(p);
       dummy.position.copy(p);dummy.position.y=scale*(.18+random(i+56)*.15);dummy.rotation.set(random(i)*.5,random(i+6)*6.28,random(i+7)*.4);dummy.scale.set(scale*1.3,scale*.65,scale);dummy.updateMatrix();rocks.setMatrixAt(i,dummy.matrix);
-      color.setHSL(.12+random(i+20)*.05,.07, .32+random(i+3)*.17-(bankDistance(p)<1.5?.055:0)).convertSRGBToLinear();rocks.setColorAt(i,color);
+      color.setHSL(.12+random(i+20)*.05,.07, .38+random(i+3)*.17-(bankDistance(p)<1.5?.055:0)).convertSRGBToLinear();rocks.setColorAt(i,color);
       dummy.position.set(p.x,.019,p.z);dummy.rotation.set(0,random(i+6)*6.28,0);dummy.scale.set(scale*2,1,scale*1.6);dummy.updateMatrix();rockContacts.setMatrixAt(i,dummy.matrix);
     }
     // Generate patch centers once; individual blades reuse their local habitat.
@@ -135,7 +135,7 @@ export function createEnvironmentLandscape(){
       dummy.position.copy(p);dummy.position.y=.015;dummy.rotation.set(0,random(i+8)*6.28,0);
       const height=.38+random(i+18)*(.65+moisture*.9);
       dummy.scale.set(hidden?0:.65+random(i+71)*.55,hidden?0:height,hidden?0:1);dummy.updateMatrix();grass.setMatrixAt(i,dummy.matrix);
-      color.setHSL(.19+moisture*.045+random(i+4)*.045,.25+moisture*.12,.24+random(i+11)*.12-moisture*.035).convertSRGBToLinear();grass.setColorAt(i,color);
+      color.setHSL(.19+moisture*.045+random(i+4)*.045,.25+moisture*.12,.34+random(i+11)*.12-moisture*.035).convertSRGBToLinear();grass.setColorAt(i,color);
     }
     for(let i=0;i<8;i++){
       const sx=1.8+random(i)*1.1,sz=1.6+random(i+9),radius=4*Math.max(sx,sz);

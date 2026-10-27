@@ -37,6 +37,16 @@
         "current": "if(liveRef.current.moveMode&&liveRef.current.pendingLevelIndex==null&&perimeterGroupRef.current",
         "baseline": "if(liveRef.current.moveMode&&perimeterGroupRef.current"
       }
+    ],
+    "renderingReplacements": [
+      {
+        "current": "createTerrainMaterial(groundSurface);\n    terrainMaterial.name=",
+        "baseline": "new THREE.MeshStandardMaterial({color:0xffffff,map:groundSurface.map(\"garden\"),roughnessMap:groundSurface.roughness,bumpMap:groundSurface.bump,bumpScale:.035,roughness:1});\n    terrainMaterial.name="
+      },
+      {
+        "current": "    const hillsGeometry=distantTerrainGeometry();\n    const hillMaterial=createTerrainMaterial(groundSurface);hillMaterial.side=THREE.DoubleSide;\n",
+        "baseline": "    const hillsGeometry=new THREE.BufferGeometry(),hillVertices:number[]=[],hillIndices:number[]=[],hillUvs:number[]=[];\n    const sectors=96,rings=5;\n    for(let ring=0;ring<rings;ring++)for(let i=0;i<=sectors;i++){\n      const a=i/sectors*Math.PI*2,r=48+ring*18;\n      const height=Math.sin(ring/(rings-1)*Math.PI)*(7+Math.sin(a*3+.8)*3+Math.sin(a*7)*2);\n      hillVertices.push(Math.cos(a)*r,height-.04,Math.sin(a)*r);\n      hillUvs.push(Math.cos(a)*r/256+.5,.5-Math.sin(a)*r/256);\n      if(ring<rings-1&&i<sectors){const k=ring*(sectors+1)+i;hillIndices.push(k,k+sectors+1,k+1,k+1,k+sectors+1,k+sectors+2);}\n    }\n    hillsGeometry.setAttribute(\"position\",new THREE.Float32BufferAttribute(hillVertices,3));hillsGeometry.setAttribute(\"uv\",new THREE.Float32BufferAttribute(hillUvs,2));hillsGeometry.setIndex(hillIndices);hillsGeometry.computeVertexNormals();\n    const hillMaterial=terrainMaterial.clone();hillMaterial.side=THREE.DoubleSide;\n"
+      }
     ]
   },
   {

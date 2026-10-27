@@ -20,11 +20,11 @@ export function placedWaterCurve(length:number):WaterCurve{
 function courseGeometry(curve:WaterCurve,width:number,height:number,bank:boolean,steps:number){
   const across=bank?[-1,-.8,-.58,-.32,0,.32,.58,.8,1]:[-1,-.8,-.4,0,.4,.8,1];
   const positions:number[]=[],colors:number[]=[],uvs:number[]=[],indices:number[]=[],length=curve.getLength();
-  const deep=new THREE.Color(width<1.2?0x41665b:0x2d5355),shallow=new THREE.Color(width<1.2?0x9ba087:0x8a9a7f);
+  const deep=new THREE.Color(width<1.2?0x41665b:0x2d5355),shallow=new THREE.Color(width<1.2?0x89917a:0x738674);
   const wet=new THREE.Color(0x696b53),dry=new THREE.Color(0x9b977e),color=new THREE.Color();
   for(let i=0;i<=steps;i++){
     const t=i/steps,p=curve.getPoint(t),d=curve.getTangent(t),normal=new THREE.Vector3(d.z,0,-d.x).normalize();
-    const half=width*.5*(1+.045*Math.sin(t*19)+.025*Math.sin(t*43));
+    const half=width*.5*(1+.075*Math.sin(t*19)+.035*Math.sin(t*43)+.02*Math.sin(t*71));
     const padding=bank?.32+width*.12:0,outer=half+padding;
     for(let j=0;j<across.length;j++){
       const s=across[j],distance=Math.abs(s)*outer,edge=bank?clamp((distance-half)/Math.max(.01,padding)):Math.abs(s);
@@ -52,7 +52,7 @@ function rippleNormal(){
   const size=64,pixels=new Uint8Array(size*size*4),normal=new THREE.Vector3();
   for(let y=0;y<size;y++)for(let x=0;x<size;x++){
     const u=x/size*Math.PI*2,v=y/size*Math.PI*2;
-    const dx=1.8*Math.cos(u*3+v)+.6*Math.cos(u+v*5),dy=.6*Math.cos(u*3+v)+3*Math.cos(u+v*5);
+    const dx=1.2*Math.cos(u*3+v)+.4*Math.cos(u+v*5)+.65*Math.cos(u*5-v*2),dy=.4*Math.cos(u*3+v)+2*Math.cos(u+v*5)-.26*Math.cos(u*5-v*2);
     normal.set(-dx*.22,-dy*.22,1).normalize();const i=(y*size+x)*4;
     pixels[i]=(normal.x*.5+.5)*255;pixels[i+1]=(normal.y*.5+.5)*255;pixels[i+2]=(normal.z*.5+.5)*255;pixels[i+3]=255;
   }
@@ -62,7 +62,7 @@ function rippleNormal(){
 
 export function createWaterMaterials(){
   const normal=rippleNormal();
-  const water=new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.19,metalness:0,normalMap:normal,normalScale:new THREE.Vector2(.07,.07),envMapIntensity:1.1});
+  const water=new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:.24,metalness:0,normalMap:normal,normalScale:new THREE.Vector2(.1,.1),envMapIntensity:1.1});
   // The owning material's disposal releases its small private texture on deletion/rebuild.
   let released=false;water.addEventListener("dispose",()=>{if(!released){released=true;normal.dispose();}});
   const bank=new THREE.MeshStandardMaterial({color:0xffffff,vertexColors:true,roughness:1,transparent:true,depthWrite:false});
