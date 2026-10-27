@@ -1,6 +1,7 @@
 import * as THREE from "three";
 
-export type LandscapeTheme="garden"|"desert"|"twilight";
+import { sceneryPresets, sceneryThemes, type LandscapeTheme } from "./sceneryPresets";
+export type { LandscapeTheme } from "./sceneryPresets";
 const clamp=(x:number)=>Math.max(0,Math.min(1,x));
 const blend=(a:number,b:number,t:number)=>a+(b-a)*t;
 const hash=(x:number,z:number)=>{const n=Math.sin(x*127.1+z*311.7)*43758.5453;return n-Math.floor(n);};
@@ -9,15 +10,11 @@ function noise(x:number,z:number){
   const u=fx*fx*(3-2*fx),v=fz*fz*(3-2*fz);
   return blend(blend(hash(ix,iz),hash(ix+1,iz),u),blend(hash(ix,iz+1),hash(ix+1,iz+1),u),v);
 }
-const palettes={
-  garden:{grass:[116,135,84],earth:[125,110,84],dry:[150,143,96],gravel:[146,142,124]},
-  desert:{grass:[173,145,105],earth:[146,115,81],dry:[192,162,117],gravel:[166,151,124]},
-  twilight:{grass:[116,135,84],earth:[125,110,84],dry:[150,143,96],gravel:[146,142,124]}
-};
+
 
 /** World-space material variation; geometry stays flat and usable for building. */
 export function groundColor(x:number,z:number,theme:LandscapeTheme):[number,number,number]{
-  const p=palettes[theme];
+  const p=sceneryPresets[theme].ground;
   const soil=clamp((noise(x*.075+31,z*.075-17)-.43)*1.6);
   const dry=clamp((noise(x*.19-8,z*.19+24)-.48)*1.2);
   const gravel=clamp((noise(x*.33+18,z*.33+5)-.65)*1.35);
@@ -68,14 +65,13 @@ export function createGroundSurface(anisotropy:number){
     }
     ctx.putImageData(pixels,0,0);cached=texture(c,true);colorMaps.set(key,cached);return cached;
   };
-  return {map,bump,roughness,detail:micro,dispose(){colorMaps.forEach(t=>t.dispose());bump.dispose();roughness.dispose();micro.dispose();}};
+  return {map,bump,roughness,detail:micro,snow:{value:0},dispose(){colorMaps.forEach(t=>t.dispose());bump.dispose();roughness.dispose();micro.dispose();}};
 }
 
 /** Low-resolution linear sky/ground radiance for outdoor reflections and soft fill. */
 export function outdoorRadiance(theme:LandscapeTheme,width=128,height=64){
-  const top=new THREE.Color(theme==="twilight"?0x283650:theme==="desert"?0xb4c9d4:0x9dbbd4);
-  const horizon=new THREE.Color(theme==="twilight"?0xcc8c6e:theme==="desert"?0xe3cda7:0xd8dfd8);
-  const ground=new THREE.Color(theme==="desert"?0x8b7452:0x535c41);
+  const [skyColor,horizonColor,groundColor]=sceneryPresets[theme].reflection;
+  const top=new THREE.Color(skyColor),horizon=new THREE.Color(horizonColor),ground=new THREE.Color(groundColor);
   const pixels=new Float32Array(width*height*4),color=new THREE.Color();
   for(let y=0;y<height;y++){
     const elevation=Math.sin(((y+.5)/height-.5)*Math.PI);
@@ -87,11 +83,7 @@ export function outdoorRadiance(theme:LandscapeTheme,width=128,height=64){
   t.mapping=THREE.EquirectangularReflectionMapping;t.colorSpace=THREE.LinearSRGBColorSpace;t.needsUpdate=true;return t;
 }
 
-export const naturalLight={
-  garden:{sun:1.8,exposure:.95,sky:0xced9d5,sunColor:0xffedd0,fill:.14,ambient:.38,environment:.65},
-  desert:{sun:2.05,exposure:.92,sky:0xe3cda7,sunColor:0xffe3b8,fill:.12,ambient:.34,environment:.6},
-  twilight:{sun:1.6,exposure:1.05,sky:0x9a8592,sunColor:0xffbd90,fill:.24,ambient:.48,environment:.85}
-} as const;
+export const naturalLight=Object.fromEntries(sceneryThemes.map(id=>[id,sceneryPresets[id].light])) as {[K in LandscapeTheme]:typeof sceneryPresets[K]["light"]};
 
 /** A soft ground contact mark, shared by instanced tree and rock footprints. */
 export function contactShadowTexture(){
@@ -108,8 +100,10 @@ export function contactShadowTexture(){
 export function createTerrainMaterial(surface:ReturnType<typeof createGroundSurface>){
   const material=new THREE.MeshStandardMaterial({color:0xffffff,map:surface.map("garden"),roughnessMap:surface.roughness,bumpMap:surface.bump,bumpScale:.025,roughness:1});
   material.onBeforeCompile=shader=>{
-    shader.uniforms.terrainDetail={value:surface.detail};
-    shader.fragmentShader=shader.fragmentShader.replace("#include <map_pars_fragment>","#include <map_pars_fragment>\nuniform sampler2D terrainDetail;");
+    shader.uniforms.terrainDetail={value:surface.detail};shader.uniforms.terrainSnow=surface.snow;
+    shader.vertexShader=shader.vertexShader.replace("#include <common>","#include <common>\nvarying float vTerrainHeight;");
+    shader.vertexShader=shader.vertexShader.replace("#include <worldpos_vertex>","#include <worldpos_vertex>\nvTerrainHeight=(modelMatrix*vec4(transformed,1.0)).y;");
+    shader.fragmentShader=shader.fragmentShader.replace("#include <map_pars_fragment>","#include <map_pars_fragment>\nuniform sampler2D terrainDetail;\nuniform float terrainSnow;\nvarying float vTerrainHeight;");
     shader.fragmentShader=shader.fragmentShader.replace("#include <map_fragment>",`#include <map_fragment>
       #ifdef USE_MAP
         vec4 closeDetail=texture2D(terrainDetail,vMapUv*96.0);
@@ -117,9 +111,10 @@ export function createTerrainMaterial(surface:ReturnType<typeof createGroundSurf
         float living=smoothstep(-0.005,0.035,diffuseColor.g-diffuseColor.r);
         vec3 grain=mix(vec3(closeDetail.a*2.0),closeDetail.rgb*2.0,living);
         diffuseColor.rgb*=grain;
+        diffuseColor.rgb=mix(diffuseColor.rgb,vec3(0.79,0.85,0.89),smoothstep(5.2,9.2,vTerrainHeight)*terrainSnow);
       #endif`);
   };
-  material.customProgramCacheKey=()=>"echoes-terrain-detail-v1";
+  material.customProgramCacheKey=()=>"echoes-terrain-detail-v2";
   return material;
 }
 

@@ -9,6 +9,7 @@ import { addSceneryTree } from "./sceneryTrees";
 import { createEnvironmentLandscape } from "./environmentLandscape";
 import { batchBuildingShell, perimeterPlan } from "./builderGeometry";
 import { createGroundSurface, createTerrainMaterial, distantTerrainGeometry, outdoorRadiance, naturalLight, type LandscapeTheme } from "./naturalLighting";
+import { sceneryPresets } from "./sceneryPresets";
 import { TempleCameraController, type TempleView } from "./TempleCameraController";
 import { finishArchitecturalSurfaces } from "./architecturalSurfaces";
 import { createBuildingTrim } from "./buildingTrim";
@@ -68,7 +69,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
   statues: Statue[];
   siteColumns: SiteColumn[];
   landscapeItems: LandscapeItem[];
-  scenery: "garden"|"desert"|"twilight";
+  scenery: LandscapeTheme;
   selectedStatueId?: string | null;
   selectedLevel: number;
   moveMode?: boolean;
@@ -103,7 +104,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
   const geometryCacheRef=useRef(new Map<string,{key:string;group:THREE.Group}>());
   const hostRef = useRef<HTMLDivElement|null>(null);
   const environmentBoundsRef=useRef<((bounds:THREE.Box3)=>void)|null>(null);
-  const sceneryApplyRef=useRef<((kind:"garden"|"desert"|"twilight")=>void)|null>(null);
+  const sceneryApplyRef=useRef<((kind:LandscapeTheme)=>void)|null>(null);
   const groupRef = useRef<THREE.Group|null>(null);
   const sceneRef = useRef<THREE.Scene|null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer|null>(null);
@@ -200,7 +201,9 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     const groundSurface=createGroundSurface(renderer.capabilities.getMaxAnisotropy());
     const terrainMaterial=createTerrainMaterial(groundSurface);
     terrainMaterial.name="natural-terrain";
-    const ground=new THREE.Mesh(new THREE.PlaneGeometry(256,256),terrainMaterial);ground.name="terrain-ground";ground.receiveShadow=true;
+    const ground=new THREE.Mesh(new THREE.PlaneGeometry(2048,2048),terrainMaterial);ground.name="terrain-ground";ground.receiveShadow=true;
+    // Preserve world-sized UVs while extending the existing flat backdrop beyond view.
+    const terrainUV=ground.geometry.getAttribute("uv");for(let i=0;i<terrainUV.count;i++)terrainUV.setXY(i,terrainUV.getX(i)*8-3.5,terrainUV.getY(i)*8-3.5);
     ground.rotation.x=-Math.PI/2;scene.add(ground);
     const grid=new THREE.GridHelper(96,96,0xc3b49a,0xa4a394);grid.position.y=.012;
     (grid.material as THREE.Material).transparent=true;(grid.material as THREE.Material).opacity=.15;
@@ -219,13 +222,14 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     const hillsGeometry=distantTerrainGeometry();
     const hillMaterial=createTerrainMaterial(groundSurface);hillMaterial.side=THREE.DoubleSide;
     const hills=new THREE.Mesh(hillsGeometry,hillMaterial);scene.add(hills);
-    const applyScenery=(kind:"garden"|"desert"|"twilight")=>{
-      const light=naturalLight[kind],bg=light.sky;
+    const applyScenery=(kind:LandscapeTheme)=>{
+      const light=naturalLight[kind],bg=light.sky,preset=sceneryPresets[kind];
       const sky=skyCanvas.getContext("2d");if(sky){const gradient=sky.createLinearGradient(0,0,0,128);
-        gradient.addColorStop(0,kind==="twilight"?"#101c39":kind==="desert"?"#95a7b5":"#829dad");
-        gradient.addColorStop(1,kind==="twilight"?"#d79577":kind==="desert"?"#e9d0a6":"#d9ddd0");sky.fillStyle=gradient;sky.fillRect(0,0,2,128);skyTexture.needsUpdate=true;}
+        gradient.addColorStop(0,preset.skyTop);
+        gradient.addColorStop(1,preset.skyBottom);sky.fillStyle=gradient;sky.fillRect(0,0,2,128);skyTexture.needsUpdate=true;}
       scene.background=skyTexture;
       terrainMaterial.map=hillMaterial.map=groundSurface.map(kind);
+      groundSurface.snow.value=kind==="alpine"?1:0;hills.visible=preset.hills>0;hills.scale.y=preset.hills;
       outdoorEnvironment(kind);
       if(scene.fog instanceof THREE.Fog)scene.fog.color.setHex(bg);
       environmentLandscape.setTheme(kind);

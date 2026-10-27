@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { sceneryPresets, type LandscapeTheme } from "./sceneryPresets";
 import { addSceneryTree } from "./sceneryTrees";
 import { addNaturalScenery } from "./naturalScenery";
 import { contactShadowTexture } from "./naturalLighting";
@@ -37,6 +38,23 @@ export function createEnvironmentLandscape(){
   }
   courses[0].water.name="environment-river";courses[1].water.name="environment-creek";
   const ripples=new THREE.InstancedMesh(rippleGeometry(),waterMaterials.ripple,44);root.add(ripples);
+  // The coast is decorative and stays beyond the complete editable clearing.
+  const oceanGeometry=new THREE.PlaneGeometry(2048,2048,1,12);oceanGeometry.rotateX(-Math.PI/2);
+  const seaColors:number[]=[],seaUV=oceanGeometry.getAttribute("uv"),seaPositions=oceanGeometry.getAttribute("position");
+  for(let i=0;i<seaPositions.count;i++){
+    const depth=THREE.MathUtils.clamp((seaPositions.getZ(i)+1024)/22,0,1);
+    const c=new THREE.Color(0x6faaa0).lerp(new THREE.Color(0x285b70),depth);
+    seaColors.push(c.r,c.g,c.b);seaUV.setXY(i,seaUV.getX(i)*512,seaUV.getY(i)*512);
+  }
+  oceanGeometry.setAttribute("color",new THREE.Float32BufferAttribute(seaColors,3));
+  const ocean=new THREE.Mesh(oceanGeometry,waterMaterial);ocean.name="environment-coast-water";ocean.receiveShadow=true;ocean.visible=false;root.add(ocean);
+  const beachGeometry=new THREE.PlaneGeometry(2048,3,1,8);beachGeometry.rotateX(-Math.PI/2);
+  const beachColors:number[]=[],beachPositions=beachGeometry.getAttribute("position");
+  for(let i=0;i<beachPositions.count;i++){const t=Math.abs(beachPositions.getZ(i))/1.5;beachColors.push(1,1,1,1-t*t);}
+  beachGeometry.setAttribute("color",new THREE.Float32BufferAttribute(beachColors,4));
+  const beach=new THREE.Mesh(beachGeometry,new THREE.MeshStandardMaterial({color:0xd8ca9e,roughness:1,vertexColors:true,transparent:true,depthWrite:false}));beach.name="environment-coast-beach";beach.visible=false;root.add(beach);
+  const matrices=new Map<THREE.InstancedMesh,Float32Array>();
+  let currentTheme:LandscapeTheme="garden",applyTheme=()=>{};
   const dummy=new THREE.Object3D(),color=new THREE.Color();let lastLayout="";
   const setBounds=(bounds:THREE.Box3)=>{
     const center=bounds.isEmpty()?new THREE.Vector3():bounds.getCenter(new THREE.Vector3());
@@ -96,7 +114,7 @@ export function createEnvironmentLandscape(){
         p=outsideClearing(new THREE.Vector3(grove.x+Math.cos(angle)*r,0,grove.z+Math.sin(angle)*r),2.5);
         if(bankDistance(p)>2.2&&occupied.every(q=>q.distanceToSquared(p)>4)){placed=true;break;}
       }
-      tree.scale.setScalar(scale);tree.position.copy(p);tree.visible=placed;if(placed)occupied.push(p);
+      tree.scale.setScalar(scale);tree.position.copy(p);tree.visible=placed;tree.userData.layoutVisible=placed;if(placed)occupied.push(p);
       dummy.position.set(p.x,.018,p.z);dummy.rotation.set(0,tree.rotation.y,0);dummy.scale.setScalar(tree.visible?tree.scale.x*1.65:0);dummy.updateMatrix();treeContacts.setMatrixAt(i,dummy.matrix);
     });
     const rockPositions:THREE.Vector3[]=[];
@@ -151,13 +169,52 @@ export function createEnvironmentLandscape(){
       const c=courses[i%2],t=(Math.floor(i/2)+.5)/22,p=c.curve.getPoint(t),d=c.curve.getTangent(t);
       dummy.position.set(p.x,.075,p.z);dummy.rotation.set(0,Math.atan2(-d.x,d.z),0);dummy.scale.set(c.width*(.22+random(i)*.28),1,1);dummy.updateMatrix();ripples.setMatrixAt(i,dummy.matrix);
     }
-    for(const mesh of [rocks,grass,hills,ripples,treeContacts,rockContacts]){mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;mesh.computeBoundingSphere();}
+    for(const mesh of [rocks,grass,hills,ripples,treeContacts,rockContacts]){matrices.set(mesh,new Float32Array(mesh.instanceMatrix.array));mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;mesh.computeBoundingSphere();}
+    applyTheme();
   };
-  const setTheme=(theme:"garden"|"desert"|"twilight")=>{
-    woodland.visible=theme!=="desert";treeContacts.visible=woodland.visible;grass.visible=theme!=="desert";
-    for(const c of courses){c.bank.visible=theme!=="desert";c.water.visible=theme!=="desert";}ripples.visible=theme!=="desert";
-    waterMaterial.color.setHex(theme==="twilight"?0xc5d0de:0xffffff);
-    (hills.material as THREE.MeshStandardMaterial).color.setHex(theme==="desert"?0xd5b78a:0xffffff);
+  applyTheme=()=>{
+    const theme=currentTheme,preset=sceneryPresets[theme],coastal=theme==="coast",shore=(root.userData.clearing?.hz||7)+7;
+    root.userData.theme=theme;
+    woodland.visible=preset.forest!=="none";treeContacts.visible=woodland.visible;grass.visible=theme!=="desert";
+    // Change background species only. Every tree retains its established position,
+    // scale and hundreds of small leaves, with the same two meshes per tree.
+    woodland.children.slice().forEach((old,i)=>{
+      const style=preset.forest==="pine"?(i%5?"pine":"cypress"):preset.forest==="cypress"?"cypress":(["broadleaf","broadleaf","pine","cypress"] as const)[i%4];
+      let tree=old;
+      if(old.userData.treeStyle!==style){
+        tree=addSceneryTree(new THREE.Group(),style,i*101+1);tree.position.copy(old.position);tree.rotation.copy(old.rotation);tree.scale.copy(old.scale);tree.userData.layoutVisible=old.userData.layoutVisible;
+        const index=woodland.children.indexOf(old);woodland.remove(old);woodland.add(tree);woodland.children.splice(woodland.children.indexOf(tree),1);woodland.children.splice(index,0,tree);
+        old.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.dispose();for(const m of Array.isArray(o.material)?o.material:[o.material])m.dispose();}});
+      }
+      tree.visible=tree.userData.layoutVisible!==false&&(!coastal||tree.position.z+2.5<shore);
+      const leaves=tree.children[1] as THREE.InstancedMesh;
+      if(!leaves.userData.originalColors)leaves.userData.originalColors=new Float32Array(leaves.instanceColor!.array);
+      if(theme==="autumn"&&style==="broadleaf"){
+        const palette=[0xb65c2e,0xc58c35,0x934425,0xd1a545,0xa86c32,0x8b793f];
+        for(let n=0;n<leaves.count;n++){color.setHex(palette[(n+i)%palette.length]);leaves.setColorAt(n,color);}
+      }else leaves.instanceColor!.array.set(leaves.userData.originalColors);
+      leaves.instanceColor!.needsUpdate=true;
+    });
+    for(const mesh of [rocks,grass,hills,treeContacts,rockContacts]){
+      const base=matrices.get(mesh);if(!base)continue;mesh.instanceMatrix.array.set(base);
+      if(coastal){
+        mesh.geometry.computeBoundingBox();const box=new THREE.Box3(),matrix=new THREE.Matrix4();
+        for(let i=0;i<mesh.count;i++){
+          matrix.fromArray(base,i*16);box.copy(mesh.geometry.boundingBox!).applyMatrix4(matrix);
+          const hidden=mesh===treeContacts?!woodland.children[i].visible:box.max.z>shore-.1;
+          if(hidden){matrix.makeScale(0,0,0);mesh.setMatrixAt(i,matrix);}
+        }
+      }
+      mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();
+    }
+    for(const c of courses){c.bank.visible=theme!=="desert"&&!coastal;c.water.visible=c.bank.visible;}ripples.visible=theme!=="desert"&&!coastal;
+    ocean.visible=beach.visible=coastal;ocean.position.set(0,.062,shore+1024);beach.position.set(0,.025,shore);
+    waterMaterial.color.setHex(theme==="twilight"?0xc5d0de:theme==="alpine"?0xb9dce4:0xffffff);
+    const target=sceneryPresets[theme].ground.grass,base=sceneryPresets.garden.ground.grass;
+    const baseColor=new THREE.Color().setRGB(base[0]/255,base[1]/255,base[2]/255,THREE.SRGBColorSpace);
+    color.setRGB(target[0]/255,target[1]/255,target[2]/255,THREE.SRGBColorSpace);
+    (hills.material as THREE.MeshStandardMaterial).color.setRGB(color.r/baseColor.r,color.g/baseColor.g,color.b/baseColor.b);
   };
+  const setTheme=(theme:LandscapeTheme)=>{currentTheme=theme;applyTheme();};
   setBounds(new THREE.Box3());return {root,setBounds,setTheme,dispose(){contactMap.dispose();}};
 }

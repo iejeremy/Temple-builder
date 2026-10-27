@@ -4,9 +4,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import ts from 'typescript';
 import * as THREE from 'three';
+const presetModule={exports:{}};vm.runInNewContext(ts.transpile(readFileSync('src/components/sceneryPresets.ts','utf8'),{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}),{module:presetModule,exports:presetModule.exports});
 const module={exports:{}};
 const document={createElement(){const canvas={width:0,height:0};canvas.getContext=()=>({createImageData:(w,h)=>({data:new Uint8ClampedArray(w*h*4)}),putImageData:image=>{canvas.pixels=image.data;}});return canvas;}};
-vm.runInNewContext(ts.transpile(readFileSync('src/components/naturalLighting.ts','utf8'),{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}),{module,exports:module.exports,require:()=>THREE,document});
+vm.runInNewContext(ts.transpile(readFileSync('src/components/naturalLighting.ts','utf8'),{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}),{module,exports:module.exports,require:path=>path==='three'?THREE:presetModule.exports,document});
 const {groundColor,createGroundSurface,outdoorRadiance,contactShadowTexture,createTerrainMaterial,distantTerrainGeometry}=module.exports;
 test('ground colors are deterministic, bounded and varied in each theme',()=>{
  for(const theme of ['garden','desert','twilight']){const colors=[];for(let z=-50;z<=50;z+=3)for(let x=-50;x<=50;x+=3){const color=groundColor(x,z,theme);assert.equal(color.length,3);assert.ok(color.every(n=>Number.isInteger(n)&&n>=0&&n<=255));assert.deepEqual(color,groundColor(x,z,theme));colors.push(color.join(','));}assert.ok(new Set(colors).size>64,'Ground must retain visible variation rather than a single flat color');}
@@ -35,7 +36,7 @@ test('terrain detail shares a compact periodic tile and keeps standard PBR light
  const surface=createGroundSurface(4),material=createTerrainMaterial(surface);
  assert.equal(surface.detail.image.width,128);assert.equal(surface.detail.image.height,128);assert.equal(surface.detail.colorSpace,THREE.NoColorSpace);assert.equal(surface.detail.wrapS,THREE.RepeatWrapping);
  const pixels=surface.detail.image.pixels;assert.ok(new Set(pixels).size>80);assert.ok(Array.from(pixels).every(n=>n>50&&n<200));
- const shader={uniforms:{},fragmentShader:'#include <map_pars_fragment>\n#include <map_fragment>\n#include <lights_fragment_begin>'};material.onBeforeCompile(shader);
+ const shader={uniforms:{},vertexShader:'#include <common>\n#include <worldpos_vertex>',fragmentShader:'#include <map_pars_fragment>\n#include <map_fragment>\n#include <lights_fragment_begin>'};material.onBeforeCompile(shader);
  assert.equal(shader.uniforms.terrainDetail.value,surface.detail);assert.ok(shader.fragmentShader.includes('#include <lights_fragment_begin>'));assert.ok(shader.fragmentShader.includes('vMapUv*96.0'));assert.ok(shader.fragmentShader.includes('closeDetail.a*2.0'));
  assert.equal(material.displacementMap,null);assert.equal(material.metalness,0);assert.equal(material.map,surface.map('garden'));surface.dispose();material.dispose();
 });

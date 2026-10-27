@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { sceneryPresets, sceneryThemes, isSceneryTheme, type LandscapeTheme } from "@/components/sceneryPresets";
 import { getHostedStudio, readStudioDraft, writeStudioDraft, type HostedStudio } from "@/components/hostedStudio";
 import { TempleGlyph } from "@/components/TempleGlyph";
 import { useEffect, useRef, useState } from "react";
@@ -90,7 +91,7 @@ export default function TempleBuilderPage() {
   const [roof, setRoof] = useState<RoofStyle>("flat");
   const [levels, setLevels] = useState<BuildingLevel[]>([]);
   const [pendingBuilding,setPendingBuilding] = useState<BuildingLevel|null>(null);
-  const [deletedBuildingUndo,setDeletedBuildingUndo] = useState<{levels:BuildingLevel[];selectedLevel:number;message:string;site?:{perimeter:Perimeter|null;statues:Statue[];siteColumns:SiteColumn[];landscapeItems:LandscapeItem[];pendingBuilding:BuildingLevel|null;scenery:"garden"|"desert"|"twilight"}}|null>(null);
+  const [deletedBuildingUndo,setDeletedBuildingUndo] = useState<{levels:BuildingLevel[];selectedLevel:number;message:string;site?:{perimeter:Perimeter|null;statues:Statue[];siteColumns:SiteColumn[];landscapeItems:LandscapeItem[];pendingBuilding:BuildingLevel|null;scenery:LandscapeTheme}}|null>(null);
   const [perimeter, setPerimeter] = useState<Perimeter | null>(null);
   const [statues, setStatues] = useState<Statue[]>([]);
   const [siteColumns,setSiteColumns] = useState<SiteColumn[]>([]);
@@ -104,7 +105,7 @@ export default function TempleBuilderPage() {
   const [viewerFace,setViewerFace]=useState<WallFace>("front");
   const [detailCategory, setDetailCategory] = useState<"levels"|"windows"|"doors"|"trim"|"columns"|"arches"|"stairs"|"pediments"|"roof"|"material"|null>(null);
   const [landscapeItems,setLandscapeItems] = useState<LandscapeItem[]>([]);
-  const [scenery,setScenery] = useState<"garden"|"desert"|"twilight">("garden");
+  const [scenery,setScenery] = useState<LandscapeTheme>("garden");
   const [moveMode,setMoveMode] = useState(false);
   const [panel, setPanel] = useState<"add" | "floors" | "walls" | "buildings" | "templates" | "fountains" | "statues" | "site-columns" | "stairs" | "scenery" | "more" | "edit" | null>(null);
   const dockRef=useRef<HTMLDivElement>(null);
@@ -123,7 +124,7 @@ export default function TempleBuilderPage() {
         if(Array.isArray(saved.siteColumns))setSiteColumns(saved.siteColumns);
         if(Array.isArray(saved.statues))setStatues(saved.statues);
         if(Array.isArray(saved.landscapeItems))setLandscapeItems(saved.landscapeItems);
-        if(["garden","desert","twilight"].includes(saved.scenery))setScenery(saved.scenery);
+        if(isSceneryTheme(saved.scenery))setScenery(saved.scenery);
       }
     }catch(err){
       // An unreadable design must remain intact for recovery. Do not enable
@@ -635,6 +636,17 @@ export default function TempleBuilderPage() {
             <button onClick={()=>{setPerimeter(null);setWallStep("main");}} className="min-w-[100px] rounded-2xl bg-red-500/15 p-3 text-sm text-red-200">Remove</button>
           </div>
         )}
+        {panel === "scenery" && <section aria-label="World scenery" className="border-t border-white/10 p-3">
+          <p className="mb-2 text-xs text-white/65">Choose a setting for your world. Your buildings and placed pieces stay where they are.</p>
+          <div className="flex snap-x gap-2 overflow-x-auto pb-1">{sceneryThemes.map(id=>{const preset=sceneryPresets[id];return <button key={id} aria-pressed={scenery===id} onClick={()=>setScenery(id)} className={`w-40 shrink-0 snap-start overflow-hidden rounded-xl border text-left ${scenery===id?"border-amber-200 bg-amber-200/15":"border-white/15 bg-white/5"}`}>
+            <span aria-hidden="true" className="relative block h-14 overflow-hidden" style={{background:`linear-gradient(${preset.skyTop},${preset.skyBottom})`}}>
+              <span className="absolute inset-x-0 bottom-0 h-10" style={{background:preset.swatch,clipPath:id==="alpine"?"polygon(0 100%,0 80%,25% 15%,40% 65%,65% 0,100% 80%,100% 100%)":"polygon(0 100%,0 70%,25% 30%,55% 60%,80% 40%,100% 70%,100% 100%)"}}/>
+              {id==="coast"&&<span className="absolute inset-x-0 bottom-0 h-4" style={{background:preset.water}}/>}
+              {id==="autumn"&&<span className="absolute bottom-1 left-5 h-7 w-8 rounded-full bg-orange-500/80 shadow-[30px_5px_0_#b48e35]"/>}
+              {id==="alpine"&&<span className="absolute left-[57%] top-3 h-3 w-6 bg-slate-100" style={{clipPath:"polygon(0 100%,50% 0,100% 100%,65% 70%,45% 95%,30% 65%)"}}/>}
+            </span><span className="block px-3 pb-2 pt-1"><span className="block text-xs font-semibold">{preset.name}</span><span className="block text-[10px] text-white/60">{preset.description}</span></span>
+          </button>;})}</div>
+        </section>}
         {panel === "scenery" && <div className="flex flex-wrap gap-2 border-t border-white/10 p-3">
           {(["boulder","grass","hill","river","creek","tree","garden","path","fountain","pond","rock"] as LandscapeKind[]).map(kind=><button key={kind} className="min-h-11 rounded-lg border border-amber-200/25 bg-amber-200/10 px-3 py-2 text-xs capitalize" onClick={()=>{const id=uniqueId("land");setLandscapeItems(v=>[...v,{id,kind,x:(levels[selectedLevel]?.x||0)+(levels[selectedLevel]?.width||0)/14+2+(v.length%3)*2.5,z:(levels[selectedLevel]?.z||0)+Math.floor(v.length/3)*3,scale:1,rotation:0}]);setSelectedLandscapeId(id);setActiveObject("landscape");}}>+ {kind}</button>)}
           {landscapeItems.map(item=><div key={item.id} className="flex w-full flex-wrap items-center gap-2 rounded-xl bg-white/5 p-2 text-xs">
@@ -645,7 +657,7 @@ export default function TempleBuilderPage() {
             <button onClick={()=>setLandscapeItems(v=>v.filter(q=>q.id!==item.id))} className="text-red-200">Delete</button>
           </div>)}
         </div>}
-        {panel === "scenery" && <div className="grid grid-cols-3 gap-2 border-t border-white/10 p-3">{([["garden","Garden","Green landscape"],["desert","Desert","Warm sandstone"],["twilight","Twilight","Evening light"]] as const).map(([id,name,sub])=><button key={id} aria-pressed={scenery===id} onClick={()=>setScenery(id)} className={`rounded-xl border p-3 text-left ${scenery===id?"border-amber-200 bg-amber-200/20":"border-white/10 bg-white/5"}`}><span className="block text-sm font-semibold">{name}</span><span className="text-[10px] text-white/60">{sub}</span></button>)}</div>}
+
         {panel === "site-columns" && (
           <div className="border-t border-white/10 px-3 py-3">
             <p className="mb-2 text-xs text-white/65">Swipe to choose a column. Tap one to add it, then drag it on the site.</p>
