@@ -533,7 +533,25 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       const polygonShape=(points:Array<[number,number]>)=>{const s=new THREE.Shape();points.forEach(([x,z],i)=>i?s.lineTo(x,z):s.moveTo(x,z));s.closePath();const g=new THREE.ExtrudeGeometry(s,{depth:h,bevelEnabled:false});g.rotateX(Math.PI/2);g.translate(0,baseY+h,0);return g;};
       const radialPoints=(count:number,outer:number,inner?:number)=>Array.from({length:inner?count*2:count},(_,i)=>{const r=inner?(i%2===0?outer:inner):outer;const a=-Math.PI/2+i*Math.PI/(inner?count:count/2);return [Math.cos(a)*r,Math.sin(a)*r] as [number,number];});
       const addFootprintRoof=(points:Array<[number,number]>,top:number)=>{
-        if(["dome","cone","steeple","tiered","curved","ornate"].includes(level.roof)){addRoof(lg,level.roof,w,d,0,0,top,color);return;}
+        // Tiered roofs follow the same polygon as the supporting level. A rectangular
+        // BoxGeometry roof on a circular/star/hexagonal level is a visible regression.
+        if(level.roof==="tiered"){
+          for(let i=0;i<4;i++){
+            const scale=1-i*.19;
+            const tier=new THREE.Shape();
+            points.forEach(([px,pz],j)=>j?tier.lineTo(px*scale,pz*scale):tier.moveTo(px*scale,pz*scale));
+            tier.closePath();
+            const g=new THREE.ExtrudeGeometry(tier,{depth:.18,bevelEnabled:false});
+            g.rotateX(Math.PI/2);
+            g.translate(0,top+.12+i*.38+.09,0);
+            add(g,0,0,0);
+          }
+          const radius=Math.min(w,d)*.52*.42;
+          const crown=new THREE.ConeGeometry(radius,.72,Math.max(3,points.length));
+          add(crown,0,top+1.65,0);
+          return;
+        }
+        if(["dome","cone","steeple","curved","ornate"].includes(level.roof)){addRoof(lg,level.roof,w,d,0,0,top,color);return;}
         if(level.roof==="none")return;
         if(level.roof==="flat"){
           const s=new THREE.Shape();points.forEach(([x,z],i)=>i?s.lineTo(x,z):s.moveTo(x,z));s.closePath();
