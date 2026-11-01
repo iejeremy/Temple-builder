@@ -6,11 +6,25 @@ const random=(n:number)=>{const x=Math.sin(n*127.1+78.233)*43758.5453;return x-M
 // Approved foliage: small, numerous individual leaves, never large canopy blobs.
 const leafColors=[0x42683d,0x54753e,0x365b46,0x698049,0x7c8650,0x315b40];
 
+// A folded, pointed blade reads as a leaf instead of a solid canopy pebble.
+// Four triangles keep the existing instancing budget and give both sides light.
+function leafGeometry(){
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute("position",new THREE.Float32BufferAttribute([
+    0,-1,0, -.55,0,0, 0,0,.08,
+    -.55,0,0, 0,1,0, 0,0,.08,
+    0,1,0, .55,0,0, 0,0,.08,
+    .55,0,0, 0,-1,0, 0,0,.08,
+  ],3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 /** Two draw calls per tree: tapered timber and hundreds of fine instanced leaves. */
 export function addSceneryTree(group:THREE.Group,style:TreeStyle="broadleaf",seed=1){
   group.userData.treeStyle=style;
   const timber=new THREE.InstancedMesh(new THREE.CylinderGeometry(.6,1,1,7),new THREE.MeshStandardMaterial({color:0x66513b,roughness:1}),style==="broadleaf"?9:5);
-  const leaves=new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1,0),new THREE.MeshStandardMaterial({color:0xffffff,roughness:.94}),style==="broadleaf"?360:style==="pine"?320:340);
+  const leaves=new THREE.InstancedMesh(leafGeometry(),new THREE.MeshStandardMaterial({color:0xffffff,roughness:.94,side:THREE.DoubleSide}),style==="broadleaf"?360:style==="pine"?320:340);
   const dummy=new THREE.Object3D(),up=new THREE.Vector3(0,1,0),color=new THREE.Color();
   const branch=(i:number,start:THREE.Vector3,end:THREE.Vector3,radius:number)=>{
     const direction=end.clone().sub(start);dummy.position.copy(start).add(end).multiplyScalar(.5);
@@ -28,15 +42,15 @@ export function addSceneryTree(group:THREE.Group,style:TreeStyle="broadleaf",see
       const layer=(v-.5)*2,taper=Math.sqrt(1-layer*layer);
       const lobe=1+.13*Math.sin(a*5+seed);
       x=Math.cos(a)*r*1.4*taper*lobe;y=3.25+layer*.9;z=Math.sin(a)*r*1.25*taper*lobe;
-      sx=.085+random(seed+i*7)*.055;sy=sx*1.3;sz=sx*.7;
+      sx=.075+random(seed+i*7)*.045;sy=sx*1.5;sz=sx;
     }else if(style==="pine"){
       const height=v*2.8,angle=i*2.4+seed,reach=(1-height/3.25)*(.3+r*.85);
       x=Math.cos(angle)*reach;y=1.5+height;z=Math.sin(angle)*reach;
-      sx=.075+random(seed+i*7)*.05;sy=sx*1.4;sz=sx*.7;
+      sx=.065+random(seed+i*7)*.04;sy=sx*1.65;sz=sx;
     }else{
       const layer=(v-.5)*2,taper=Math.sqrt(1-layer*layer);
       x=Math.cos(a)*r*.48*taper;y=3.2+layer*1.65;z=Math.sin(a)*r*.48*taper;
-      sx=.06+random(seed+i*7)*.04;sy=sx*1.65;sz=sx*.7;
+      sx=.055+random(seed+i*7)*.035;sy=sx*1.8;sz=sx;
     }
     dummy.position.set(x,y,z);dummy.rotation.set(random(i+seed)*Math.PI*2,a,random(i+seed+8)*Math.PI*2);dummy.scale.set(sx,sy,sz);dummy.updateMatrix();leaves.setMatrixAt(i,dummy.matrix);
     color.setHex(leafColors[i%leafColors.length]);leaves.setColorAt(i,color);
