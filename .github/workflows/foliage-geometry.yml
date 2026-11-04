@@ -1,0 +1,24 @@
+name: Foliage geometry verification
+on:
+  pull_request:
+    paths:
+      - '**/sceneryTrees.ts'
+      - 'tests/foliage-shape-audit.cjs'
+      - '.github/workflows/foliage-geometry.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  foliage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: node --test tests/foliage-shape-audit.cjs
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
