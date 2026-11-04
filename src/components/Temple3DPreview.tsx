@@ -532,6 +532,11 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       const parts:Array<[number,number,number,number]>=level.shape==="l-shape"?[[w*.42,d,-w*.29,0],[w*.72,d*.42,w*.14,d*.29]]:level.shape==="t-shape"?[[w,d*.38,0,d*.30],[w*.36,d*.76,0,-d*.12]]:level.shape==="u-shape"?[[w*.28,d,-w*.36,0],[w*.28,d,w*.36,0],[w*.72,d*.28,0,-d*.36]]:level.shape==="cross"?[[w*.34,d,0,0],[w,d*.34,0,0]]:level.shape==="x-shape"?[[w*.28,d,0,0],[w,d*.28,0,0]]:level.shape==="horseshoe"?[[w*.25,d,-w*.38,0],[w*.25,d,w*.38,0],[w*.75,d*.26,0,-d*.37]]:level.shape==="courtyard"?[[w,d*.24,0,-d*.38],[w,d*.24,0,d*.38],[w*.24,d*.58,-w*.38,0],[w*.24,d*.58,w*.38,0]]:[[w,d,0,0]];
       const polygonShape=(points:Array<[number,number]>)=>{const s=new THREE.Shape();points.forEach(([x,z],i)=>i?s.lineTo(x,z):s.moveTo(x,z));s.closePath();const g=new THREE.ExtrudeGeometry(s,{depth:h,bevelEnabled:false});g.rotateX(Math.PI/2);g.translate(0,baseY+h,0);return g;};
       const radialPoints=(count:number,outer:number,inner?:number)=>Array.from({length:inner?count*2:count},(_,i)=>{const r=inner?(i%2===0?outer:inner):outer;const a=-Math.PI/2+i*Math.PI/(inner?count:count/2);return [Math.cos(a)*r,Math.sin(a)*r] as [number,number];});
+      // Keep footprint roofs pickable as roofs and out of shell batching, just like addRoof.
+      const addFootprintRoofPiece=(geometry:THREE.BufferGeometry,y=0)=>{
+        const mesh=addArchitecturalMesh(lg,geometry,shellMaterial,0,y,0);
+        mesh.userData={levelIndex:index,detailCategory:"roof"};return mesh;
+      };
       const addFootprintRoof=(points:Array<[number,number]>,top:number)=>{
         // Tiered roofs follow the same polygon as the supporting level. A rectangular
         // BoxGeometry roof on a circular/star/hexagonal level is a visible regression.
@@ -544,23 +549,24 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
             const g=new THREE.ExtrudeGeometry(tier,{depth:.18,bevelEnabled:false});
             g.rotateX(Math.PI/2);
             g.translate(0,top+.12+i*.38+.09,0);
-            add(g,0,0,0);
+            addFootprintRoofPiece(g);
           }
           const radius=Math.min(w,d)*.52*.42;
           const crown=new THREE.ConeGeometry(radius,.72,Math.max(3,points.length));
-          add(crown,0,top+1.65,0);
+          addFootprintRoofPiece(crown,top+1.65);
           return;
         }
         if(["dome","cone","steeple","curved","ornate"].includes(level.roof)){addRoof(lg,level.roof,w,d,0,0,top,color);return;}
         if(level.roof==="none")return;
         if(level.roof==="flat"){
           const s=new THREE.Shape();points.forEach(([x,z],i)=>i?s.lineTo(x,z):s.moveTo(x,z));s.closePath();
-          const g=new THREE.ExtrudeGeometry(s,{depth:.18,bevelEnabled:false});g.rotateX(Math.PI/2);g.translate(0,top+.18,0);add(g,0,0,0);return;
+          const g=new THREE.ExtrudeGeometry(s,{depth:.18,bevelEnabled:false});g.rotateX(Math.PI/2);g.translate(0,top+.18,0);addFootprintRoofPiece(g);return;
         }
         // Non-flat roofs keep the same footprint by tapering every perimeter edge to a centered apex.
         const rh=Math.max(.7,Math.min(1.8,Math.min(w,d)*.28));
-        const vertices:number[]=[];for(let i=0;i<points.length;i++){const a=points[i],b=points[(i+1)%points.length];vertices.push(a[0],top,a[1],b[0],top,b[1],0,top+rh,0);}
-        const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.Float32BufferAttribute(vertices,3));g.computeVertexNormals();add(g,0,0,0);
+        // Reverse the profile edge so the sloping roof faces outward/upward.
+        const vertices:number[]=[];for(let i=0;i<points.length;i++){const a=points[i],b=points[(i+1)%points.length];vertices.push(b[0],top,b[1],a[0],top,a[1],0,top+rh,0);}
+        const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.Float32BufferAttribute(vertices,3));g.computeVertexNormals();addFootprintRoofPiece(g);
       };
       // Architectural structural geometry from the reference plans.
       // These are true meshes in the temple's local coordinates, not image overlays.
@@ -617,7 +623,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
         const pts=Array.from({length:sides},(_,i)=>{const a=-Math.PI/2+i*Math.PI*2/sides;return [Math.cos(a)*r*(level.shape==="oval"?w/d:1),Math.sin(a)*r] as [number,number];});
         if(level.shape==="ring"){
           const s=new THREE.Shape();s.absarc(0,0,r,0,Math.PI*2,false);const hole=new THREE.Path();hole.absarc(0,0,r*.55,0,Math.PI*2,true);s.holes.push(hole);const g=new THREE.ExtrudeGeometry(s,{depth:h,bevelEnabled:false});g.rotateX(Math.PI/2);g.translate(0,baseY+h,0);add(g,0,0,0);
-          if(level.roof==="flat"){const cap=new THREE.ExtrudeGeometry(s,{depth:.18,bevelEnabled:false});cap.rotateX(Math.PI/2);cap.translate(0,baseY+h+.18,0);add(cap,0,0,0);}else if(level.roof!=="none")addFootprintRoof(pts,baseY+h);
+          if(level.roof==="flat"){const cap=new THREE.ExtrudeGeometry(s,{depth:.18,bevelEnabled:false});cap.rotateX(Math.PI/2);cap.translate(0,baseY+h+.18,0);addFootprintRoofPiece(cap);}else if(level.roof!=="none")addFootprintRoof(pts,baseY+h);
         }else{const body=new THREE.CylinderGeometry(r,r,h,sides);if(level.shape==="oval")body.scale(w/d,1,1);add(body,0,baseY+h/2,0);addFootprintRoof(pts,baseY+h);}
       }else{
         for(const [rw,rd,x,z] of parts){

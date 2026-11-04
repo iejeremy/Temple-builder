@@ -115,8 +115,8 @@ test('vertical pan, extreme zoom and orbit cannot put the camera underground',()
   assert.ok(camera.position.y>.08);assert.ok(Number.isFinite(camera.position.x));
 });
 
-test('tagged doors, windows, columns, stairs, arches, trim and pediments select their existing editor',()=>{
-  for(const category of ['doors','windows','columns','stairs','arches','trim','pediments']){
+test('tagged doors, windows, columns, stairs, arches, trim, pediments and roofs select their existing editor',()=>{
+  for(const category of ['doors','windows','columns','stairs','arches','trim','pediments','roof']){
     const s=setup(true);s.mesh.userData={levelIndex:0,detailCategory:category,detailId:'test',detailFace:'front'};
     if(category==='doors')Object.assign(s.mesh.userData,{doorId:'test',doorFace:'front'});
     if(category==='arches')Object.assign(s.mesh.userData,{archId:'test',archFace:'front'});
