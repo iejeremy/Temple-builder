@@ -1,0 +1,25 @@
+Echoes Temple Builder — third-party asset credits
+
+Stone Wall 02
+Photography: Charlotte Baglioni
+Processing: Dario Barresi
+Publisher: Poly Haven
+Source: https://polyhaven.com/a/stone_wall_02
+Asset license: CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/
+Poly Haven licensing: https://polyhaven.com/license
+
+Echoes modifications: reduced the source maps to 512 x 512, adjusted the color
+map to retain the existing neutral Stone palette, normalized the
+resampled OpenGL normals, generated mipmaps, and compressed to KTX2/Basis.
+Original source URLs, source checksums, and shipped asset checksums are recorded
+in /materials/stone-wall-02/provenance.json.
+
+Basis Universal decoder
+Copyright Binomial LLC and contributors. Apache License 2.0.
+Source: https://github.com/BinomialLLC/basis_universal
+Decoder files are vendored unchanged from three@0.186.1.
+License: /basis/LICENSE.txt
+Three.js license: /basis/THREE-LICENSE.txt
+
+Other builder surfaces and scenery retain their existing procedural geometry
+and materials. This update introduces no third-party models.

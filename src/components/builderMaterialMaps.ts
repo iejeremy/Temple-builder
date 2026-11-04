@@ -1,8 +1,8 @@
 import * as THREE from "three";
 import type { BuilderMaterial } from "@/app/page";
 
-/** Lightweight, deterministic, tileable procedural maps. These are placeholders
- * for scanned texture sets, not substitutes for photographic PBR assets. */
+/** Small, shared surface maps: mineral color, normalized roughness and shallow relief.
+ * Procedural finishes keep the builder self-contained; these are not scanned assets. */
 const cached=new Map<string,{color:THREE.CanvasTexture;roughness:THREE.CanvasTexture;bump:THREE.CanvasTexture}>();
 const stoneKinds=new Set<BuilderMaterial>(["marble","sandstone","limestone","travertine","granite","stone","brick","concrete","stucco","plaster","timber","bronze","gold","obsidian"]);
 const hash=(x:number,y:number,seed:number)=>{
@@ -36,11 +36,15 @@ function create(kind:BuilderMaterial){
   const rgb=base[kind]||[180,175,165];
   for(let y=0;y<size;y++)for(let x=0;x<size;x++){
     const i=(y*size+x)*4;
-    const coarse=tileNoise(x,y,8,2),fine=tileNoise(x,y,64,8),grain=tileNoise(x,y,128,12);
-    const wave=Math.sin((x/size)*Math.PI*8+(y/size)*Math.PI*4+coarse*5);
-    const vein=isMarble?Math.pow(Math.max(0,wave*.5+.5),19)*(.45+fine*.55):0;
-    const pits=isTravertine&&grain>.72?(grain-.72)*2.8:0;
-    const woodGrain=isTimber?Math.sin(y*.21+coarse*4)*17+Math.sin(y*.055+fine*7)*12:0;
+    const cloud=tileNoise(x,y,128,2),mid=tileNoise(x,y,32,8),fine=tileNoise(x,y,4,12);
+    const mineral=hash(x,y,101),u=x/size,v=y/size;
+    // Smooth domain warping produces delicate branching veins instead of thick contour lines.
+    // Integer cycles and wrapped noise keep the color and relief seamless at tile boundaries.
+    const flow=Math.PI*2*(u+v*2)+(cloud-.5)*3+(mid-.5)*.65;
+    const vein=isMarble?Math.exp(-Math.pow(Math.sin(flow)/.055,2))*(.4+mid*.6):0;
+    const hairline=isMarble?Math.exp(-Math.pow(Math.sin(flow*2+(fine-.5)*.15)/.035,2))*.24:0;
+    const pits=isTravertine&&mineral>.965?(mineral-.965)*14:0;
+    const woodGrain=isTimber?Math.sin(u*Math.PI*64+(mid-.5)*3)*7+Math.sin(u*Math.PI*16+(cloud-.5)*5)*6:0;
     // Staggered masonry courses: visible mortar and subtle per-block color variation.
     const masonry=kind==="stone"||kind==="brick"||kind==="limestone"||kind==="sandstone";
     const courseHeight=kind==="brick"?32:64;
@@ -50,25 +54,22 @@ function create(kind:BuilderMaterial){
     const localX=((x+stagger)%blockWidth+blockWidth)%blockWidth;
     const localY=y%courseHeight;
     const joint=masonry&&(localY<2||localX<2);
-    const blockVariation=masonry?(hash(Math.floor((x+stagger)/blockWidth),course,39)-.5)*18:0;
-    const marbleFlow=Math.sin(x*.033+y*.016+tileNoise(x,y,64,31)*6);
-    const secondaryVein=isMarble?Math.pow(Math.max(0,marbleFlow),26)*25:0;
-    const graniteSpeckle=isGranite?(hash(x,y,77)-.5)*32:0;
-    // Fine mineral grains, pores and layered deposits add close-up surface variation.
-    // Stable hash noise remains tileable and does not require external texture downloads.
-    const mineral=hash(x,y,101);
-    const mineralGrain=(mineral-.5)*(isGranite?25:isMarble?5:isMetal?2:11);
-    const pores=(kind==="limestone"||kind==="sandstone"||kind==="travertine")&&mineral>.975?(mineral-.975)*950:0;
+    const blockVariation=masonry?(hash(Math.floor((x+stagger)/blockWidth)%(size/blockWidth),course,39)-.5)*10:0;
+    const graniteSpeckle=isGranite?(hash(x,y,77)-.5)*46:0;
+    const mineralGrain=(mineral-.5)*(isGranite?22:isMarble?3:isMetal?3:8);
+    const pores=(kind==="limestone"||kind==="sandstone"||kind==="travertine")&&mineral>.985?(mineral-.985)*650:0;
     const stratification=(kind==="sandstone"||kind==="travertine")?
-      Math.sin(y*.115+coarse*2.5)*4+Math.sin(y*.035+fine*4)*5:0;
-    const variation=(coarse-.5)*(isGranite?95:kind==="sandstone"?48:22)+(fine-.5)*20-vein*95-secondaryVein-pits*95+woodGrain+blockVariation+graniteSpeckle+mineralGrain+stratification-pores-(joint?kind==="brick"?67:44:0);
+      Math.sin(v*Math.PI*12+(cloud-.5)*2)*3+Math.sin(v*Math.PI*32+(mid-.5)*2)*2:0;
+    const variation=(cloud-.5)*(isMarble?7:isGranite?16:18)+(mid-.5)*8+(fine-.5)*4-(vein+hairline)*33-pits*18+woodGrain+blockVariation+graniteSpeckle+mineralGrain+stratification-pores-(joint?kind==="brick"?42:23:0);
     for(let c=0;c<3;c++)ci.data[i+c]=Math.max(0,Math.min(255,rgb[c]+variation));
     ci.data[i+3]=255;
-    const rough=(isMetal?65:kind==="obsidian"?52:isMarble?110:kind==="granite"?175:235)
-      +(fine-.5)*35+(mineral-.5)*(isMetal?7:24)+(joint?30:0)+pores*.25;
+    // Three multiplies this map by the material roughness. Keep it near one so
+    // marble/metal retain their chosen finish rather than becoming mirror plastic.
+    const rough=231+(mid-.5)*24+(mineral-.5)*(isMetal?10:18)+(joint?16:0)+pores;
     for(let c=0;c<3;c++)ri.data[i+c]=Math.max(0,Math.min(255,rough));
     ri.data[i+3]=255;
-    const height=Math.max(0,Math.min(255,128+(coarse-.5)*80+(fine-.5)*45+(mineral-.5)*26-pits*95-pores*.65-(joint?105:0)));
+    const relief=isMarble||isMetal||kind==="obsidian"?3:isGranite?16:25;
+    const height=Math.max(0,Math.min(255,128+(fine-.5)*relief+(mineral-.5)*relief*.6-pits*32-pores*.7-(joint?48:0)));
     for(let c=0;c<3;c++)bi.data[i+c]=height;
     bi.data[i+3]=255;
   }

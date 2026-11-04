@@ -1,0 +1,36 @@
+{
+  "asset": "Stone Wall 02",
+  "source": "https://polyhaven.com/a/stone_wall_02",
+  "license": "CC0-1.0",
+  "photography": "Charlotte Baglioni",
+  "processing": "Dario Barresi",
+  "sourceFiles": {
+    "color": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/stone_wall_02/stone_wall_02_diff_4k.jpg",
+      "sha256": "dce58d8787bf15773f40c9ed975e9e359a81cc51fce6572dec1fbc4b09d993b7"
+    },
+    "normal": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/stone_wall_02/stone_wall_02_nor_gl_4k.jpg",
+      "sha256": "e7de3890c62a78ffd4e081da218db0d9a8f17dca598b61beccd65ef172c03567"
+    },
+    "roughness": {
+      "url": "https://dl.polyhaven.org/file/ph-assets/Textures/jpg/4k/stone_wall_02/stone_wall_02_rough_4k.jpg",
+      "sha256": "890b563dc24a79a235dfc5a5b1d87d1a81b3fe084d360e22b0f26359606da053"
+    }
+  },
+  "outputs": {
+    "normal.ktx2": {
+      "bytes": 319121,
+      "sha256": "f97494a33b3332917ee2d11c4f5c64a60b3e7f3e6ef9a513767cae84914c30c1"
+    },
+    "roughness.ktx2": {
+      "bytes": 9380,
+      "sha256": "430439962b420f2b7b8975df95d80b31713a9a56da7923557d1776117f1f3027"
+    },
+    "color.ktx2": {
+      "bytes": 85896,
+      "sha256": "3e37062ed137c132f2715fd98fc5787fec12b2617b25291e919edc5a9347cec2"
+    }
+  },
+  "colorAdjustment": "Preserve scanned luminance detail, reduce chroma to 30%, shift channel means to [126,122,113] to retain the existing neutral Stone palette."
+}

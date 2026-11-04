@@ -53,3 +53,7 @@ No objects, menus, data fields, material definitions, geometry generation, stack
 - The pending-building ghost replaces materials without disposing the replaced materials at that point; pending selection highlighting also lacks a pending-index dependency. These are separate rendering lifecycle concerns.
 
 No claim of live mobile regression clearance is made. No removals are proposed.
+
+
+## November 4, 2026 merge resolution
+This historical draft was reconciled with main b65a813. The former inline camera system has been replaced by the approved TempleCameraController, and all ten original interaction-audit test scenarios already exist in main's expanded 22-test interaction audit. Resolve the stale camera and test conflicts by retaining the complete current main files, including the protected camera hashes, floor-placement guards and polygon-roof selection fixes. This merge adds the historical audit only; it changes no camera, pointer handler, geometry, test implementation or builder piece.

@@ -1,9 +1,20 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import type { BuildingLevel, RoofStyle, WallFace, Perimeter, BuilderMaterial, Statue, SiteColumn, LandscapeItem } from "@/app/page";
 import { getProceduralMaps, retainProceduralMaps } from "./builderMaterialMaps";
+import { addNaturalScenery } from "./naturalScenery";
+import { addSceneryTree } from "./sceneryTrees";
+import { createEnvironmentLandscape } from "./environmentLandscape";
+import { batchBuildingShell, perimeterPlan } from "./builderGeometry";
+import { createGroundSurface, createTerrainMaterial, distantTerrainGeometry, outdoorRadiance, naturalLight, type LandscapeTheme } from "./naturalLighting";
+import { sceneryPresets } from "./sceneryPresets";
+import { TempleCameraController, type TempleView } from "./TempleCameraController";
+import { finishArchitecturalSurfaces } from "./architecturalSurfaces";
+import { createBuildingTrim } from "./buildingTrim";
+import { createStoneSurface } from "./stoneSurface";
+import { attachPreviewDiagnostics } from "./previewDiagnostics";
 
 const COLORS: Record<BuilderMaterial, number> = { marble:0xe7e2da,sandstone:0xb98b5b,limestone:0xcbbd9d,obsidian:0x17191d,granite:0x62636a,travertine:0xc7a77d,brick:0x884838,stone:0x77736b,concrete:0x92908a,stucco:0xd8ccb8,plaster:0xe0d9ca,timber:0x70472f,bronze:0x8a5b32,gold:0xc39a36 };
 
@@ -25,7 +36,7 @@ const addArchitecturalMesh=(parent:THREE.Group,geometry:THREE.BufferGeometry,mat
 const makeMaterial=(kind:BuilderMaterial,color=COLORS[kind],selected=false)=>{
   const p=MATERIAL_PROPS[kind];
   const maps=getProceduralMaps(kind);
-  return new THREE.MeshStandardMaterial({
+  const material=new THREE.MeshStandardMaterial({
     color:maps?0xffffff:(selected?new THREE.Color(color).offsetHSL(0,0,.06):color),
     map:maps?.color||null,
     roughnessMap:maps?.roughness||null,
@@ -34,34 +45,9 @@ const makeMaterial=(kind:BuilderMaterial,color=COLORS[kind],selected=false)=>{
     roughness:p.roughness, metalness:p.metalness,
     emissive:selected?0x211b08:0x000000, emissiveIntensity:selected?.1:0
   });
-};
-
-// Shared by initial framing, viewport resize, and the explicit Center Temple action.
-function templeFitDistance(radius:number,camera:THREE.PerspectiveCamera){
-  // The virtual viewport positions the optical center above the toolbar.
-  // Fit inside the remaining unobscured height, which varies by orientation.
-  const virtualHeight=camera.view?.fullHeight||1;
-  const visibleHeight=Math.max(1,(camera.view?.height||virtualHeight)-(camera.userData.builderVerticalReserve||0));
-  const halfVertical=Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)*visibleHeight/virtualHeight);
-  const halfHorizontal=Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)*camera.aspect);
-  const usableHalfAngle=Math.min(halfVertical,halfHorizontal);
-  return Math.max(3,radius/Math.sin(usableHalfAngle)*1.15);
-}
-
-/** Camera math is pure and independent of the renderer and pointer handlers. */
-const orbitCameraPosition=(target:THREE.Vector3,theta:number,phi:number,radius:number)=>{
-  const sinPhi=Math.sin(phi);
-  return new THREE.Vector3(
-    target.x+Math.sin(theta)*sinPhi*radius,
-    target.y+Math.cos(phi)*radius,
-    target.z+Math.cos(theta)*sinPhi*radius
-  );
-};
-
-const clampCameraRadius=(radius:number,fitRadius:number)=>{
-  const min=Math.max(2,fitRadius*.18);
-  const max=Math.max(45,fitRadius*3);
-  return THREE.MathUtils.clamp(radius,min,max);
+  material.userData.architecturalSurface=true;
+  material.userData.surfaceKind=kind;
+  return material;
 };
 
 /** Convert pointer coordinates into normalized device coordinates for scene picking. */
@@ -83,7 +69,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
   statues: Statue[];
   siteColumns: SiteColumn[];
   landscapeItems: LandscapeItem[];
-  scenery: "garden"|"desert"|"twilight";
+  scenery: LandscapeTheme;
   selectedStatueId?: string | null;
   selectedLevel: number;
   moveMode?: boolean;
@@ -106,21 +92,25 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
   onSelectLandscape?: (id:string)=>void;
   onMoveLandscape?: (id:string,x:number,z:number)=>void;
 }) {
+  const [showGrid,setShowGrid]=useState(false);
+  const [renderError,setRenderError]=useState(false);
+  const [quality,setQuality]=useState<"auto"|"detail">("auto");
+  const stoneSurfaceRef=useRef<ReturnType<typeof createStoneSurface>|null>(null);
+  const gridRef=useRef<THREE.GridHelper|null>(null);
+  const viewRef=useRef<(view:TempleView)=>void>(()=>{});
+  const selectionBoundsRef=useRef<()=>void>(()=>{});
+  const syncFocusedBuildingRef=useRef<()=>void>(()=>{});
+  const snapshotRef=useRef<()=>void>(()=>{});
+  const geometryCacheRef=useRef(new Map<string,{key:string;group:THREE.Group}>());
   const hostRef = useRef<HTMLDivElement|null>(null);
-  const sceneryApplyRef=useRef<((kind:"garden"|"desert"|"twilight")=>void)|null>(null);
+  const environmentBoundsRef=useRef<((bounds:THREE.Box3)=>void)|null>(null);
+  const sceneryApplyRef=useRef<((kind:LandscapeTheme)=>void)|null>(null);
   const groupRef = useRef<THREE.Group|null>(null);
   const sceneRef = useRef<THREE.Scene|null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer|null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera|null>(null);
-  const orbitRef = useRef({ theta: 0, phi: 0.90, radius: 19, lastX: 0, lastY: 0, dragging: false, pinch: 0 });
-  const targetYRef = useRef(0.6);
-  const cameraPanRef = useRef({x:0,y:0,z:0,manual:false});
-  const cameraFocusRef = useRef({x:0,z:0});
+  const cameraRigRef=useRef(new TempleCameraController());
   const lastFacingRef=useRef<WallFace|null>(null);
-  const cameraFitRef = useRef({initialized:false,lastSpan:0,fitRadius:13,buildingCount:0,userFramed:false});
-  const lastBoundsRef=useRef(new THREE.Box3());
-  const framingRadiusRef=useRef(0);
-  const resetCameraRef = useRef<()=>void>(()=>{});
   const gestureRef = useRef({midX:0,midY:0});
   const renderCameraRef=useRef<()=>void>(()=>{});
   const levelGroupsRef = useRef<THREE.Group[]>([]);
@@ -138,15 +128,17 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
   const siteObjectGroupsRef=useRef<THREE.Group[]>([]);
   const movingSiteObjectRef=useRef<{kind:"column"|"landscape";id:string}|null>(null);
   const buildingDragOffsetRef=useRef(new THREE.Vector2());
-  const liveRef = useRef({levels,perimeter,selectedLevel,moveMode,onSelectLevel,onSelectFace,onCameraFacingChange,onMoveLevel,onMoveDoor,onMoveArch,onMoveDetail,onResizePerimeter,onSelectDetail,onSelectPerimeter,onSelectStatue,onMoveStatue,selectedStatueId,onSelectSiteColumn,onMoveSiteColumn,onSelectLandscape,onMoveLandscape});
-  liveRef.current={levels,perimeter,selectedLevel,moveMode,onSelectLevel,onSelectFace,onCameraFacingChange,onMoveLevel,onMoveDoor,onMoveArch,onMoveDetail,onResizePerimeter,onSelectDetail,onSelectPerimeter,onSelectStatue,onMoveStatue,selectedStatueId,onSelectSiteColumn,onMoveSiteColumn,onSelectLandscape,onMoveLandscape};
+  const siteDragOffsetRef=useRef(new THREE.Vector2());
+  const liveRef = useRef({levels,perimeter,selectedLevel,pendingLevelIndex,moveMode,onPatioChange,onSelectLevel,onSelectFace,onCameraFacingChange,onMoveLevel,onMoveDoor,onMoveArch,onMoveDetail,onResizePerimeter,onSelectDetail,onSelectPerimeter,onSelectStatue,onMoveStatue,selectedStatueId,onSelectSiteColumn,onMoveSiteColumn,onSelectLandscape,onMoveLandscape});
+  liveRef.current={levels,perimeter,selectedLevel,pendingLevelIndex,moveMode,onPatioChange,onSelectLevel,onSelectFace,onCameraFacingChange,onMoveLevel,onMoveDoor,onMoveArch,onMoveDetail,onResizePerimeter,onSelectDetail,onSelectPerimeter,onSelectStatue,onMoveStatue,selectedStatueId,onSelectSiteColumn,onMoveSiteColumn,onSelectLandscape,onMoveLandscape};
 
   // Dispose each GPU resource only once per teardown, even when meshes share it.
   const disposeMeshResources=(root:THREE.Object3D)=>{
     const geometries=new Set<THREE.BufferGeometry>();
     const materials=new Set<THREE.Material>();
     root.traverse(object=>{
-      if(!(object instanceof THREE.Mesh))return;
+      if(!(object instanceof THREE.Mesh)&&!(object instanceof THREE.LineSegments))return;
+      if(object instanceof THREE.InstancedMesh)object.dispose();
       geometries.add(object.geometry);
       const assigned=object.material;
       if(Array.isArray(assigned))assigned.forEach(material=>materials.add(material));
@@ -158,121 +150,108 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     materials.forEach(material=>material.dispose());
   };
 
+  // Start optional surface/diagnostic work after the mounted scene has finished
+  // its synchronous setup. Keep the approved camera setup block unchanged.
+  useEffect(()=>{
+    let cancelled=false,cleanup:(()=>void)|undefined;
+    queueMicrotask(()=>{
+      if(cancelled)return;
+      const renderer=rendererRef.current,host=hostRef.current;if(!renderer||!host)return;
+      const surface=createStoneSurface(renderer,()=>renderCameraRef.current());
+      stoneSurfaceRef.current=surface;
+      if(groupRef.current)surface.bind(groupRef.current);
+      const detachDiagnostics=attachPreviewDiagnostics(host,renderer);
+      cleanup=()=>{stoneSurfaceRef.current=null;surface.dispose();detachDiagnostics();};
+    });
+    return ()=>{cancelled=true;cleanup?.();};
+  },[]);
+
   useEffect(() => {
     const host=hostRef.current; if(!host) return;
     const releaseProceduralMaps=retainProceduralMaps();
-    const scene=new THREE.Scene(); scene.background=new THREE.Color(0xb9c4cb); scene.fog=new THREE.Fog(0xb9c4cb,220,420);
+    const scene=new THREE.Scene(); scene.background=new THREE.Color(0xb9c4cb); scene.fog=new THREE.Fog(0xb9c4cb,45,150);
     const camera=new THREE.PerspectiveCamera(42,1,.1,600);
-    const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:"high-performance"});
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+    let renderer:THREE.WebGLRenderer;
+    try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:"high-performance"});}
+    catch{setRenderError(true);releaseProceduralMaps();return;}
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));
     renderer.outputColorSpace=THREE.SRGBColorSpace;
     renderer.toneMapping=THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure=1.05;
     renderer.shadowMap.enabled=true;
-    renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type=THREE.PCFShadowMap;
+    renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true;
     renderer.domElement.style.imageRendering="auto";
     host.appendChild(renderer.domElement);
-    scene.add(new THREE.HemisphereLight(0xffffff,0x6f6b5e,2));
+    const pmrem=new THREE.PMREMGenerator(renderer);
+    const environments=new Map<LandscapeTheme,THREE.WebGLRenderTarget>();
+    const outdoorEnvironment=(kind:LandscapeTheme)=>{
+      let environment=environments.get(kind);
+      if(!environment){const sky=outdoorRadiance(kind);environment=pmrem.fromEquirectangular(sky);sky.dispose();environments.set(kind,environment);}
+      scene.environment=environment.texture;
+    };
+    const hemisphere=new THREE.HemisphereLight(0xc7d9e6,0x6c6448,.38);scene.add(hemisphere);
     const sun=new THREE.DirectionalLight(0xfff4df,2.35); sun.position.set(8,12,7); sun.castShadow=true;
     sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.near=.5;sun.shadow.camera.far=42;
     sun.shadow.camera.left=-14;sun.shadow.camera.right=14;sun.shadow.camera.top=14;sun.shadow.camera.bottom=-14;
     sun.shadow.bias=-.00035;sun.shadow.normalBias=.025;sun.shadow.radius=2;scene.add(sun);
-    const fill=new THREE.DirectionalLight(0xbfd7ff,.55);fill.position.set(-7,6,-5);scene.add(fill);
+    const fill=new THREE.DirectionalLight(0xbfd7ff,.14);fill.position.set(-7,6,-5);scene.add(fill);
     // Low-cost hemisphere bounce keeps recesses readable without flattening the sun shadows.
-    const bounce=new THREE.HemisphereLight(0xdde8f2,0x554b3e,.32);scene.add(bounce);
-    // Subtle repeating terrain variation gives the site depth without downloading textures.
-    const terrainCanvas=document.createElement("canvas");terrainCanvas.width=128;terrainCanvas.height=128;
-    const terrainCtx=terrainCanvas.getContext("2d");
-    if(terrainCtx){
-      const pixels=terrainCtx.createImageData(128,128);
-      for(let y=0;y<128;y++)for(let x=0;x<128;x++){
-        const n=Math.sin(x*12.9898+y*78.233)*43758.5453;
-        const grain=(n-Math.floor(n))-.5;
-        const broad=Math.sin(x*.14)*Math.cos(y*.11)*8;
-        const value=Math.max(0,Math.min(255,190+grain*27+broad));
-        const k=(y*128+x)*4;pixels.data[k]=value;pixels.data[k+1]=Math.min(255,value+5);pixels.data[k+2]=Math.max(0,value-8);pixels.data[k+3]=255;
-      }
-      terrainCtx.putImageData(pixels,0,0);
-    }
-    const terrainTexture=new THREE.CanvasTexture(terrainCanvas);
-    terrainTexture.wrapS=THREE.RepeatWrapping;terrainTexture.wrapT=THREE.RepeatWrapping;
-    terrainTexture.repeat.set(10,10);terrainTexture.colorSpace=THREE.SRGBColorSpace;
-    terrainTexture.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
-    const ground=new THREE.Mesh(new THREE.PlaneGeometry(64,64),new THREE.MeshStandardMaterial({color:0x878777,map:terrainTexture,roughness:1}));ground.receiveShadow=true;
-    ground.rotation.x=-Math.PI/2; scene.add(ground);
-    const grid=new THREE.GridHelper(64,32,0x66685e,0x7b7d70); grid.position.y=.01; scene.add(grid);
-    // Scenery sits outside the primary building area so site editing remains unobstructed.
-    const landscape=new THREE.Group();scene.add(landscape);
-    // Fine-grained tree crowns use instancing: hundreds of small leaf clusters per tree
-    // without hundreds of draw calls. No new dependencies or builder-data changes.
-    const leafColors=[0x42683d,0x54753e,0x365b46,0x698049,0x7c8650,0x315b40];
-    const leafMats=leafColors.map(color=>new THREE.MeshStandardMaterial({color,roughness:.94,side:THREE.DoubleSide}));
-    const barkMats=[0x65503a,0x594b39,0x756044].map(color=>new THREE.MeshStandardMaterial({color,roughness:1}));
-    const leafGeometry=new THREE.IcosahedronGeometry(1,0);
-    const trunkGeometry=new THREE.CylinderGeometry(.09,.17,1.55,7);
-    const rand=(seed:number)=>{const v=Math.sin(seed*127.1+78.233)*43758.5453;return v-Math.floor(v);};
-    const leafDummy=new THREE.Object3D();
-    for(let i=0;i<26;i++){
-      const angle=i*Math.PI*2/26+(rand(i+17)-.5)*.19;
-      const radius=17+(i%4)*1.2+(rand(i+32)-.5)*1.25;
-      const tree=new THREE.Group();tree.position.set(Math.cos(angle)*radius,0,Math.sin(angle)*radius);
-      tree.rotation.y=rand(i+91)*Math.PI*2;
-      const height=.76+rand(i+51)*.7;
-      tree.scale.set(height*(.9+rand(i+6)*.2),height,height*(.9+rand(i+9)*.2));
-      landscape.add(tree);
-      const type=i%5;
-      const trunk=new THREE.Mesh(trunkGeometry,barkMats[i%barkMats.length]);
-      trunk.position.y=.775;trunk.castShadow=true;tree.add(trunk);
-      // Narrow conifers, columnar cypress, oval ornamentals and wide woodland crowns.
-      const count=type===0?170:type===2?180:260;
-      const instances=leafMats.map(mat=>new THREE.InstancedMesh(leafGeometry,mat,Math.ceil(count/leafMats.length)));
-      const counts=new Array(instances.length).fill(0);
-      for(let j=0;j<count;j++){
-        const u=rand(i*701+j*19+1),v=rand(i*701+j*19+2),w=rand(i*701+j*19+3);
-        const theta=u*Math.PI*2;
-        const radial=Math.sqrt(v);
-        let rx=1,rz=.85,cy=2.05,ry=.72;
-        if(type===0){rx=.68;rz=.68;cy=2.04;ry=1.15;}
-        if(type===2){rx=.35;rz=.35;cy=2.13;ry=1.25;}
-        if(type===3){rx=.86;rz=.8;cy=1.96;ry=.63;}
-        if(type===4){rx=1.2;rz=.94;cy=2.06;ry=.62;}
-        // Multi-lobed density variation prevents a single spherical silhouette.
-        const lobe=.82+.18*Math.sin(theta*(type===4?5:7)+i);
-        const layer=(w-.5)*2;
-        const taper=type===0||type===2?Math.max(.14,1-(layer+.8)*.48):Math.sqrt(Math.max(.12,1-layer*layer));
-        const x=Math.cos(theta)*radial*rx*lobe*taper;
-        const z=Math.sin(theta)*radial*rz*lobe*taper;
-        const y=cy+layer*ry+.10*Math.sin(theta*4+i);
-        const size=(type===2?.075:.09)*(0.7+rand(i*503+j*7)*.7);
-        leafDummy.position.set(x,y,z);
-        leafDummy.rotation.set(u*6.28,v*6.28,w*6.28);
-        leafDummy.scale.set(size*.7,size*1.2,size*.65);
-        leafDummy.updateMatrix();
-        const slot=j%instances.length;
-        instances[slot].setMatrixAt(counts[slot]++,leafDummy.matrix);
-      }
-      for(let j=0;j<instances.length;j++){
-        const mesh=instances[j];mesh.count=counts[j];mesh.instanceMatrix.needsUpdate=true;
-        mesh.castShadow=true;mesh.receiveShadow=true;mesh.computeBoundingSphere();tree.add(mesh);
-      }
-    }
-    const applyScenery=(kind:"garden"|"desert"|"twilight")=>{
-      const bg=kind==="twilight"?0x29334c:kind==="desert"?0xd8b98b:0xb9c4cb;
-      scene.background=new THREE.Color(bg);if(scene.fog instanceof THREE.Fog)scene.fog.color.setHex(bg);
-      (ground.material as THREE.MeshStandardMaterial).color.setHex(kind==="desert"?0xbda079:kind==="twilight"?0x454d51:0x878777);
-      grid.visible=kind!=="twilight";landscape.visible=kind==="garden";
-      sun.color.setHex(kind==="twilight"?0xffad75:kind==="desert"?0xffe4b2:0xfff4df);
-      sun.intensity=kind==="twilight"?1.45:2.35;
+    const bounce=new THREE.HemisphereLight(0xdde8f2,0x554b3e,.08);scene.add(bounce);
+    const groundSurface=createGroundSurface(renderer.capabilities.getMaxAnisotropy());
+    const terrainMaterial=createTerrainMaterial(groundSurface);
+    terrainMaterial.name="natural-terrain";
+    const ground=new THREE.Mesh(new THREE.PlaneGeometry(2048,2048),terrainMaterial);ground.name="terrain-ground";ground.receiveShadow=true;
+    // Preserve world-sized UVs while extending the existing flat backdrop beyond view.
+    const terrainUV=ground.geometry.getAttribute("uv");for(let i=0;i<terrainUV.count;i++)terrainUV.setXY(i,terrainUV.getX(i)*8-3.5,terrainUV.getY(i)*8-3.5);
+    ground.rotation.x=-Math.PI/2;scene.add(ground);
+    const grid=new THREE.GridHelper(96,96,0xc3b49a,0xa4a394);grid.position.y=.012;
+    (grid.material as THREE.Material).transparent=true;(grid.material as THREE.Material).opacity=.15;
+    gridRef.current=grid;scene.add(grid);
+    const environmentLandscape=createEnvironmentLandscape();scene.add(environmentLandscape.root);
+    let environmentUpdate:ReturnType<typeof setTimeout>|undefined;
+    environmentBoundsRef.current=(bounds)=>{
+      if(environmentUpdate)clearTimeout(environmentUpdate);
+      const next=bounds.clone();
+      // Replant after a drag settles, rather than rebuilding thousands of instances per move.
+      environmentUpdate=setTimeout(()=>{environmentLandscape.setBounds(next);renderer.shadowMap.needsUpdate=true;renderCameraRef.current();},180);
+    };
+    // Screen-space sky gradient and a single low-poly distant ridgeline add depth.
+    const skyCanvas=document.createElement("canvas");skyCanvas.width=2;skyCanvas.height=128;
+    const skyTexture=new THREE.CanvasTexture(skyCanvas);skyTexture.colorSpace=THREE.SRGBColorSpace;
+    const hillsGeometry=distantTerrainGeometry();
+    const hillMaterial=createTerrainMaterial(groundSurface);hillMaterial.side=THREE.DoubleSide;
+    const hills=new THREE.Mesh(hillsGeometry,hillMaterial);scene.add(hills);
+    const applyScenery=(kind:LandscapeTheme)=>{
+      const light=naturalLight[kind],bg=light.sky,preset=sceneryPresets[kind];
+      const sky=skyCanvas.getContext("2d");if(sky){const gradient=sky.createLinearGradient(0,0,0,128);
+        gradient.addColorStop(0,preset.skyTop);
+        gradient.addColorStop(1,preset.skyBottom);sky.fillStyle=gradient;sky.fillRect(0,0,2,128);skyTexture.needsUpdate=true;}
+      scene.background=skyTexture;
+      terrainMaterial.map=hillMaterial.map=groundSurface.map(kind);
+      groundSurface.snow.value=kind==="alpine"?1:0;hills.visible=preset.hills>0;hills.scale.y=preset.hills;
+      outdoorEnvironment(kind);
+      if(scene.fog instanceof THREE.Fog)scene.fog.color.setHex(bg);
+      environmentLandscape.setTheme(kind);
+      sun.color.setHex(light.sunColor);sun.intensity=light.sun;
+      sun.position.set(kind==="twilight"?-14:12,kind==="twilight"?8:18,10);
+      hemisphere.intensity=light.ambient;fill.intensity=light.fill;
+      scene.environmentIntensity=light.environment;
+      renderer.toneMappingExposure=light.exposure;
+      renderer.shadowMap.needsUpdate=true;
     };
     sceneryApplyRef.current=applyScenery;applyScenery(scenery);
     const group=new THREE.Group(); scene.add(group);
     sceneRef.current=scene; rendererRef.current=renderer; cameraRef.current=camera; groupRef.current=group;
 
     // Single authoritative camera transform for orbit, touch, reset and redraw.
-    const render=()=>{
-      const o=orbitRef.current,p=cameraPanRef.current;
-      const target=new THREE.Vector3(cameraFocusRef.current.x+p.x,targetYRef.current+p.y,cameraFocusRef.current.z+p.z);
-      camera.position.copy(orbitCameraPosition(target,o.theta,o.phi,o.radius));
+    let renderFrame=0,lastRenderTime=performance.now();
+    const reducedMotion=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const renderNow=()=>{
+      renderFrame=0;
+      const o=cameraRigRef.current.orbit;
+      const now=performance.now();
+      const settling=cameraRigRef.current.apply(camera,!reducedMotion,(now-lastRenderTime)/1000);lastRenderTime=now;
       // Report the wall actually facing the viewer, accounting for building rotation.
       const currentLevel=liveRef.current.levels[liveRef.current.selectedLevel]||liveRef.current.levels[0];
       if(currentLevel){
@@ -281,54 +260,59 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
         const facing:WallFace=Math.abs(x)>Math.abs(z)?(x>0?"right":"left"):(z>0?"front":"back");
         if(lastFacingRef.current!==facing){lastFacingRef.current=facing;liveRef.current.onCameraFacingChange?.(facing);}
       }
-      camera.up.set(0,1,0);
-      camera.lookAt(target);
-      camera.updateMatrixWorld(true);
+      // Keep atmosphere behind the subject even when a wide site needs a distant camera.
+      if(scene.fog instanceof THREE.Fog){scene.fog.near=Math.max(45,o.radius*.7);scene.fog.far=Math.max(150,o.radius*3);}
+      const far=Math.max(600,o.radius*4);if(camera.far!==far){camera.far=far;camera.updateProjectionMatrix();}
       renderer.render(scene,camera);
+      if(settling&&!renderFrame)renderFrame=requestAnimationFrame(renderNow);
     };
+    // At most one render per display frame; an idle scene consumes no animation loop.
+    const render=()=>{if(!renderFrame)renderFrame=requestAnimationFrame(renderNow);};
     renderCameraRef.current=render;
-    const clampZoom=(radius:number)=>clampCameraRadius(radius,cameraFitRef.current.fitRadius);
-    // A sphere about the structural pivot encloses roofs and attached details at every orbit angle.
-    const centerTemple=()=>{
-      const bounds=lastBoundsRef.current;
-      if(bounds.isEmpty()){
-        // An empty site must not retain the orbit target of a deleted temple.
-        cameraFocusRef.current={x:0,z:0};
-        targetYRef.current=0.6;
-        cameraPanRef.current={x:0,y:0,z:0,manual:false};
-        orbitRef.current.radius=cameraFitRef.current.fitRadius=25;
-        return;
-      }
-      const center=bounds.getCenter(new THREE.Vector3());
-      cameraFocusRef.current={x:center.x,z:center.z};targetYRef.current=center.y;
-      cameraPanRef.current={x:0,y:0,z:0,manual:false};
-      orbitRef.current.radius=cameraFitRef.current.fitRadius=templeFitDistance(framingRadiusRef.current,camera);
+    snapshotRef.current=()=>{
+      cancelAnimationFrame(renderFrame);renderNow();
+      const link=document.createElement("a");link.download="Echoes-Temple.png";
+      link.href=renderer.domElement.toDataURL("image/png");link.click();
     };
-    let previousWidth=0,previousHeight=0;
+    const clampZoom=(radius:number)=>cameraRigRef.current.clamp(radius);
+    const centerTemple=(view:TempleView="temple")=>{
+      selectionBoundsRef.current();
+      const active=liveRef.current.levels[liveRef.current.selectedLevel]||liveRef.current.levels[0];
+      cameraRigRef.current.center(camera,view,active?.buildingId||active?.id||null);
+    };
+    viewRef.current=(view)=>{centerTemple(view);render();};
+    let previousWidth=0,previousHeight=0,previousTop=-1,previousBottom=-1;
     let previousOrientation: "portrait"|"landscape"|null=null;
+    const toolbar=document.querySelector<HTMLElement>('[data-builder-bottom-toolbar]');
+    const header=document.querySelector<HTMLElement>('[data-builder-top-toolbar]');
     const resize=()=>{
       const w=Math.max(1,host.clientWidth),h=Math.max(1,host.clientHeight);
-      if(w===previousWidth&&h===previousHeight)return;
-      previousWidth=w;previousHeight=h;
+      const hostRect=host.getBoundingClientRect();
+      const toolbarRect=toolbar?.getBoundingClientRect();
+      // Measure the actual overlay, including its expanded editor and safe-area padding.
+      const bottom=toolbarRect?Math.max(0,Math.min(h,hostRect.bottom-Math.max(hostRect.top,toolbarRect.top))):Math.min(235,h*.34);
+      const headerRect=header?.getBoundingClientRect();
+      const top=headerRect?Math.max(0,Math.min(h,headerRect.bottom-hostRect.top)):Math.min(65,h*.10);
+      if(w===previousWidth&&h===previousHeight&&Math.abs(top-previousTop)<1&&Math.abs(bottom-previousBottom)<1)return;
+      previousWidth=w;previousHeight=h;previousTop=top;previousBottom=bottom;
       const orientation: "portrait"|"landscape"=w>=h?"landscape":"portrait";
       const orientationChanged=previousOrientation!==null&&orientation!==previousOrientation;
       previousOrientation=orientation;
-      const bottom=Math.min(190,h*.32),top=Math.min(85,h*.14);
       camera.userData.builderVerticalReserve=top+bottom;
-      // Positive vertical offset moves the projected temple upward, away from the bottom controls.
-      // Use a genuinely larger virtual viewport so the visible crop is valid.
-      // Cropping from the bottom shifts the scene's optical center upward into
-      // the space above the toolbar without moving the orbit target itself.
-      const virtualHeight=h+top+bottom;
-      camera.aspect=w/virtualHeight;
-      camera.setViewOffset(w,virtualHeight,0,bottom,w,h);
-      camera.updateProjectionMatrix();renderer.setSize(w,h,false);
+      // The visible optical center must lie halfway between the top reserved area
+      // and the toolbar's actual top edge: (h + top - bottom) / 2.
+      // Three.js view offset is measured from the TOP of the virtual viewport.
+      // Therefore cropping at y=bottom (not top) shifts the subject UP.
+      cameraRigRef.current.resize(camera,w,h,top,bottom);
+      // Keep CSS pixels equal to the host. The backing buffer may be denser,
+      // but must never enlarge the displayed canvas on high-DPI phones.
+      renderer.setSize(w,h);
       // Reframe on an actual portrait/landscape rotation; ordinary resize preserves manual orbit.
       // The old logic retained stale pan/zoom across orientation changes, hiding the temple.
       // Only a real orientation change may reframe automatically after first load.
       // Ordinary viewport resizing never overrides a manually chosen view.
-      if(cameraFitRef.current.initialized && orientationChanged){
-        cameraFitRef.current.userFramed=false;
+      if(cameraRigRef.current.fit.initialized && orientationChanged){
+        cameraRigRef.current.fit.userFramed=false;
         centerTemple();
       }
       render();
@@ -339,17 +323,17 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     // that resolve to the same snapped object position.
     let lastDragKey="";
     let gestureMoved=false;
+    let pinchStart:{midX:number;midY:number;distance:number;radius:number;pan:{x:number;y:number;z:number;manual:boolean};right:THREE.Vector3;up:THREE.Vector3;scale:number}|null=null;
     const clearObjectDrag=()=>{
       movingLevelRef.current=null;movingStatueRef.current=null;movingSiteObjectRef.current=null;
-      movingDoorRef.current=null;movingArchRef.current=null;movingDetailRef.current=null;
-      resizingPerimeterRef.current=null;
+      movingDoorRef.current=null;movingArchRef.current=null;movingDetailRef.current=null;resizingPerimeterRef.current=null;
     };
-    const rebasePinch=()=>{
-      const pts=[...pointers.values()];
-      if(pts.length!==2)return;
-      gestureRef.current.midX=(pts[0].x+pts[1].x)/2;
-      gestureRef.current.midY=(pts[0].y+pts[1].y)/2;
-      orbitRef.current.pinch=pointerSeparation(pts);
+    const rebasePinch=()=>{const pts=[...pointers.values()];if(pts.length!==2){pinchStart=null;return;}
+      gestureRef.current.midX=(pts[0].x+pts[1].x)/2;gestureRef.current.midY=(pts[0].y+pts[1].y)/2;
+      const rig=cameraRigRef.current;rig.orbit.pinch=pointerSeparation(pts);
+      pinchStart={...gestureRef.current,distance:rig.orbit.pinch,radius:rig.orbit.radius,pan:{...rig.pan},
+        right:new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0),up:new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,1),
+        scale:2*rig.orbit.radius*Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)/Math.max(1,camera.view?.fullHeight||canvas.clientHeight)};
     };
     const emitSnappedDrag=(key:string,apply:()=>void)=>{if(key!==lastDragKey){lastDragKey=key;apply();}};
     const distance=()=>pointerSeparation(pointers.values());
@@ -364,11 +348,16 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       while(object){if(objects.includes(object))return [hit];object=object.parent;}
       return [];
     };
-    const down=(e:PointerEvent)=>{lastDragKey="";if(pointers.size===0)gestureMoved=false;pointerDownRef.current={x:e.clientX,y:e.clientY};const rect=canvas.getBoundingClientRect();const mouse=pointerToNdc(e.clientX,e.clientY,rect);raycasterRef.current.setFromCamera(mouse,camera);const doorHits=(liveRef.current.moveMode?visibleHits(levelGroupsRef.current,true):[]).filter(h=>h.object.userData.doorId!==undefined);if(doorHits.length){const d=doorHits[0].object.userData;movingDoorRef.current={levelIndex:d.levelIndex as number,id:d.doorId as string,face:d.doorFace as WallFace};}const archHits=(!liveRef.current.moveMode||doorHits.length)?[]:visibleHits(levelGroupsRef.current,true).filter(h=>h.object.userData.archId!==undefined);if(archHits.length){const a=archHits[0].object.userData;movingArchRef.current={levelIndex:a.levelIndex as number,id:a.archId as string,face:a.archFace as WallFace};}const detailHits=(!liveRef.current.moveMode||doorHits.length||archHits.length)?[]:visibleHits(levelGroupsRef.current,true).filter(h=>["windows","columns","stairs","pediments","trim"].includes(h.object.userData.detailCategory)&&h.object.userData.detailId);if(detailHits.length){const d=detailHits[0].object.userData;movingDetailRef.current={levelIndex:d.levelIndex as number,id:d.detailId as string,face:d.detailFace as WallFace,category:d.detailCategory};}const statueHits=(doorHits.length||archHits.length)?[]:visibleHits(statueGroupsRef.current,true);if(statueHits.length){let so:THREE.Object3D|null=statueHits[0].object;while(so&&so.userData.statueId===undefined)so=so.parent;if(so&&liveRef.current.moveMode){const id=so.userData.statueId as string;movingStatueRef.current=id;}}const siteHits=statueHits.length?[]:visibleHits(siteObjectGroupsRef.current,true);if(siteHits.length){let o:THREE.Object3D|null=siteHits[0].object;while(o&&!o.userData.siteObjectId)o=o.parent;if(o){/* Select site objects only on pointerup after a genuine tap. */}}if(siteHits.length){let obj:THREE.Object3D|null=siteHits[0].object;while(obj&&!obj.userData.siteObjectId)obj=obj.parent;if(obj&&liveRef.current.moveMode)movingSiteObjectRef.current={kind:obj.userData.siteObjectKind as "column"|"landscape",id:obj.userData.siteObjectId as string};}const perimeterHits=(statueHits.length||siteHits.length)?[]:(perimeterGroupRef.current?visibleHits(perimeterGroupRef.current.children,true):[]);const hits=(statueHits.length||perimeterHits.length)?[]:visibleHits(levelGroupsRef.current,true);if(hits.length){let obj:THREE.Object3D|null=hits[0].object;while(obj&&obj.userData.levelIndex===undefined)obj=obj.parent;if(obj&&obj.userData.levelIndex!==undefined){
+    const down=(e:PointerEvent)=>{lastDragKey="";if(pointers.size===0)gestureMoved=false;pointerDownRef.current={x:e.clientX,y:e.clientY};const rect=canvas.getBoundingClientRect();const mouse=pointerToNdc(e.clientX,e.clientY,rect);raycasterRef.current.setFromCamera(mouse,camera);const doorHits=(liveRef.current.moveMode&&liveRef.current.pendingLevelIndex==null?visibleHits(levelGroupsRef.current,true):[]).filter(h=>h.object.userData.doorId!==undefined);if(doorHits.length){const d=doorHits[0].object.userData;movingDoorRef.current={levelIndex:d.levelIndex as number,id:d.doorId as string,face:d.doorFace as WallFace};}const archHits=(!liveRef.current.moveMode||liveRef.current.pendingLevelIndex!=null||doorHits.length)?[]:visibleHits(levelGroupsRef.current,true).filter(h=>h.object.userData.archId!==undefined);if(archHits.length){const a=archHits[0].object.userData;movingArchRef.current={levelIndex:a.levelIndex as number,id:a.archId as string,face:a.archFace as WallFace};}const detailHits=(!liveRef.current.moveMode||liveRef.current.pendingLevelIndex!=null||doorHits.length||archHits.length)?[]:visibleHits(levelGroupsRef.current,true).filter(h=>["windows","columns","stairs","pediments","trim"].includes(h.object.userData.detailCategory)&&h.object.userData.detailId);if(detailHits.length){const d=detailHits[0].object.userData;movingDetailRef.current={levelIndex:d.levelIndex as number,id:d.detailId as string,face:d.detailFace as WallFace,category:d.detailCategory};}const statueHits=(doorHits.length||archHits.length)?[]:visibleHits(statueGroupsRef.current,true);if(statueHits.length){let so:THREE.Object3D|null=statueHits[0].object;while(so&&so.userData.statueId===undefined)so=so.parent;if(so&&liveRef.current.moveMode&&liveRef.current.pendingLevelIndex==null){const id=so.userData.statueId as string;movingStatueRef.current=id;
+      const hit=new THREE.Vector3();siteDragOffsetRef.current.set(0,0);
+      if(raycasterRef.current.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),hit))siteDragOffsetRef.current.set(so.position.x-hit.x,so.position.z-hit.z);}}const siteHits=statueHits.length?[]:visibleHits(siteObjectGroupsRef.current,true);if(siteHits.length){let o:THREE.Object3D|null=siteHits[0].object;while(o&&!o.userData.siteObjectId)o=o.parent;if(o){/* Select site objects only on pointerup after a genuine tap. */}}if(siteHits.length){let obj:THREE.Object3D|null=siteHits[0].object;while(obj&&!obj.userData.siteObjectId)obj=obj.parent;if(obj&&liveRef.current.moveMode&&liveRef.current.pendingLevelIndex==null){movingSiteObjectRef.current={kind:obj.userData.siteObjectKind as "column"|"landscape",id:obj.userData.siteObjectId as string};
+      const hit=new THREE.Vector3();siteDragOffsetRef.current.set(0,0);
+      if(raycasterRef.current.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),hit))siteDragOffsetRef.current.set(obj.position.x-hit.x,obj.position.z-hit.z);
+    }}const perimeterHits=(statueHits.length||siteHits.length)?[]:(perimeterGroupRef.current?visibleHits(perimeterGroupRef.current.children,true):[]);const hits=(statueHits.length||perimeterHits.length)?[]:visibleHits(levelGroupsRef.current,true);if(hits.length){let obj:THREE.Object3D|null=hits[0].object;while(obj&&obj.userData.levelIndex===undefined)obj=obj.parent;if(obj&&obj.userData.levelIndex!==undefined){
         const index=obj.userData.levelIndex as number;
         const level=liveRef.current.levels[index];
         // Only ground-floor buildings can be repositioned; elevated stories stay attached.
-        if(liveRef.current.moveMode && level && (level.elevation||0)===0 && !doorHits.length && !archHits.length && !detailHits.length){
+        if(liveRef.current.moveMode && (liveRef.current.pendingLevelIndex==null||index===liveRef.current.pendingLevelIndex) && level && (level.elevation||0)===0 && !doorHits.length && !archHits.length && !detailHits.length){
           movingLevelRef.current=index;
           const ground=new THREE.Plane(new THREE.Vector3(0,1,0),0);
           dragPlaneRef.current.copy(ground);
@@ -377,13 +366,8 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
             buildingDragOffsetRef.current.set((level.x||0)-intersection.x,(level.z||0)-intersection.z);
           }else buildingDragOffsetRef.current.set(0,0);
         }
-      }}pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const o=orbitRef.current;if(pointers.size===1){o.dragging=movingLevelRef.current===null && movingDoorRef.current===null && movingArchRef.current===null && movingDetailRef.current===null && movingStatueRef.current===null && movingSiteObjectRef.current===null;o.lastX=e.clientX;o.lastY=e.clientY;}else if(pointers.size===2){pointerDownRef.current=null;o.dragging=false;o.pinch=distance();{const ps=[...pointers.values()];gestureRef.current.midX=(ps[0].x+ps[1].x)/2;gestureRef.current.midY=(ps[0].y+ps[1].y)/2;}if(liveRef.current.moveMode&&perimeterGroupRef.current&&liveRef.current.perimeter){const rect=canvas.getBoundingClientRect();const cx=[...pointers.values()].reduce((s,p)=>s+p.x,0)/2,cy=[...pointers.values()].reduce((s,p)=>s+p.y,0)/2;const mouse=new THREE.Vector2(((cx-rect.left)/rect.width)*2-1,-((cy-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);if(visibleHits(perimeterGroupRef.current.children,true).length)resizingPerimeterRef.current={pinch:o.pinch,margin:liveRef.current.perimeter.margin};}}if(pointers.size>1){
-      // Additional fingers invalidate object movement immediately, even if no
-      // two-finger move event occurs before one of the fingers is lifted.
-      movingLevelRef.current=null;movingStatueRef.current=null;movingSiteObjectRef.current=null;
-      movingDoorRef.current=null;movingArchRef.current=null;movingDetailRef.current=null;
-      pointerDownRef.current=null;gestureMoved=true;o.dragging=false;
-      if(pointers.size>2)resizingPerimeterRef.current=null;
+      }}pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const o=cameraRigRef.current.orbit;if(pointers.size===1){o.dragging=movingLevelRef.current===null && movingDoorRef.current===null && movingArchRef.current===null && movingDetailRef.current===null && movingStatueRef.current===null && movingSiteObjectRef.current===null;o.lastX=e.clientX;o.lastY=e.clientY;}else if(pointers.size===2){pointerDownRef.current=null;o.dragging=false;rebasePinch();if(liveRef.current.moveMode&&liveRef.current.pendingLevelIndex==null&&perimeterGroupRef.current&&liveRef.current.perimeter){const rect=canvas.getBoundingClientRect();const cx=[...pointers.values()].reduce((s,p)=>s+p.x,0)/2,cy=[...pointers.values()].reduce((s,p)=>s+p.y,0)/2;const mouse=new THREE.Vector2(((cx-rect.left)/rect.width)*2-1,-((cy-rect.top)/rect.height)*2+1);raycasterRef.current.setFromCamera(mouse,camera);if(visibleHits(perimeterGroupRef.current.children,true).length)resizingPerimeterRef.current={pinch:o.pinch,margin:liveRef.current.perimeter.margin};}}if(pointers.size>1){movingLevelRef.current=null;movingStatueRef.current=null;movingSiteObjectRef.current=null;movingDoorRef.current=null;movingArchRef.current=null;movingDetailRef.current=null;
+      pointerDownRef.current=null;gestureMoved=true;o.dragging=false;if(pointers.size>2)resizingPerimeterRef.current=null;
     }canvas.setPointerCapture?.(e.pointerId);};
     const wallTransform=(level:BuildingLevel)=>new THREE.Matrix4().makeRotationY(THREE.MathUtils.degToRad(level.rotation||0)).setPosition(level.x||0,0,level.z||0);
     const wallLocalPoint=(level:BuildingLevel,point:THREE.Vector3)=>point.clone().applyMatrix4(wallTransform(level).invert());
@@ -392,52 +376,78 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       const offset=frontBack?(face==="front"?level.depth/14:-level.depth/14):(face==="right"?level.width/14:-level.width/14);
       return new THREE.Plane(frontBack?new THREE.Vector3(0,0,1):new THREE.Vector3(1,0,0),-offset).applyMatrix4(wallTransform(level));
     };
-    const move=(e:PointerEvent)=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const o=orbitRef.current;
+    const move=(e:PointerEvent)=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});const o=cameraRigRef.current.orbit;
       if(pointers.size>2)return;
-      const start=pointerDownRef.current;
-      if(start&&Math.hypot(e.clientX-start.x,e.clientY-start.y)>=8)gestureMoved=true;
-      if(pointers.size===2){movingLevelRef.current=null;movingDoorRef.current=null;movingArchRef.current=null;movingDetailRef.current=null;movingStatueRef.current=null;movingSiteObjectRef.current=null;const pts=[...pointers.values()];const midX=(pts[0].x+pts[1].x)/2,midY=(pts[0].y+pts[1].y)/2;const dx=midX-gestureRef.current.midX,dy=midY-gestureRef.current.midY;gestureRef.current.midX=midX;gestureRef.current.midY=midY;const panScale=2*o.radius*Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)/Math.max(1,camera.view?.fullHeight||canvas.clientHeight);
-      const right=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0);
-      const upAxis=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,1);
-      const pan=cameraPanRef.current;
-      pan.x+=(-right.x*dx+upAxis.x*dy)*panScale;
-      pan.y+=(-right.y*dx+upAxis.y*dy)*panScale;
-      pan.z+=(-right.z*dx+upAxis.z*dy)*panScale;
-      if(Math.abs(dx)+Math.abs(dy)>0){pan.manual=true;cameraFitRef.current.userFramed=true;}const next=distance();if(resizingPerimeterRef.current&&next>0){const ratio=next/Math.max(1,resizingPerimeterRef.current.pinch);const margin=Math.max(.25,Math.min(10,resizingPerimeterRef.current.margin*ratio));liveRef.current.onResizePerimeter?.(Math.round(margin*4)/4);}else if(o.pinch>0){const scale=o.pinch/Math.max(1,next);o.radius=clampZoom(o.radius*scale);cameraFitRef.current.userFramed=true;}o.pinch=next;render();return;}// A tap selects an object; only an intentional drag may reposition it.
+      const start=pointerDownRef.current;if(start&&Math.hypot(e.clientX-start.x,e.clientY-start.y)>=8)gestureMoved=true;
+      if(pointers.size===2){
+        movingLevelRef.current=null;movingDoorRef.current=null;movingArchRef.current=null;movingDetailRef.current=null;movingStatueRef.current=null;movingSiteObjectRef.current=null;
+        if(!pinchStart)rebasePinch();const base=pinchStart;if(!base)return;
+        const pts=[...pointers.values()],midX=(pts[0].x+pts[1].x)/2,midY=(pts[0].y+pts[1].y)/2;
+        const dx=midX-base.midX,dy=midY-base.midY,pan=cameraRigRef.current.pan;
+        // Absolute displacement from one shared gesture snapshot prevents the
+        // first finger's zoom scale from changing the second finger's pan scale.
+        pan.x=base.pan.x+(-base.right.x*dx+base.up.x*dy)*base.scale;
+        pan.y=base.pan.y+(-base.right.y*dx+base.up.y*dy)*base.scale;
+        pan.z=base.pan.z+(-base.right.z*dx+base.up.z*dy)*base.scale;
+        pan.manual=base.pan.manual||Math.abs(dx)+Math.abs(dy)>0;
+        gestureRef.current.midX=midX;gestureRef.current.midY=midY;
+        const next=distance();
+        if(resizingPerimeterRef.current&&next>0){
+          const ratio=next/Math.max(1,resizingPerimeterRef.current.pinch);
+          const margin=Math.max(.25,Math.min(10,resizingPerimeterRef.current.margin*ratio));liveRef.current.onResizePerimeter?.(Math.round(margin*4)/4);
+        }else if(base.distance>1)o.radius=clampZoom(base.radius*base.distance/Math.max(1,next));
+        else if(next>1)rebasePinch();
+        if(dx!==0||dy!==0||next!==base.distance)cameraRigRef.current.fit.userFramed=true;
+        o.pinch=next;render();return;
+      }// A tap selects an object; only an intentional drag may reposition it.
       // Apply the same movement threshold to doors, details, statues and site
       // objects as to buildings, so slight finger movement cannot shift them.
       const dragStart=pointerDownRef.current;
       const movingAnObject=movingLevelRef.current!==null||movingDoorRef.current!==null||movingArchRef.current!==null||movingDetailRef.current!==null||movingStatueRef.current!==null||movingSiteObjectRef.current!==null;
       if(pointers.size===1&&movingAnObject&&dragStart&&!gestureMoved)return;
-      if(movingDetailRef.current&&pointers.size===1){const md=movingDetailRef.current,level=liveRef.current.levels[md.levelIndex];if(level){const rect=canvas.getBoundingClientRect();const mouse=pointerToNdc(e.clientX,e.clientY,rect);raycasterRef.current.setFromCamera(mouse,camera);const plane=wallDragPlane(level,md.face);const hit=new THREE.Vector3();if(raycasterRef.current.ray.intersectPlane(plane,hit)){const local=wallLocalPoint(level,hit);const center=0;const span=(md.face==="front"||md.face==="back"?level.width:level.depth)/7*.38;const axis=md.face==="front"||md.face==="back"?local.x:local.z;const u=Math.max(-1,Math.min(1,(axis-center)/Math.max(.1,span)));const base=(level.elevation||0)/7;const h=level.height/7;const v=md.category==="windows"?Math.max(.12,Math.min(.9,(hit.y-base)/Math.max(.1,h))):undefined;liveRef.current.onMoveDetail?.(md.levelIndex,md.category,md.id,Math.round(u*20)/20,v===undefined?undefined:Math.round(v*20)/20);}}return;}if(movingArchRef.current&&pointers.size===1){const ma=movingArchRef.current,level=liveRef.current.levels[ma.levelIndex];if(level){const rect=canvas.getBoundingClientRect();const mouse=pointerToNdc(e.clientX,e.clientY,rect);raycasterRef.current.setFromCamera(mouse,camera);const plane=wallDragPlane(level,ma.face);const hit=new THREE.Vector3();if(raycasterRef.current.ray.intersectPlane(plane,hit)){const local=wallLocalPoint(level,hit);const center=0;const span=(ma.face==="front"||ma.face==="back"?level.width:level.depth)/7*.38;const axis=ma.face==="front"||ma.face==="back"?local.x:local.z;const u=Math.max(-1,Math.min(1,(axis-center)/Math.max(.1,span)));liveRef.current.onMoveArch?.(ma.levelIndex,ma.id,Math.round(u*20)/20);}}return;}if(movingDoorRef.current&&pointers.size===1){const md=movingDoorRef.current,level=liveRef.current.levels[md.levelIndex];if(level){const rect=canvas.getBoundingClientRect();const mouse=pointerToNdc(e.clientX,e.clientY,rect);raycasterRef.current.setFromCamera(mouse,camera);const y=liveRef.current.levels.slice(0,md.levelIndex).reduce((s,l)=>s+l.height/7,0)+.5;const plane=wallDragPlane(level,md.face);const hit=new THREE.Vector3();if(raycasterRef.current.ray.intersectPlane(plane,hit)){const local=wallLocalPoint(level,hit);const center=0;const span=(md.face==="front"||md.face==="back"?level.width:level.depth)/7*.38;const axis=md.face==="front"||md.face==="back"?local.x:local.z;const u=Math.max(-1,Math.min(1,(axis-center)/Math.max(.1,span)));liveRef.current.onMoveDoor?.(md.levelIndex,md.id,Math.round(u*20)/20);} }return;}if(movingSiteObjectRef.current&&pointers.size===1){const rect=canvas.getBoundingClientRect();const mouse=pointerToNdc(e.clientX,e.clientY,rect);raycasterRef.current.setFromCamera(mouse,camera);const hit=new THREE.Vector3();if(raycasterRef.current.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),hit)){const item=movingSiteObjectRef.current,x=Math.round(hit.x*4)/4,z=Math.round(hit.z*4)/4;emitSnappedDrag(`${item.kind}:${item.id}:${x}:${z}`,()=>{if(item.kind==="column")liveRef.current.onMoveSiteColumn?.(item.id,x,z);else liveRef.current.onMoveLandscape?.(item.id,x,z);});}return;}if(movingStatueRef.current!==null&&pointers.size===1){const rect=canvas.getBoundingClientRect();const mouse=pointerToNdc(e.clientX,e.clientY,rect);raycasterRef.current.setFromCamera(mouse,camera);const plane=new THREE.Plane(new THREE.Vector3(0,1,0),0),hit=new THREE.Vector3();if(raycasterRef.current.ray.intersectPlane(plane,hit)){const id=movingStatueRef.current,x=Math.round(hit.x*4)/4,z=Math.round(hit.z*4)/4;emitSnappedDrag(`statue:${id}:${x}:${z}`,()=>liveRef.current.onMoveStatue?.(id,x,z));}return;}if(movingLevelRef.current!==null&&pointers.size===1){const start=pointerDownRef.current;if(start&&!gestureMoved)return;const rect=canvas.getBoundingClientRect();const mouse=pointerToNdc(e.clientX,e.clientY,rect);raycasterRef.current.setFromCamera(mouse,camera);const hit=new THREE.Vector3();if(raycasterRef.current.ray.intersectPlane(dragPlaneRef.current,hit)){const snap=.25;const id=movingLevelRef.current,x=Math.round((hit.x+buildingDragOffsetRef.current.x)/snap)*snap,z=Math.round((hit.z+buildingDragOffsetRef.current.y)/snap)*snap;emitSnappedDrag(`level:${id}:${x}:${z}`,()=>liveRef.current.onMoveLevel?.(id,x,z));}return;}if(!o.dragging)return;const dx=e.clientX-o.lastX,dy=e.clientY-o.lastY;o.lastX=e.clientX;o.lastY=e.clientY;if(e.shiftKey||(e.buttons&4)!==0){const scale=2*o.radius*Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)/Math.max(1,camera.view?.fullHeight||canvas.clientHeight);const right=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0),upAxis=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,1),pan=cameraPanRef.current;pan.x+=(-right.x*dx+upAxis.x*dy)*scale;pan.y+=(-right.y*dx+upAxis.y*dy)*scale;pan.z+=(-right.z*dx+upAxis.z*dy)*scale;pan.manual=true;}else{o.theta-=dx*.008;o.phi=Math.max(.82,Math.min(Math.PI/2-.08,o.phi+dy*.0055));}cameraFitRef.current.userFramed=true;render();};
-    const up=(e:PointerEvent)=>{if(!pointers.has(e.pointerId))return;clearObjectDrag();const start=pointerDownRef.current;pointerDownRef.current=null;if(start&&!gestureMoved&&Math.hypot(e.clientX-start.x,e.clientY-start.y)<8&&pointers.size===1){const rect=canvas.getBoundingClientRect();const mouse=pointerToNdc(e.clientX,e.clientY,rect);raycasterRef.current.setFromCamera(mouse,camera);const statueTap=visibleHits(statueGroupsRef.current,true);if(statueTap.length){let so:THREE.Object3D|null=statueTap[0].object;while(so&&so.userData.statueId===undefined)so=so.parent;if(so)liveRef.current.onSelectStatue?.(so.userData.statueId as string);}const siteTap=statueTap.length?[]:visibleHits(siteObjectGroupsRef.current,true);if(siteTap.length){let obj:THREE.Object3D|null=siteTap[0].object;while(obj&&!obj.userData.siteObjectId)obj=obj.parent;if(obj){const id=obj.userData.siteObjectId as string;if(obj.userData.siteObjectKind==="column")liveRef.current.onSelectSiteColumn?.(id);else liveRef.current.onSelectLandscape?.(id);}}const perimeterTap=(statueTap.length||siteTap.length)?[]:(perimeterGroupRef.current?visibleHits(perimeterGroupRef.current.children,true):[]);if(perimeterTap.length)liveRef.current.onSelectPerimeter?.();const hits=(statueTap.length||siteTap.length||perimeterTap.length)?[]:visibleHits(levelGroupsRef.current,true);if(hits.length){const tagged=hits[0].object.userData.detailCategory?hits[0]:undefined;if(tagged){const d=tagged.object.userData;liveRef.current.onSelectDetail?.(d.levelIndex as number,(d.detailFace||null) as WallFace|null,d.detailCategory);}else{let obj:THREE.Object3D|null=hits[0].object;while(obj&&obj.userData.levelIndex===undefined)obj=obj.parent;if(obj&&obj.userData.levelIndex!==undefined){const idx=obj.userData.levelIndex as number;liveRef.current.onSelectLevel?.(idx);const hit=hits[0];if(hit.face){const n=hit.face.normal.clone().transformDirection(hit.object.matrixWorld).transformDirection(new THREE.Matrix4().extractRotation(levelGroupsRef.current[idx].matrixWorld).invert());const ax=Math.abs(n.x),az=Math.abs(n.z);const face:WallFace=ax>az?(n.x>0?"right":"left"):(n.z>0?"front":"back");liveRef.current.onSelectFace?.(idx,face);}}}}}pointers.delete(e.pointerId);const o=orbitRef.current;o.pinch=0;rebasePinch();if(pointers.size===1){const pt=[...pointers.values()][0];o.dragging=false;o.lastX=pt.x;o.lastY=pt.y;}else{o.dragging=false;}};
-    const wheel=(e:WheelEvent)=>{e.preventDefault();const o=orbitRef.current;o.radius=clampZoom(o.radius+e.deltaY*.012);cameraFitRef.current.userFramed=true;render();};
+      if(movingDetailRef.current&&pointers.size===1){const md=movingDetailRef.current,level=liveRef.current.levels[md.levelIndex];if(level){const rect=canvas.getBoundingClientRect();const mouse=pointerToNdc(e.clientX,e.clientY,rect);raycasterRef.current.setFromCamera(mouse,camera);const plane=wallDragPlane(level,md.face);const hit=new THREE.Vector3();if(raycasterRef.current.ray.intersectPlane(plane,hit)){const local=wallLocalPoint(level,hit);const center=0;const span=(md.face==="front"||md.face==="back"?level.width:level.depth)/7*.38;const axis=md.face==="front"||md.face==="back"?local.x:local.z;const u=Math.max(-1,Math.min(1,(axis-center)/Math.max(.1,span)));const base=(level.elevation||0)/7;const h=level.height/7;const v=md.category==="windows"?Math.max(.12,Math.min(.9,(hit.y-base)/Math.max(.1,h))):undefined;liveRef.current.onMoveDetail?.(md.levelIndex,md.category,md.id,Math.round(u*20)/20,v===undefined?undefined:Math.round(v*20)/20);}}return;}if(movingArchRef.current&&pointers.size===1){const ma=movingArchRef.current,level=liveRef.current.levels[ma.levelIndex];if(level){const rect=canvas.getBoundingClientRect();const mouse=pointerToNdc(e.clientX,e.clientY,rect);raycasterRef.current.setFromCamera(mouse,camera);const plane=wallDragPlane(level,ma.face);const hit=new THREE.Vector3();if(raycasterRef.current.ray.intersectPlane(plane,hit)){const local=wallLocalPoint(level,hit);const center=0;const span=(ma.face==="front"||ma.face==="back"?level.width:level.depth)/7*.38;const axis=ma.face==="front"||ma.face==="back"?local.x:local.z;const u=Math.max(-1,Math.min(1,(axis-center)/Math.max(.1,span)));liveRef.current.onMoveArch?.(ma.levelIndex,ma.id,Math.round(u*20)/20);}}return;}if(movingDoorRef.current&&pointers.size===1){const md=movingDoorRef.current,level=liveRef.current.levels[md.levelIndex];if(level){const rect=canvas.getBoundingClientRect();const mouse=pointerToNdc(e.clientX,e.clientY,rect);raycasterRef.current.setFromCamera(mouse,camera);const y=liveRef.current.levels.slice(0,md.levelIndex).reduce((s,l)=>s+l.height/7,0)+.5;const plane=wallDragPlane(level,md.face);const hit=new THREE.Vector3();if(raycasterRef.current.ray.intersectPlane(plane,hit)){const local=wallLocalPoint(level,hit);const center=0;const span=(md.face==="front"||md.face==="back"?level.width:level.depth)/7*.38;const axis=md.face==="front"||md.face==="back"?local.x:local.z;const u=Math.max(-1,Math.min(1,(axis-center)/Math.max(.1,span)));liveRef.current.onMoveDoor?.(md.levelIndex,md.id,Math.round(u*20)/20);} }return;}if(movingSiteObjectRef.current&&pointers.size===1){const rect=canvas.getBoundingClientRect();const mouse=pointerToNdc(e.clientX,e.clientY,rect);raycasterRef.current.setFromCamera(mouse,camera);const hit=new THREE.Vector3();if(raycasterRef.current.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),hit)){const item=movingSiteObjectRef.current,x=Math.round((hit.x+siteDragOffsetRef.current.x)*4)/4,z=Math.round((hit.z+siteDragOffsetRef.current.y)*4)/4;emitSnappedDrag(`${item.kind}:${item.id}:${x}:${z}`,()=>{if(item.kind==="column")liveRef.current.onMoveSiteColumn?.(item.id,x,z);else liveRef.current.onMoveLandscape?.(item.id,x,z);});}return;}if(movingStatueRef.current!==null&&pointers.size===1){const rect=canvas.getBoundingClientRect();const mouse=pointerToNdc(e.clientX,e.clientY,rect);raycasterRef.current.setFromCamera(mouse,camera);const plane=new THREE.Plane(new THREE.Vector3(0,1,0),0),hit=new THREE.Vector3();if(raycasterRef.current.ray.intersectPlane(plane,hit)){const id=movingStatueRef.current,x=Math.round((hit.x+siteDragOffsetRef.current.x)*4)/4,z=Math.round((hit.z+siteDragOffsetRef.current.y)*4)/4;emitSnappedDrag(`statue:${id}:${x}:${z}`,()=>liveRef.current.onMoveStatue?.(id,x,z));}return;}if(movingLevelRef.current!==null&&pointers.size===1){const start=pointerDownRef.current;if(start&&!gestureMoved)return;const rect=canvas.getBoundingClientRect();const mouse=pointerToNdc(e.clientX,e.clientY,rect);raycasterRef.current.setFromCamera(mouse,camera);const hit=new THREE.Vector3();if(raycasterRef.current.ray.intersectPlane(dragPlaneRef.current,hit)){const snap=.25;const id=movingLevelRef.current,x=Math.round((hit.x+buildingDragOffsetRef.current.x)/snap)*snap,z=Math.round((hit.z+buildingDragOffsetRef.current.y)/snap)*snap;emitSnappedDrag(`level:${id}:${x}:${z}`,()=>liveRef.current.onMoveLevel?.(id,x,z));}return;}if(!o.dragging)return;const dx=e.clientX-o.lastX,dy=e.clientY-o.lastY;o.lastX=e.clientX;o.lastY=e.clientY;if(e.shiftKey||(e.buttons&6)!==0){const scale=2*o.radius*Math.tan(THREE.MathUtils.degToRad(camera.fov)/2)/Math.max(1,camera.view?.fullHeight||canvas.clientHeight);const right=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,0),upAxis=new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld,1),pan=cameraRigRef.current.pan;pan.x+=(-right.x*dx+upAxis.x*dy)*scale;pan.y+=(-right.y*dx+upAxis.y*dy)*scale;pan.z+=(-right.z*dx+upAxis.z*dy)*scale;pan.manual=true;}else{o.theta-=dx*.008;o.phi=Math.max(.16,Math.min(Math.PI/2-.06,o.phi+dy*.0055));}cameraRigRef.current.fit.userFramed=true;render();};
+    const up=(e:PointerEvent)=>{if(!pointers.has(e.pointerId))return;clearObjectDrag();const start=pointerDownRef.current;pointerDownRef.current=null;if(start&&!gestureMoved&&Math.hypot(e.clientX-start.x,e.clientY-start.y)<8&&pointers.size===1){const rect=canvas.getBoundingClientRect();const mouse=pointerToNdc(e.clientX,e.clientY,rect);raycasterRef.current.setFromCamera(mouse,camera);const statueTap=visibleHits(statueGroupsRef.current,true);if(statueTap.length){let so:THREE.Object3D|null=statueTap[0].object;while(so&&so.userData.statueId===undefined)so=so.parent;if(so)liveRef.current.onSelectStatue?.(so.userData.statueId as string);}const siteTap=statueTap.length?[]:visibleHits(siteObjectGroupsRef.current,true);if(siteTap.length){let obj:THREE.Object3D|null=siteTap[0].object;while(obj&&!obj.userData.siteObjectId)obj=obj.parent;if(obj){const id=obj.userData.siteObjectId as string;if(obj.userData.siteObjectKind==="column")liveRef.current.onSelectSiteColumn?.(id);else liveRef.current.onSelectLandscape?.(id);}}const perimeterTap=(statueTap.length||siteTap.length)?[]:(perimeterGroupRef.current?visibleHits(perimeterGroupRef.current.children,true):[]);if(perimeterTap.length)liveRef.current.onSelectPerimeter?.();const hits=(statueTap.length||siteTap.length||perimeterTap.length)?[]:visibleHits(levelGroupsRef.current,true);if(hits.length){const tagged=hits[0].object.userData.detailCategory?hits[0]:undefined;if(tagged){const d=tagged.object.userData;liveRef.current.onSelectDetail?.(d.levelIndex as number,(d.detailFace||null) as WallFace|null,d.detailCategory);}else{let obj:THREE.Object3D|null=hits[0].object;while(obj&&obj.userData.levelIndex===undefined)obj=obj.parent;if(obj&&obj.userData.levelIndex!==undefined){const idx=obj.userData.levelIndex as number;liveRef.current.onSelectLevel?.(idx);const hit=hits[0];if(hit.face){const n=hit.face.normal.clone().transformDirection(hit.object.matrixWorld).transformDirection(new THREE.Matrix4().extractRotation(levelGroupsRef.current[idx].matrixWorld).invert());const ax=Math.abs(n.x),az=Math.abs(n.z);const face:WallFace=ax>az?(n.x>0?"right":"left"):(n.z>0?"front":"back");liveRef.current.onSelectFace?.(idx,face);}}}}}pointers.delete(e.pointerId);const o=cameraRigRef.current.orbit;o.pinch=0;rebasePinch();if(pointers.size===1){const pt=[...pointers.values()][0];o.dragging=false;o.lastX=pt.x;o.lastY=pt.y;}else{o.dragging=false;}if(pointers.size===0)syncFocusedBuildingRef.current();};
+    const wheel=(e:WheelEvent)=>{e.preventDefault();const o=cameraRigRef.current.orbit;o.radius=clampZoom(o.radius+e.deltaY*.012);cameraRigRef.current.fit.userFramed=true;render();};
     const cancel=(e:PointerEvent)=>{
       // A canceled gesture is never a tap: discard selection and all drag state.
       pointerDownRef.current=null;
       clearObjectDrag();gestureMoved=true;
       pointers.delete(e.pointerId);
-      orbitRef.current.dragging=false;orbitRef.current.pinch=0;
-      rebasePinch();
+      cameraRigRef.current.orbit.dragging=false;cameraRigRef.current.orbit.pinch=0;rebasePinch();
+      if(pointers.size===0)syncFocusedBuildingRef.current();
     };
+    const contextMenu=(e:Event)=>e.preventDefault();
+    const contextLost=(e:Event)=>{e.preventDefault();setRenderError(true);};
+    canvas.addEventListener("contextmenu",contextMenu);canvas.addEventListener("webglcontextlost",contextLost);
+    canvas.addEventListener("lostpointercapture",cancel);
     canvas.addEventListener("pointerdown",down);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",up);canvas.addEventListener("pointercancel",cancel);canvas.addEventListener("wheel",wheel,{passive:false});
-    window.addEventListener("resize",resize); const sizeObserver=new ResizeObserver(resize);sizeObserver.observe(host); resize();
-    resetCameraRef.current=()=>{const o=orbitRef.current;o.theta=0;o.phi=0.90;cameraFitRef.current.userFramed=false;centerTemple();render();};
-    return()=>{sizeObserver.disconnect();window.removeEventListener("resize",resize);canvas.removeEventListener("pointerdown",down);canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerup",up);canvas.removeEventListener("pointercancel",cancel);canvas.removeEventListener("wheel",wheel);disposeMeshResources(scene);terrainTexture.dispose();renderer.dispose();releaseProceduralMaps();canvas.remove();};
+    window.addEventListener("resize",resize); const sizeObserver=new ResizeObserver(resize);sizeObserver.observe(host); if(toolbar)sizeObserver.observe(toolbar);if(header)sizeObserver.observe(header); resize();
+    return()=>{cancelAnimationFrame(renderFrame);geometryCacheRef.current.clear();
+      canvas.removeEventListener("contextmenu",contextMenu);canvas.removeEventListener("webglcontextlost",contextLost);canvas.removeEventListener("lostpointercapture",cancel);
+      if(environmentUpdate)clearTimeout(environmentUpdate);environmentBoundsRef.current=null;
+      environments.forEach(environment=>environment.dispose());pmrem.dispose();skyTexture.dispose();environmentLandscape.dispose();sizeObserver.disconnect();window.removeEventListener("resize",resize);canvas.removeEventListener("pointerdown",down);canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerup",up);canvas.removeEventListener("pointercancel",cancel);canvas.removeEventListener("wheel",wheel);disposeMeshResources(scene);groundSurface.dispose();renderer.dispose();releaseProceduralMaps();canvas.remove();};
   },[]);
 
   useEffect(()=>{
     const group=groupRef.current,scene=sceneRef.current,renderer=rendererRef.current,camera=cameraRef.current;if(!group||!scene||!renderer||!camera)return;
-    while(group.children.length){const o=group.children[0];group.remove(o);disposeMeshResources(o);}
+    const cache=geometryCacheRef.current;
+    const retained=new Set([...cache.values()].map(entry=>entry.group));
+    // Keep architectural meshes alive when only their transform or another object changes.
+    for(const child of [...group.children]){group.remove(child);if(!retained.has(child as THREE.Group))disposeMeshResources(child);}
+    const currentIds=new Set(levels.map(level=>level.id));
+    for(const [id,entry] of cache){if(!currentIds.has(id)){disposeMeshResources(entry.group);cache.delete(id);}}
     levelGroupsRef.current=[];
     let baseY=0;
 
-    const enableShadows=(root:THREE.Object3D)=>root.traverse(o=>{if(o instanceof THREE.Mesh){o.castShadow=true;o.receiveShadow=true;}});
+    const enableShadows=(root:THREE.Object3D)=>root.traverse(o=>{if(o instanceof THREE.Mesh){o.castShadow=!o.userData.pickSurface&&!o.userData.noShadow;o.receiveShadow=true;}});
     const addRoof=(parent:THREE.Group,roof:RoofStyle,rw:number,rd:number,x:number,z:number,top:number,color:number)=>{
       // Roof pieces share a single material rather than allocating one per cornice or tier.
       if(roof==="none")return;
-      const roofMaterial=new THREE.MeshStandardMaterial({color,roughness:.58,metalness:0});
-      const add=(g:THREE.BufferGeometry,px:number,py:number,pz:number)=>addArchitecturalMesh(parent,g,roofMaterial,px,py,pz);
+      const roofMaterial=makeMaterial(levels[parent.userData.levelIndex].material,color);
+      const add=(g:THREE.BufferGeometry,px:number,py:number,pz:number)=>{
+        const mesh=addArchitecturalMesh(parent,g,roofMaterial,px,py,pz);
+        mesh.userData={levelIndex:parent.userData.levelIndex,detailCategory:"roof"};return mesh;
+      };
       // Tiered stone cornices establish a visible roof silhouette from ground-level cameras.
       const lip=Math.min(.15,Math.max(.045,Math.min(rw,rd)*.025));
       const cornice=(spread:number,y:number,thickness:number)=>add(new THREE.BoxGeometry(rw+spread,thickness,rd+spread),x,y,z);
@@ -503,26 +513,60 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
 
     levels.forEach((level,index)=>{
       baseY=(level.elevation||0)/7;
-      const lg=new THREE.Group();lg.userData.levelIndex=index;lg.position.set(level.x||0,0,level.z||0);lg.rotation.y=THREE.MathUtils.degToRad(level.rotation||0);group.add(lg);levelGroupsRef.current.push(lg);
+      const {x:ignoredX,z:ignoredZ,rotation:ignoredRotation,...geometry}=level;
+      const key=JSON.stringify({...geometry,pending:index===pendingLevelIndex});
+      const cached=cache.get(level.id);
+      if(cached?.key===key){
+        const lg=cached.group;lg.position.set(level.x||0,0,level.z||0);lg.rotation.y=THREE.MathUtils.degToRad(level.rotation||0);
+        lg.traverse(o=>{if(o.userData.levelIndex!==undefined)o.userData.levelIndex=index;});
+        group.add(lg);levelGroupsRef.current.push(lg);return;
+      }
+      if(cached)disposeMeshResources(cached.group);
+      const lg=new THREE.Group();cache.set(level.id,{key,group:lg});lg.userData.levelIndex=index;lg.position.set(level.x||0,0,level.z||0);lg.rotation.y=THREE.MathUtils.degToRad(level.rotation||0);group.add(lg);levelGroupsRef.current.push(lg);
       const w=level.width/7,d=level.depth/7,h=level.height/7,color=COLORS[level.material];
       const selected=index===selectedLevel;
-      const mat=()=>makeMaterial(level.material,color,selected);
+      const shellMaterial=makeMaterial(level.material,color,selected);
+      const mat=()=>shellMaterial;
       const add=(g:THREE.BufferGeometry,x:number,y:number,z:number)=>{const m=new THREE.Mesh(g,mat());m.position.set(x,y,z);lg.add(m);};
       const box=(rw:number,rh:number,rd:number,x:number,y:number,z:number)=>add(new THREE.BoxGeometry(rw,rh,rd),x,y,z);
       const parts:Array<[number,number,number,number]>=level.shape==="l-shape"?[[w*.42,d,-w*.29,0],[w*.72,d*.42,w*.14,d*.29]]:level.shape==="t-shape"?[[w,d*.38,0,d*.30],[w*.36,d*.76,0,-d*.12]]:level.shape==="u-shape"?[[w*.28,d,-w*.36,0],[w*.28,d,w*.36,0],[w*.72,d*.28,0,-d*.36]]:level.shape==="cross"?[[w*.34,d,0,0],[w,d*.34,0,0]]:level.shape==="x-shape"?[[w*.28,d,0,0],[w,d*.28,0,0]]:level.shape==="horseshoe"?[[w*.25,d,-w*.38,0],[w*.25,d,w*.38,0],[w*.75,d*.26,0,-d*.37]]:level.shape==="courtyard"?[[w,d*.24,0,-d*.38],[w,d*.24,0,d*.38],[w*.24,d*.58,-w*.38,0],[w*.24,d*.58,w*.38,0]]:[[w,d,0,0]];
       const polygonShape=(points:Array<[number,number]>)=>{const s=new THREE.Shape();points.forEach(([x,z],i)=>i?s.lineTo(x,z):s.moveTo(x,z));s.closePath();const g=new THREE.ExtrudeGeometry(s,{depth:h,bevelEnabled:false});g.rotateX(Math.PI/2);g.translate(0,baseY+h,0);return g;};
       const radialPoints=(count:number,outer:number,inner?:number)=>Array.from({length:inner?count*2:count},(_,i)=>{const r=inner?(i%2===0?outer:inner):outer;const a=-Math.PI/2+i*Math.PI/(inner?count:count/2);return [Math.cos(a)*r,Math.sin(a)*r] as [number,number];});
+      // Keep footprint roofs pickable as roofs and out of shell batching, just like addRoof.
+      const addFootprintRoofPiece=(geometry:THREE.BufferGeometry,y=0)=>{
+        const mesh=addArchitecturalMesh(lg,geometry,shellMaterial,0,y,0);
+        mesh.userData={levelIndex:index,detailCategory:"roof"};return mesh;
+      };
       const addFootprintRoof=(points:Array<[number,number]>,top:number)=>{
-        if(["dome","cone","steeple","tiered","curved","ornate"].includes(level.roof)){addRoof(lg,level.roof,w,d,0,0,top,color);return;}
+        // Tiered roofs follow the same polygon as the supporting level. A rectangular
+        // BoxGeometry roof on a circular/star/hexagonal level is a visible regression.
+        if(level.roof==="tiered"){
+          for(let i=0;i<4;i++){
+            const scale=1-i*.19;
+            const tier=new THREE.Shape();
+            points.forEach(([px,pz],j)=>j?tier.lineTo(px*scale,pz*scale):tier.moveTo(px*scale,pz*scale));
+            tier.closePath();
+            const g=new THREE.ExtrudeGeometry(tier,{depth:.18,bevelEnabled:false});
+            g.rotateX(Math.PI/2);
+            g.translate(0,top+.12+i*.38+.09,0);
+            addFootprintRoofPiece(g);
+          }
+          const radius=Math.min(w,d)*.52*.42;
+          const crown=new THREE.ConeGeometry(radius,.72,Math.max(3,points.length));
+          addFootprintRoofPiece(crown,top+1.65);
+          return;
+        }
+        if(["dome","cone","steeple","curved","ornate"].includes(level.roof)){addRoof(lg,level.roof,w,d,0,0,top,color);return;}
         if(level.roof==="none")return;
         if(level.roof==="flat"){
           const s=new THREE.Shape();points.forEach(([x,z],i)=>i?s.lineTo(x,z):s.moveTo(x,z));s.closePath();
-          const g=new THREE.ExtrudeGeometry(s,{depth:.18,bevelEnabled:false});g.rotateX(Math.PI/2);g.translate(0,top+.18,0);add(g,0,0,0);return;
+          const g=new THREE.ExtrudeGeometry(s,{depth:.18,bevelEnabled:false});g.rotateX(Math.PI/2);g.translate(0,top+.18,0);addFootprintRoofPiece(g);return;
         }
         // Non-flat roofs keep the same footprint by tapering every perimeter edge to a centered apex.
         const rh=Math.max(.7,Math.min(1.8,Math.min(w,d)*.28));
-        const vertices:number[]=[];for(let i=0;i<points.length;i++){const a=points[i],b=points[(i+1)%points.length];vertices.push(a[0],top,a[1],b[0],top,b[1],0,top+rh,0);}
-        const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.Float32BufferAttribute(vertices,3));g.computeVertexNormals();add(g,0,0,0);
+        // Reverse the profile edge so the sloping roof faces outward/upward.
+        const vertices:number[]=[];for(let i=0;i<points.length;i++){const a=points[i],b=points[(i+1)%points.length];vertices.push(b[0],top,b[1],a[0],top,a[1],0,top+rh,0);}
+        const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.Float32BufferAttribute(vertices,3));g.computeVertexNormals();addFootprintRoofPiece(g);
       };
       // Architectural structural geometry from the reference plans.
       // These are true meshes in the temple's local coordinates, not image overlays.
@@ -537,7 +581,8 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
         const top:[number,number,number][]=[[-upperW/2,baseY+h,-upperD/2],[upperW/2,baseY+h,-upperD/2],[upperW/2,baseY+h,upperD/2],[-upperW/2,baseY+h,upperD/2]];
         for(let i=0;i<4;i++){const j=(i+1)%4;verts.push(...bottom[i],...bottom[j],...top[i],...bottom[j],...top[j],...top[i]);}
         const geom=new THREE.BufferGeometry();geom.setAttribute("position",new THREE.Float32BufferAttribute(verts,3));geom.computeVertexNormals();
-        const tapered=new THREE.Mesh(geom,new THREE.MeshStandardMaterial({color:COLORS[level.material],side:THREE.DoubleSide,roughness:.95}));lg.add(tapered);
+        const taperedMaterial=makeMaterial(level.material);taperedMaterial.side=THREE.DoubleSide;
+        const tapered=new THREE.Mesh(geom,taperedMaterial);lg.add(tapered);
         for(const t of [.12,.88])structural(new THREE.BoxGeometry(w*(1-t*.12),.09,d*(1-t*.12)),0,baseY+h*t,0);
       }
       if(level.architecture==="hindu" && level.roof==="tiered" && level.width<=26){
@@ -552,7 +597,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       }
       if(level.architecture==="gothic" && level.shape==="wide"){
         // Exterior flying buttresses: solid piers plus curved stone arch ribs.
-        const stone=new THREE.MeshStandardMaterial({color:COLORS[level.material],roughness:.88});
+        const stone=makeMaterial(level.material);
         for(const side of [-1,1])for(const fraction of [-.36,-.12,.12,.36]){
           const z=fraction*d*2,wallX=side*w*.5,pierX=wallX+side*1.2;
           structural(new THREE.BoxGeometry(.36,h*.73,.45),pierX,baseY+h*.365,z);
@@ -578,7 +623,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
         const pts=Array.from({length:sides},(_,i)=>{const a=-Math.PI/2+i*Math.PI*2/sides;return [Math.cos(a)*r*(level.shape==="oval"?w/d:1),Math.sin(a)*r] as [number,number];});
         if(level.shape==="ring"){
           const s=new THREE.Shape();s.absarc(0,0,r,0,Math.PI*2,false);const hole=new THREE.Path();hole.absarc(0,0,r*.55,0,Math.PI*2,true);s.holes.push(hole);const g=new THREE.ExtrudeGeometry(s,{depth:h,bevelEnabled:false});g.rotateX(Math.PI/2);g.translate(0,baseY+h,0);add(g,0,0,0);
-          if(level.roof==="flat"){const cap=new THREE.ExtrudeGeometry(s,{depth:.18,bevelEnabled:false});cap.rotateX(Math.PI/2);cap.translate(0,baseY+h+.18,0);add(cap,0,0,0);}else if(level.roof!=="none")addFootprintRoof(pts,baseY+h);
+          if(level.roof==="flat"){const cap=new THREE.ExtrudeGeometry(s,{depth:.18,bevelEnabled:false});cap.rotateX(Math.PI/2);cap.translate(0,baseY+h+.18,0);addFootprintRoofPiece(cap);}else if(level.roof!=="none")addFootprintRoof(pts,baseY+h);
         }else{const body=new THREE.CylinderGeometry(r,r,h,sides);if(level.shape==="oval")body.scale(w/d,1,1);add(body,0,baseY+h/2,0);addFootprintRoof(pts,baseY+h);}
       }else{
         for(const [rw,rd,x,z] of parts){
@@ -643,6 +688,8 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       }
       // Visible connecting course at the junction between stacked levels.
       // Use the same material maps as the level so this reads as architecture, not a pasted-on shape.
+      finishArchitecturalSurfaces(lg);
+      batchBuildingShell(lg,shellMaterial);
       if((level.elevation||0)>0){
         const transition=mat();
         const circular=["circle","rotunda","octagon","hexagon","oval","ring"].includes(level.shape);
@@ -677,7 +724,15 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
           }
         }
       }
+      const tagParts=(start:number,category:string,item:{id:string;face:WallFace})=>{
+        for(const child of lg.children.slice(start))child.traverse(object=>Object.assign(object.userData,{
+          levelIndex:index,detailCategory:category,detailId:item.id,detailFace:item.face,
+          ...(category==="doors"?{doorId:item.id,doorFace:item.face}:{}),
+          ...(category==="arches"?{archId:item.id,archFace:item.face}:{})
+        }));
+      };
       for(const win of level.windows||[]){
+        const attachmentStart=lg.children.length;
         const ww=Math.max(.9,win.width*h/11),wh=Math.max(1.3,win.height*h/6),edge=.018;
         let geometry:THREE.BufferGeometry;
         if(win.style==="round"||win.style==="rose") geometry=new THREE.CylinderGeometry(ww*.55,ww*.55,.08,24);
@@ -701,7 +756,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
         if(win.style!=="round"&&win.style!=="rose"&&win.style!=="arched"){
           const casing=new THREE.Group();
           casing.position.copy(frame.position);casing.rotation.copy(frame.rotation);
-          const trimMaterial=new THREE.MeshStandardMaterial({color:0xc5b9a4,roughness:.78});
+          const trimMaterial=makeMaterial(level.material);
           const rail=(width:number,height:number,px:number,py:number)=>{
             const piece=new THREE.Mesh(new THREE.BoxGeometry(width,height,.085),trimMaterial);
             piece.position.set(px,py,.012);piece.castShadow=true;casing.add(piece);
@@ -711,8 +766,10 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
           lg.add(casing);
         }
         frame.userData.levelIndex=index;frame.userData.windowId=win.id;frame.userData.detailCategory="windows";frame.userData.detailId=win.id;frame.userData.detailFace=win.face;lg.add(frame);
+              tagParts(attachmentStart,"windows",win);
       }
       for(const door of level.doors||[]){
+        const attachmentStart=lg.children.length;
         const dw=Math.max(1.1,door.width*h/9),dh=Math.min(h*.8,Math.max(2.8,door.height*h/7)),edge=.018;
         const arched=door.style==="arched"||door.style==="temple"||door.style==="portico"||door.style==="wood-arch"||door.style==="stone-arch"||door.style==="grand-arch"||door.style==="carved-stone"||door.style==="metal-gate";
         let dg:THREE.BufferGeometry;
@@ -726,15 +783,15 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
           dg=new THREE.ExtrudeGeometry(profile,{depth:.08,bevelEnabled:false});
           dg.translate(0,0,-.04);
         }else dg=new THREE.BoxGeometry(dw,dh,.08);
-        const dc=door.style==="bronze"||door.style==="metal-gate"?0x7b552e:door.style==="stone-arch"||door.style==="carved-stone"?0x77736b:door.style==="temple"||door.style==="portico"||door.style==="grand-arch"?0x6b4a2d:0x4b3527;
-        const mesh=new THREE.Mesh(dg,new THREE.MeshStandardMaterial({color:dc,roughness:.72,metalness:door.style==="bronze"||door.style==="metal-gate"?.5:.08}));
+        const doorMaterial:BuilderMaterial=door.style==="bronze"||door.style==="metal-gate"?"bronze":door.style==="stone-arch"||door.style==="carved-stone"?"stone":"timber";
+        const mesh=new THREE.Mesh(dg,makeMaterial(doorMaterial));
         const y=arched?baseY:baseY+dh/2;
         if(door.face==="front"||door.face==="back"){mesh.position.set((door.u||0)*(w*.38),y,door.face==="front"?d/2+edge:-d/2-edge);if(door.face==="back")mesh.rotation.y=Math.PI;}
         else{mesh.position.set(door.face==="right"?w/2+edge:-w/2-edge,y,(door.u||0)*(d*.38));mesh.rotation.y=Math.PI/2;}
         // A shallow stone sill and lintel visually anchor rectangular doors in the wall.
         if(!arched){
           const surround=new THREE.Group();surround.position.copy(mesh.position);surround.rotation.copy(mesh.rotation);
-          const trimMaterial=new THREE.MeshStandardMaterial({color:0xaaa092,roughness:.83});
+          const trimMaterial=makeMaterial(level.material);
           for(const side of [-1,1]){
             const jamb=new THREE.Mesh(new THREE.BoxGeometry(.09,dh+.12,.1),trimMaterial);
             jamb.position.set(side*(dw/2+.045),0,.01);jamb.castShadow=true;surround.add(jamb);
@@ -745,20 +802,21 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
         }
         mesh.userData.levelIndex=index;mesh.userData.doorId=door.id;mesh.userData.doorFace=door.face;mesh.userData.detailCategory="doors";mesh.userData.detailFace=door.face;lg.add(mesh);
         if(door.style==="portico"){
-          const colMat=new THREE.MeshStandardMaterial({color:0xd9d4cc,roughness:.75});
+          const colMat=makeMaterial(level.material);
           for(const side of [-1,1]){const col=new THREE.Mesh(new THREE.CylinderGeometry(.08,.1,dh,10),colMat.clone());if(door.face==="front"||door.face==="back")col.position.set(mesh.position.x+side*(dw*.72),baseY+dh/2,mesh.position.z+(door.face==="front"?.08:-.08));else col.position.set(mesh.position.x+(door.face==="right"?.08:-.08),baseY+dh/2,mesh.position.z+side*(dw*.72));lg.add(col);}
         }
+              tagParts(attachmentStart,"doors",door);
       }
       // Architectural detail system: references supplied for arches, classical/Gothic columns,
       // pediments, stairs and ornamental trim are rendered as procedural 3D pieces.
       // Reuse one material for identical details within a level.
-      const detailMaterial=makeMaterial(level.material,color,false);
-      const detailMat=()=>detailMaterial;
+      const detailMat=()=>shellMaterial;
       const facePlace=(face:WallFace,u:number,y:number,out:number)=>{
         if(face==="front"||face==="back") return {x:u*(w*.38),y,z:face==="front"?d/2+out:-d/2-out,rot:face==="back"?Math.PI:0};
         return {x:face==="right"?w/2+out:-w/2-out,y,z:u*(d*.38),rot:face==="right"?Math.PI/2:-Math.PI/2};
       };
       for(const col of level.columns||[]){
+        const attachmentStart=lg.children.length;
         const pos=facePlace(col.face,col.u,baseY+h*.48,.13),ch=h*.9;
         const cg=col.style==="square"?new THREE.BoxGeometry(.28,ch,.28):new THREE.CylinderGeometry((col.style==="corinthian"||col.style==="composite") ? .18 : .14,.17,ch,col.style==="fluted"?20:14);
         const cm=new THREE.Mesh(cg,detailMat());cm.position.set(pos.x,pos.y,pos.z);cm.rotation.y=pos.rot;cm.userData.levelIndex=index;cm.userData.detailCategory="columns";cm.userData.detailId=col.id;cm.userData.detailFace=col.face;lg.add(cm);
@@ -778,39 +836,48 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
         }
         const foot=new THREE.Mesh(new THREE.CylinderGeometry(.22,.25,.12,16),detailMat());foot.position.set(pos.x,baseY+.08,pos.z);lg.add(foot);
         if(col.style==="twisted") cm.rotation.y+=Math.PI/4;
+              tagParts(attachmentStart,"columns",col);
       }
       for(const arch of level.arches||[]){
+        const attachmentStart=lg.children.length;
         const pos=facePlace(arch.face,arch.u,baseY+h*.55,.15);
         const pointed=["pointed","three-pointed","pointed-segmental","lancet","ogee","oriental","pointed-trefoil","pointed-cinquefoil"].includes(arch.style);
         const wide=["segmental","three-centered","four-centered","tudor","venetian","florentine"].includes(arch.style);
         const radius=wide?.8:.62;
         const ag=new THREE.TorusGeometry(radius,.09,8,28,Math.PI);
-        const am=new THREE.Mesh(ag,detailMat());am.position.set(pos.x,pos.y,pos.z);am.rotation.z=Math.PI;am.rotation.y=pos.rot;
+        const am=new THREE.Mesh(ag,detailMat());am.position.set(pos.x,pos.y,pos.z);am.rotation.z=0;am.rotation.y=pos.rot;
         if(pointed) am.scale.set(1,.72,1);
         if(arch.style==="horseshoe"||arch.style==="keyhole") am.scale.set(.85,1.12,1);
         am.userData.levelIndex=index;am.userData.archId=arch.id;am.userData.archFace=arch.face;am.userData.detailCategory="arches";am.userData.detailFace=arch.face;lg.add(am);
         for(const side of [-1,1]){const leg=new THREE.Mesh(new THREE.BoxGeometry(.12,h*.48,.14),detailMat());const offset=side*radius;if(arch.face==="front"||arch.face==="back")leg.position.set(pos.x+offset,baseY+h*.31,pos.z);else leg.position.set(pos.x,baseY+h*.31,pos.z+offset);lg.add(leg);}
+              tagParts(attachmentStart,"arches",arch);
       }
       for(const trim of level.trims||[]){
-        const pos=facePlace(trim.face,trim.u||0,trim.style==="base"?baseY+.12:trim.style==="crown"||trim.style==="dentils"||trim.style==="frieze"?baseY+h-.16:baseY+h*.72,.11);
-        const len=(trim.face==="front"||trim.face==="back")?w:d;
-        const tg=new THREE.BoxGeometry(len,trim.style==="frieze"?.28:.12,.12);
-        const tm=new THREE.Mesh(tg,detailMat());tm.position.set(pos.x,pos.y,pos.z);tm.rotation.y=pos.rot;tm.userData.levelIndex=index;tm.userData.detailCategory="trim";tm.userData.detailId=trim.id;tm.userData.detailFace=trim.face;lg.add(tm);
-        if(["dentils","greek-fret","acanthus","rosette"].includes(trim.style)){for(let k=-4;k<=4;k++){const deco=new THREE.Mesh(new THREE.BoxGeometry(.12,.12,.08),detailMat());const du=k*len/10;if(trim.face==="front"||trim.face==="back")deco.position.set(du,pos.y-.13,pos.z);else deco.position.set(pos.x,pos.y-.13,du);lg.add(deco);}}
+        const attachmentStart=lg.children.length;
+        const y=trim.style==="base"?baseY+.12:trim.style==="crown"||trim.style==="dentils"||trim.style==="frieze"?baseY+h-.16:baseY+h*.72;
+        const tm=new THREE.Mesh(createBuildingTrim(level.shape,w,d,trim),detailMat());tm.position.y=y;
+        tm.userData={levelIndex:index,detailCategory:"trim",detailId:trim.id,detailFace:trim.face};lg.add(tm);
+              tagParts(attachmentStart,"trim",trim);
       }
       for(const stair of level.stairs||[]){
+        const attachmentStart=lg.children.length;
         const pos=facePlace(stair.face,stair.u,baseY,.22),sw=stair.style==="wide"||stair.style==="split"?1.8:1.15;
         for(let k=0;k<5;k++){const step=new THREE.Mesh(new THREE.BoxGeometry(sw,.12,.34+k*.12),detailMat());const outward=.28+k*.25;const angle=pos.rot;step.position.set(pos.x+Math.sin(angle)*outward,baseY+.06+(4-k)*.1,pos.z+Math.cos(angle)*outward);step.rotation.y=angle;step.userData.levelIndex=index;step.userData.detailCategory="stairs";step.userData.detailId=stair.id;step.userData.detailFace=stair.face;lg.add(step);}
+              tagParts(attachmentStart,"stairs",stair);
       }
       for(const ped of level.pediments||[]){
+        const attachmentStart=lg.children.length;
         const pos=facePlace(ped.face,ped.u,baseY+h*.9,.17),pw=1.55;
-        if(ped.style==="segmental"||ped.style==="broken-segmental"||ped.style==="swan-neck"){const pg=new THREE.TorusGeometry(pw/2,.1,8,24,Math.PI);const pm=new THREE.Mesh(pg,detailMat());pm.position.set(pos.x,pos.y,pos.z);pm.rotation.z=Math.PI;pm.rotation.y=pos.rot;pm.userData.levelIndex=index;pm.userData.detailCategory="pediments";pm.userData.detailId=ped.id;pm.userData.detailFace=ped.face;lg.add(pm);}
+        if(ped.style==="segmental"||ped.style==="broken-segmental"||ped.style==="swan-neck"){const pg=new THREE.TorusGeometry(pw/2,.1,8,24,Math.PI);const pm=new THREE.Mesh(pg,detailMat());pm.position.set(pos.x,pos.y,pos.z);pm.rotation.z=0;pm.rotation.y=pos.rot;pm.userData.levelIndex=index;pm.userData.detailCategory="pediments";pm.userData.detailId=ped.id;pm.userData.detailFace=ped.face;lg.add(pm);}
         else {for(const side of [-1,1]){const bar=new THREE.Mesh(new THREE.BoxGeometry(pw*.58,.11,.13),detailMat());bar.position.set(pos.x+(ped.face==="front"||ped.face==="back"?side*.34:0),pos.y+.22,pos.z+(ped.face==="left"||ped.face==="right"?side*.34:0));bar.rotation.y=pos.rot;bar.rotation.z=side*.5;bar.userData.levelIndex=index;bar.userData.detailCategory="pediments";bar.userData.detailId=ped.id;bar.userData.detailFace=ped.face;lg.add(bar);}}
+              tagParts(attachmentStart,"pediments",ped);
       }
+      finishArchitecturalSurfaces(lg);
+      batchBuildingShell(lg,shellMaterial);
       if((level.elevation||0)>0){
-        const below=levels.filter((candidate,i)=>i!==index && (candidate.elevation||0)<(level.elevation||0)).sort((a,b)=>(b.elevation||0)-(a.elevation||0))[0];
+        const below=levels.filter((candidate,i)=>i!==index && (candidate.elevation||0)<(level.elevation||0) && (candidate.buildingId||candidate.id)===(level.buildingId||level.id)).sort((a,b)=>(b.elevation||0)-(a.elevation||0))[0];
         const exposed=!!below&&(Math.abs((level.x||0)-(below.x||0))>.15||Math.abs((level.z||0)-(below.z||0))>.15||level.width<below.width-4||level.depth<below.depth-4);
-        if(exposed!==level.patio) queueMicrotask(()=>onPatioChange?.(index,exposed));
+        if(exposed!==level.patio) queueMicrotask(()=>liveRef.current.onPatioChange?.(index,exposed));
       }
     });
     // Independent site columns can be arranged around any temple without a wall attachment.
@@ -837,10 +904,9 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       const g=new THREE.Group();g.position.set(item.x,0,item.z);g.rotation.y=THREE.MathUtils.degToRad(item.rotation);g.scale.setScalar(Math.max(.3,Math.min(4,item.scale||1)));g.userData.siteObjectId=item.id;g.userData.siteObjectKind="landscape";siteObjectGroupsRef.current.push(g);group.add(g);
       const material=(color:number)=>new THREE.MeshStandardMaterial({color,roughness:.85});
       const add=(geo:THREE.BufferGeometry,x:number,y:number,z:number,color:number)=>{const m=new THREE.Mesh(geo,material(color));m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;g.add(m);};
+      if(addNaturalScenery(g,item))continue;
       if(item.kind==="tree"){
-        add(new THREE.CylinderGeometry(.12,.19,1.6,8),0,.8,0,0x695039);
-        for(let i=0;i<4;i++)add(new THREE.ConeGeometry(.93-i*.15,1.25,12),0,1.45+i*.48,0,i%2?0x416b40:0x537d4b);
-        for(let i=0;i<6;i++){const a=i*Math.PI/3;add(new THREE.SphereGeometry(.13,8,6),Math.cos(a)*.47,1.7+(i%3)*.38,Math.sin(a)*.47,0x8f7440);}
+        addSceneryTree(g,item.treeStyle||"broadleaf",Array.from(item.id).reduce((sum,c)=>sum+c.charCodeAt(0),0));
       }else if(item.kind==="garden"){
         add(new THREE.CylinderGeometry(1.15,1.2,.16,24),0,.08,0,0x776c56);
         add(new THREE.CylinderGeometry(1.05,1.05,.04,24),0,.18,0,0x394b2f);
@@ -870,7 +936,7 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     for(const statue of statues){
       const sg=new THREE.Group();sg.userData.statueId=statue.id;sg.position.set(statue.x,0,statue.z);sg.rotation.y=THREE.MathUtils.degToRad(statue.rotation);sg.scale.setScalar(statue.scale);group.add(sg);statueGroupsRef.current.push(sg);
       const sm=new THREE.MeshStandardMaterial({color:statueColor(statue.finish),roughness:(statue.finish==="gold"||statue.finish==="bronze")?.42:.72,metalness:statue.finish==="gold"?.65:statue.finish==="bronze"?.45:.05,emissive:statue.id===selectedStatueId?0x241d08:0,emissiveIntensity:.22});
-      const mesh=(g:THREE.BufferGeometry,x:number,y:number,z:number)=>{const m=new THREE.Mesh(g,sm.clone());m.position.set(x,y,z);sg.add(m);return m;};
+      const mesh=(g:THREE.BufferGeometry,x:number,y:number,z:number)=>{const m=new THREE.Mesh(g,sm);m.position.set(x,y,z);sg.add(m);return m;};
       mesh(new THREE.CylinderGeometry(.42,.5,.22,18),0,.11,0);
       if(statue.kind==="lion"){
         mesh(new THREE.SphereGeometry(.42,16,10),0,.72,0);
@@ -888,28 +954,41 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
       const pg=new THREE.Group();pg.userData.perimeter=true;group.add(pg);perimeterGroupRef.current=pg;
       const mat=makeMaterial(perimeter.material);
       const addWall=(len:number,x:number,z:number,rot:number)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(len,perimeter.height,perimeter.thickness),mat.clone());m.position.set(x,perimeter.height/2,z);m.rotation.y=rot;pg.add(m);};
-      const maxW=Math.max(...levels.map(l=>l.width/7+Math.abs(l.x||0)*2))+perimeter.margin*2;
-      const maxD=Math.max(...levels.map(l=>l.depth/7+Math.abs(l.z||0)*2))+perimeter.margin*2;
-      const points:Array<[number,number]>=perimeter.style==="circle"?Array.from({length:32},(_,i)=>{const a=i*Math.PI*2/32;return [Math.cos(a)*maxW/2,Math.sin(a)*maxD/2] as [number,number];}):perimeter.style==="octagon"?Array.from({length:8},(_,i)=>{const a=-Math.PI/8+i*Math.PI*2/8;return [Math.cos(a)*maxW/2,Math.sin(a)*maxD/2] as [number,number];}):perimeter.style==="star"?Array.from({length:10},(_,i)=>{const a=-Math.PI/2+i*Math.PI/5,r=i%2===0?1:.72;return [Math.cos(a)*maxW/2*r,Math.sin(a)*maxD/2*r] as [number,number];}):[[-maxW/2,-maxD/2],[maxW/2,-maxD/2],[maxW/2,maxD/2],[-maxW/2,maxD/2]];
-      points.forEach((a,i)=>{const b=points[(i+1)%points.length],dx=b[0]-a[0],dz=b[1]-a[1];addWall(Math.hypot(dx,dz),(a[0]+b[0])/2,(a[1]+b[1])/2,-Math.atan2(dz,dx));});
-      if(perimeter.gate){const front=points.reduce((best,p)=>p[1]>best[1]?p:best,points[0]);const gate=new THREE.Mesh(new THREE.BoxGeometry(1.4,perimeter.height*.82,.16),new THREE.MeshStandardMaterial({color:0x4b3527,roughness:.65,metalness:.18}));gate.position.set(front[0],perimeter.height*.41,front[1]);pg.add(gate);}
+      const {points,center:wallCenter,frontEdge,gate:gatePosition}=perimeterPlan(levels,perimeter.margin,perimeter.style);
+      points.forEach((a,i)=>{
+        const b=points[(i+1)%points.length],dx=b[0]-a[0],dz=b[1]-a[1],length=Math.hypot(dx,dz),rotation=-Math.atan2(dz,dx);
+        if(perimeter.gate&&i===frontEdge&&length>1.6){
+          const part=(length-1.5)/2;
+          for(const direction of [-1,1]){const distance=(length+1.5)/4;addWall(part,(a[0]+b[0])/2+direction*dx/length*distance,(a[1]+b[1])/2+direction*dz/length*distance,rotation);}
+        }else addWall(length,(a[0]+b[0])/2,(a[1]+b[1])/2,rotation);
+      });
+      if(perimeter.gate){const gate=new THREE.Mesh(new THREE.BoxGeometry(1.4,perimeter.height*.82,.16),new THREE.MeshStandardMaterial({color:0x4b3527,roughness:.65,metalness:.18}));gate.position.set(gatePosition.x,perimeter.height*.41,gatePosition.z);gate.rotation.y=gatePosition.rotation;pg.add(gate);}
       if(perimeter.towers){const towerMat=mat.clone();points.forEach(([x,z])=>{const r=.38;let g:THREE.BufferGeometry;if(perimeter.towerShape==="square")g=new THREE.BoxGeometry(.8,perimeter.height*1.5,.8);else if(perimeter.towerShape==="star"){const sh=new THREE.Shape();for(let i=0;i<10;i++){const rr=i%2===0?r:r*.48,a=-Math.PI/2+i*Math.PI/5;i?sh.lineTo(Math.cos(a)*rr,Math.sin(a)*rr):sh.moveTo(Math.cos(a)*rr,Math.sin(a)*rr);}sh.closePath();g=new THREE.ExtrudeGeometry(sh,{depth:perimeter.height*1.5,bevelEnabled:false});g.rotateX(Math.PI/2);g.translate(0,perimeter.height*1.5,0);}else g=new THREE.CylinderGeometry(r,r,perimeter.height*1.5,perimeter.towerShape==="octagon"?8:perimeter.towerShape==="hexagon"?6:20);const t=new THREE.Mesh(g,towerMat.clone());t.position.set(x,perimeter.towerShape==="star"?0:perimeter.height*.75,z);pg.add(t);});}
-      if(perimeter.columns||perimeter.arches){const frontZ=Math.max(...points.map(p=>p[1]));for(const x of [-1.1,1.1]){if(perimeter.columns){const col=new THREE.Mesh(new THREE.CylinderGeometry(.12,.15,perimeter.height*1.1,12),mat.clone());col.position.set(x,perimeter.height*.55,frontZ);pg.add(col);}}if(perimeter.arches){const arch=new THREE.Mesh(new THREE.TorusGeometry(.75,.12,8,20,Math.PI),mat.clone());arch.rotation.z=Math.PI;arch.position.set(0,perimeter.height*.78,frontZ);pg.add(arch);}}
+      if(perimeter.columns||perimeter.arches){const frontZ=Math.max(...points.map(p=>p[1]));for(const x of [-1.1,1.1]){if(perimeter.columns){const col=new THREE.Mesh(new THREE.CylinderGeometry(.12,.15,perimeter.height*1.1,12),mat.clone());col.position.set(wallCenter.x+x,perimeter.height*.55,frontZ);pg.add(col);}}if(perimeter.arches){const arch=new THREE.Mesh(new THREE.TorusGeometry(.75,.12,8,20,Math.PI),mat.clone());arch.rotation.z=0;arch.position.set(wallCenter.x,perimeter.height*.78,frontZ);pg.add(arch);}}
     }
     // Render the unconfirmed building as a translucent blue ghost, preserving its geometry.
     if(pendingLevelIndex!==null && pendingLevelIndex!==undefined){
       const pendingGroup=levelGroupsRef.current[pendingLevelIndex];
-      pendingGroup?.traverse(object=>{
+      const oldMaterials=new Set<THREE.Material>();
+      if(pendingGroup&&!pendingGroup.userData.ghost)pendingGroup.traverse(object=>{
         if(!(object instanceof THREE.Mesh))return;
+        (Array.isArray(object.material)?object.material:[object.material]).forEach(m=>oldMaterials.add(m));
         object.material=new THREE.MeshBasicMaterial({color:0x48a9ff,transparent:true,opacity:.38,depthWrite:false,side:THREE.DoubleSide});
         object.castShadow=false;
       });
+      oldMaterials.forEach(m=>m.dispose());if(pendingGroup)pendingGroup.userData.ghost=true;
     }
+    finishArchitecturalSurfaces(group);if(perimeterGroupRef.current)finishArchitecturalSurfaces(perimeterGroupRef.current);
     enableShadows(group);if(perimeterGroupRef.current)enableShadows(perimeterGroupRef.current);statueGroupsRef.current.forEach(enableShadows);
+    stoneSurfaceRef.current?.bind(group);
     // Structural bounds define the orbit pivot; site decorations never move it.
     group.updateWorldMatrix(true,true);
     const buildingBounds=new THREE.Box3();
     const renderedBounds=new THREE.Box3();
+    const selectedBounds=new THREE.Box3();
+    const selectedRenderedBounds=new THREE.Box3();
+    const activeLevel=levels[selectedLevel]||levels[0];
+    const activeBuildingId=activeLevel?.buildingId||activeLevel?.id;
     levelGroupsRef.current.forEach((levelGroup,index)=>{
       const level=levels[index],bottom=(level.elevation||0)/7;
       const shell=new THREE.Box3(
@@ -917,9 +996,26 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
         new THREE.Vector3(level.width/14,bottom+level.height/7,level.depth/14)
       ).applyMatrix4(levelGroup.matrixWorld);
       buildingBounds.union(shell);
-      renderedBounds.union(new THREE.Box3().setFromObject(levelGroup));
+      const rendered=new THREE.Box3().setFromObject(levelGroup);
+      renderedBounds.union(rendered);
+      if(activeBuildingId && (level.buildingId||level.id)===activeBuildingId){
+        selectedBounds.union(shell);
+        selectedRenderedBounds.union(rendered);
+      }
     });
-    const fit=cameraFitRef.current;
+    cameraRigRef.current.selectedBounds.copy(selectedBounds);
+    if(!selectedBounds.isEmpty()){
+      const pivot=selectedBounds.getCenter(new THREE.Vector3());
+      let selectedRadius=0;
+      for(const x of [selectedRenderedBounds.min.x,selectedRenderedBounds.max.x])
+        for(const y of [selectedRenderedBounds.min.y,selectedRenderedBounds.max.y])
+          for(const z of [selectedRenderedBounds.min.z,selectedRenderedBounds.max.z])
+            selectedRadius=Math.max(selectedRadius,pivot.distanceTo(new THREE.Vector3(x,y,z)));
+      cameraRigRef.current.selectedRadius=selectedRadius;
+    }else cameraRigRef.current.selectedRadius=0;
+    cameraRigRef.current.siteBounds.copy(new THREE.Box3().setFromObject(group));
+    environmentBoundsRef.current?.(cameraRigRef.current.siteBounds);
+    const fit=cameraRigRef.current.fit;
     if(!buildingBounds.isEmpty()){
       // Frame the full rendered geometry, including roofs, cornices and trim,
       // while keeping the orbit pivot on the structural building center.
@@ -929,39 +1025,80 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
         for(const y of [renderedBounds.min.y,renderedBounds.max.y])
           for(const z of [renderedBounds.min.z,renderedBounds.max.z])
             radius=Math.max(radius,center.distanceTo(new THREE.Vector3(x,y,z)));
-      lastBoundsRef.current.copy(buildingBounds);
-      framingRadiusRef.current=radius;
-      const needed=templeFitDistance(radius,camera);
+      cameraRigRef.current.allBounds.copy(buildingBounds);
+      cameraRigRef.current.allRadius=radius;
+      const needed=cameraRigRef.current.distance(radius,camera);
       const firstBuild=!fit.initialized;
       const hadNoBuilding=fit.buildingCount===0;
       fit.fitRadius=needed;
-      // Scene edits update the reset target and fit distance, but never move the
-      // live camera. Only first load, explicit Center Temple, or orientation reset
-      // can change the camera's target and radius.
-      if(firstBuild || (hadNoBuilding && !fit.userFramed)){
-        cameraFocusRef.current={x:center.x,z:center.z};
-        targetYRef.current=center.y;
-        cameraPanRef.current={x:0,y:0,z:0,manual:false};
-        orbitRef.current.radius=needed;
-        orbitRef.current.theta=0;
-        orbitRef.current.phi=0.90;
+      // Edits update fit bounds without resetting orbit or zoom. The framed
+      // building's structural midpoint follows completed moves and level changes;
+      // selection alone never switches the live camera to a different building.
+      if(firstBuild || hadNoBuilding){
+        // The first frame should target the actual selected building geometry.
+        const initialBounds=selectedBounds.isEmpty()?buildingBounds:selectedBounds;
+        const initialCenter=initialBounds.getCenter(new THREE.Vector3());
+        cameraRigRef.current.focusedBuildingId=activeBuildingId||null;
+        cameraRigRef.current.focus={x:initialCenter.x,z:initialCenter.z};
+        cameraRigRef.current.targetY=initialCenter.y;
+        cameraRigRef.current.pan={x:0,y:0,z:0,manual:false};
+        cameraRigRef.current.orbit.radius=cameraRigRef.current.distance(selectedBounds.isEmpty()?radius:cameraRigRef.current.selectedRadius,camera);
+        cameraRigRef.current.orbit.theta=0;
+        cameraRigRef.current.orbit.phi=1.22;
       }
       fit.initialized=true;fit.lastSpan=radius;
     }else{
-      lastBoundsRef.current.makeEmpty();framingRadiusRef.current=0;fit.initialized=false;
+      cameraRigRef.current.focusedBuildingId=null;cameraRigRef.current.allBounds.makeEmpty();cameraRigRef.current.selectedBounds.makeEmpty();cameraRigRef.current.allRadius=0;cameraRigRef.current.selectedRadius=0;fit.initialized=false;
       // Clear stale camera framing when the last building is removed; preserve the
       // current user view until Center Temple is explicitly requested.
-      fit.fitRadius=25;
+      fit.fitRadius=30;
     }
     fit.buildingCount=levels.length;
+    syncFocusedBuildingRef.current();
+    renderer.shadowMap.needsUpdate=true;
     renderCameraRef.current();
 
-  },[levels,perimeter,statues,siteColumns,landscapeItems]);
+  },[levels,perimeter,statues,siteColumns,landscapeItems,pendingLevelIndex]);
 
   useEffect(()=>{sceneryApplyRef.current?.(scenery);renderCameraRef.current();},[scenery]);
 
+  syncFocusedBuildingRef.current=()=>{
+    // Keep drag rays stable while a piece is under the finger. Rebase the orbit
+    // pivot only after the drag ends, or after structural edits have rendered.
+    if(movingLevelRef.current!==null)return;
+    const rig=cameraRigRef.current,owner=rig.focusedBuildingId;if(!owner)return;
+    const bounds=new THREE.Box3();
+    levelGroupsRef.current.forEach((g,i)=>{
+      const l=liveRef.current.levels[i];if(!l||(l.buildingId||l.id)!==owner)return;
+      g.updateWorldMatrix(true,true);
+      bounds.union(new THREE.Box3(new THREE.Vector3(-l.width/14,(l.elevation||0)/7,-l.depth/14),new THREE.Vector3(l.width/14,((l.elevation||0)+l.height)/7,l.depth/14)).applyMatrix4(g.matrixWorld));
+    });
+    if(rig.followBuilding(owner,bounds))renderCameraRef.current();
+  };
+
+  selectionBoundsRef.current=()=>{
+    const active=liveRef.current.levels[liveRef.current.selectedLevel]||liveRef.current.levels[0];
+    const owner=active?.buildingId||active?.id;
+    const shell=new THREE.Box3(),rendered=new THREE.Box3();
+    levelGroupsRef.current.forEach((g,i)=>{
+      const l=liveRef.current.levels[i];if(!l||(l.buildingId||l.id)!==owner)return;
+      g.updateWorldMatrix(true,true);
+      shell.union(new THREE.Box3(new THREE.Vector3(-l.width/14,l.elevation/7,-l.depth/14),new THREE.Vector3(l.width/14,(l.elevation+l.height)/7,l.depth/14)).applyMatrix4(g.matrixWorld));
+      rendered.union(new THREE.Box3().setFromObject(g));
+    });
+    const rig=cameraRigRef.current;rig.selectedBounds.copy(shell);
+    if(!shell.isEmpty()){
+      const center=shell.getCenter(new THREE.Vector3());let radius=0;
+      for(const x of [rendered.min.x,rendered.max.x])for(const y of [rendered.min.y,rendered.max.y])for(const z of [rendered.min.z,rendered.max.z])radius=Math.max(radius,center.distanceTo(new THREE.Vector3(x,y,z)));
+      rig.selectedRadius=radius;
+    }
+  };
+  useEffect(()=>{if(gridRef.current)gridRef.current.visible=showGrid;renderCameraRef.current();},[showGrid]);
+  useEffect(()=>{const renderer=rendererRef.current;if(renderer){renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,quality==="detail"?2:1.5));renderCameraRef.current();}},[quality]);
+
   // Selection highlighting does not require rebuilding geometry or reframing the camera.
   useEffect(()=>{
+    selectionBoundsRef.current();
     levelGroupsRef.current.forEach((group,index)=>group.traverse(object=>{
       if(!(object instanceof THREE.Mesh))return;
       const materials=Array.isArray(object.material)?object.material:[object.material];
@@ -971,5 +1108,26 @@ export default function Temple3DPreview({ levels, pendingLevelIndex, perimeter, 
     if(scene&&renderer&&camera)renderCameraRef.current();
   },[selectedLevel,levels]);
 
-  return <div className="absolute inset-0"><div ref={hostRef} className="absolute inset-0" /><button type="button" onClick={()=>resetCameraRef.current()} className="absolute right-3 top-20 z-30 rounded-xl bg-black/70 px-3 py-2 text-xs font-semibold text-white shadow-lg">Center Temple</button><div className="pointer-events-none absolute bottom-[128px] left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-black/45 px-3 py-2 text-xs text-white/70">{moveMode?"Move mode: drag an object • two fingers to pan or zoom":"Swipe to orbit • two fingers to pan or zoom • tap to edit"}</div></div>;
+  useEffect(()=>{
+    statueGroupsRef.current.forEach(group=>group.traverse(object=>{
+      if(!(object instanceof THREE.Mesh))return;
+      const materials=Array.isArray(object.material)?object.material:[object.material];
+      for(const material of materials)if(material instanceof THREE.MeshStandardMaterial){material.emissive.setHex(group.userData.statueId===selectedStatueId?0x241d08:0);material.emissiveIntensity=.22;}
+    }));renderCameraRef.current();
+  },[selectedStatueId,statues]);
+
+  return <div className="absolute inset-0">
+    <div ref={hostRef} className="absolute inset-0" aria-label="Interactive 3D temple site" />
+    <div className="studio-view-tools absolute right-3 top-24 z-20 flex flex-col gap-1.5" aria-label="View controls">
+      <button aria-label="Center Temple" title="Frame selected building" className="flex-col" onClick={()=>viewRef.current("temple")}><b className="text-base leading-none">◎</b><small className="text-[8px] leading-none">Center</small><span>Center Temple</span></button>
+      <button aria-label="View landscape" title="See the woodland, hills and water around your temple" onClick={()=>viewRef.current("landscape")} className="flex-col"><b className="text-base leading-none">♧</b><small className="text-[8px] leading-none">Scenery</small></button>
+      <button aria-label="Whole site" title="Frame all buildings, walls and site pieces" onClick={()=>viewRef.current("site")}>▧<span>Whole site</span></button>
+      <button aria-label="Front" title="Front elevation" onClick={()=>viewRef.current("front")}>▤<span>Front</span></button>
+      <button aria-label="Plan" title="Overhead plan" onClick={()=>viewRef.current("plan")}>◇<span>Plan</span></button>
+      <button aria-pressed={showGrid} onClick={()=>setShowGrid(v=>!v)}>⌗<span>Grid</span></button>
+      <button aria-pressed={quality==="detail"} onClick={()=>setQuality(v=>v==="auto"?"detail":"auto")}>✧<span>{quality==="auto"?"Balanced":"Fine detail"}</span></button>
+      <button aria-label="Capture" title="Download a picture of your temple" onClick={()=>snapshotRef.current()}>▣<span>Capture</span></button>
+    </div>
+    {renderError&&<div role="alert" className="absolute inset-x-6 top-1/3 z-40 rounded-2xl bg-slate-950/95 p-6 text-center"><p className="font-semibold">The 3D view needs to reconnect.</p><p className="mt-2 text-sm text-slate-300">Your saved design stays on this device.</p><button className="mt-4 rounded-xl bg-amber-200 px-4 py-2 text-slate-950" onClick={()=>window.location.reload()}>Reload view</button></div>}
+  </div>;
 }

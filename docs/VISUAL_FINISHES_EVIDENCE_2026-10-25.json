@@ -1,0 +1,67 @@
+{
+  "baseline": "781c83c610ece43c7cd11d603e03ac860766ba9b",
+  "automatedChecks": 51,
+  "templates": [
+    {
+      "name": "Temple of the Sun",
+      "vertices": 16664,
+      "drawCalls": 223,
+      "textures": 17,
+      "baselineTextures": 17
+    },
+    {
+      "name": "Eternal Courtyard",
+      "vertices": 30233,
+      "drawCalls": 306,
+      "textures": 20,
+      "baselineTextures": 14
+    },
+    {
+      "name": "Celestial Shrine",
+      "vertices": 27050,
+      "drawCalls": 365,
+      "textures": 20,
+      "baselineTextures": 20
+    },
+    {
+      "name": "Marble Pantheon",
+      "vertices": 57534,
+      "drawCalls": 1307,
+      "textures": 17,
+      "baselineTextures": 14
+    },
+    {
+      "name": "Cathedral of Echoes",
+      "vertices": 48383,
+      "drawCalls": 739,
+      "textures": 17,
+      "baselineTextures": 14
+    },
+    {
+      "name": "Temple of Unity",
+      "vertices": 47524,
+      "drawCalls": 734,
+      "textures": 20,
+      "baselineTextures": 17
+    }
+  ],
+  "materialChoicesVerified": [
+    "marble",
+    "sandstone",
+    "limestone",
+    "travertine",
+    "granite",
+    "stone",
+    "brick",
+    "concrete",
+    "stucco",
+    "plaster",
+    "timber",
+    "bronze",
+    "gold",
+    "obsidian"
+  ],
+  "browserErrors": [],
+  "softwareWebGL": true,
+  "physicalPhoneTested": false
+}

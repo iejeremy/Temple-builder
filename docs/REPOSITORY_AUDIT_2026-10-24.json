@@ -1,0 +1,318 @@
+{
+  "baseline": "388732b4d6a2a103eb2a693decaa926f8dd7c9e5",
+  "scope": "All 52 tracked files at baseline; first-party source/config/tests/docs read, generated lockfile structurally inspected. Runtime tests are separately scoped; dependency internals are not exhaustively source-audited.",
+  "files": [
+    {
+      "path": ".gitignore",
+      "baseline_lines": 5,
+      "baseline_sha256": "6f5d9561bf6ca0b4aae0552a0f9023dda3dcf79c2f41f024792eac8ee278e1df",
+      "review": "Checked build/dependency/generated/environment exclusions."
+    },
+    {
+      "path": "DEFERRED_IMPROVEMENTS.md",
+      "baseline_lines": 107,
+      "baseline_sha256": "829c9063eaaf05069d8b2393032d42ec637e9f5a5e8d61fe39e8e0df475b9c2c",
+      "review": "Read complete historical document and compare claims/limits against current code; prior change notes remain historical, not proof that all features currently satisfy every requirement."
+    },
+    {
+      "path": "IMPROVEMENTS_OCT_2026.md",
+      "baseline_lines": 16,
+      "baseline_sha256": "3b8eabe033eac8d43727e1e1b9008bb50c8fec95b46b173f18d0045f0719aa29",
+      "review": "Read complete historical document and compare claims/limits against current code; prior change notes remain historical, not proof that all features currently satisfy every requirement."
+    },
+    {
+      "path": "README.md",
+      "baseline_lines": 18,
+      "baseline_sha256": "6d9bd8db83604b13e20ebded126a6259ae17b5af4bd4ab124853572720d3e490",
+      "review": "Read complete historical document and compare claims/limits against current code; prior change notes remain historical, not proof that all features currently satisfy every requirement."
+    },
+    {
+      "path": "builderMaterialMaps.ts",
+      "baseline_lines": 68,
+      "baseline_sha256": "9aa2b7c65294d2de49a80aed3845f0d062a5eb295dc643f33417ab99e6f53f56",
+      "review": "Read legacy root procedural texture helper; inactive in the live runtime import chain."
+    },
+    {
+      "path": "catalog.ts",
+      "baseline_lines": 76,
+      "baseline_sha256": "7142f2bc4af214f98efd996c6e08a5d8b25f8a2ffc47ad72bf4532bd2e8a45ba",
+      "review": "Read legacy root piece catalogue; not used by the active page."
+    },
+    {
+      "path": "docs/CAMERA_CENTERING_2026-10-24.md",
+      "baseline_lines": 38,
+      "baseline_sha256": "1dc20f21c868cdbbe0ef43b5566d0bc5b0ace2738bf1acca6bacc79a106b6455",
+      "review": "Read complete historical document and compare claims/limits against current code; prior change notes remain historical, not proof that all features currently satisfy every requirement."
+    },
+    {
+      "path": "docs/CLEAR_SITE_2026-10-23.md",
+      "baseline_lines": 13,
+      "baseline_sha256": "c4ca9c8462c8318c6bd07732292f556de37c894ca422942edc1aae4eddc91473",
+      "review": "Read complete historical document and compare claims/limits against current code; prior change notes remain historical, not proof that all features currently satisfy every requirement."
+    },
+    {
+      "path": "docs/ECHOES_3D_INTEGRATION.md",
+      "baseline_lines": 31,
+      "baseline_sha256": "667b9c39d859dfe8d94cc0b2b3f226502356bbb2dafa612bad43d99f4230c70a",
+      "review": "Read complete historical document and compare claims/limits against current code; prior change notes remain historical, not proof that all features currently satisfy every requirement."
+    },
+    {
+      "path": "docs/LANDSCAPE_UPGRADE_2026-10-23.md",
+      "baseline_lines": 24,
+      "baseline_sha256": "7e19db25fce1e4b9c6f63313fa25b4d82cc6c6d88be5937307eb8c5c0029ebef",
+      "review": "Read complete historical document and compare claims/limits against current code; prior change notes remain historical, not proof that all features currently satisfy every requirement."
+    },
+    {
+      "path": "docs/LIGHTING_GROUND_2026-10-24.md",
+      "baseline_lines": 22,
+      "baseline_sha256": "450dbb14fd913c0f8ad871002fb46dbb1d02d4a9d481fa171b6b101d131f7602",
+      "review": "Read complete historical document and compare claims/limits against current code; prior change notes remain historical, not proof that all features currently satisfy every requirement."
+    },
+    {
+      "path": "docs/NATURAL_LANDSCAPE_2026-10-24.md",
+      "baseline_lines": 33,
+      "baseline_sha256": "a44c82fa57dd8a83cd80778b118cf68ce95ee031d585cadcfa147ac9f85c0050",
+      "review": "Read complete historical document and compare claims/limits against current code; prior change notes remain historical, not proof that all features currently satisfy every requirement."
+    },
+    {
+      "path": "docs/NATURAL_SCENERY_2026-10-23.md",
+      "baseline_lines": 30,
+      "baseline_sha256": "ca1538f0b486563fef4e91637e0e31ff68e589d1bd5ea4d39df8b49af99a0f83",
+      "review": "Read complete historical document and compare claims/limits against current code; prior change notes remain historical, not proof that all features currently satisfy every requirement."
+    },
+    {
+      "path": "docs/STUDIO_UPGRADE_2026-10-23.md",
+      "baseline_lines": 76,
+      "baseline_sha256": "e0c90f95b3df3c0af10f8ef1d5a3eedd312501870a0c61797967656ba4d4f9a1",
+      "review": "Read complete historical document and compare claims/limits against current code; prior change notes remain historical, not proof that all features currently satisfy every requirement."
+    },
+    {
+      "path": "docs/TREE_FOLIAGE_CORRECTION_2026-10-24.md",
+      "baseline_lines": 13,
+      "baseline_sha256": "7dfc912e36453501a8ab44efd1fbc8dce493f95eaa065214c1497e19e988de40",
+      "review": "Read complete historical document and compare claims/limits against current code; prior change notes remain historical, not proof that all features currently satisfy every requirement."
+    },
+    {
+      "path": "docs/WATER_REFINEMENT_2026-10-24.md",
+      "baseline_lines": 22,
+      "baseline_sha256": "d93e18b2bb53a8957e303df12d7586dd97c7077ee5ddbb148c8b6945f08aaebe",
+      "review": "Read complete historical document and compare claims/limits against current code; prior change notes remain historical, not proof that all features currently satisfy every requirement."
+    },
+    {
+      "path": "globals.css",
+      "baseline_lines": 14,
+      "baseline_sha256": "0c8dbccd93e46603543a09a4a19d42426ffd6c4ed83e58489f01c309ad376fbb",
+      "review": "Read legacy root stylesheet; not imported by the live App Router layout."
+    },
+    {
+      "path": "next-env.d.ts",
+      "baseline_lines": 2,
+      "baseline_sha256": "879741880b6ab48da99dcc06dcc674d381c9826137b0496bf7bb368f302de9fc",
+      "review": "Checked ambient Next/image declarations; compiler input, not runtime camera code."
+    },
+    {
+      "path": "package-lock.json",
+      "baseline_lines": 2211,
+      "baseline_sha256": "3772aeadd863f072b19edafeb6cd1486bc5fe8edb99ba2ba2cfe979522955431",
+      "review": "Parsed every package entry and checked package versions, resolution URLs/integrity fields, framework-only version changes and npm advisory output; generated data review rather than handwritten-code review."
+    },
+    {
+      "path": "package.json",
+      "baseline_lines": 29,
+      "baseline_sha256": "b2d372b60c3b6f49f70b3fecc205ec9a4f54a27f7190843bc0c2491e31bd6f0d",
+      "review": "Checked commands, exact engine/framework/React pins, peer compatibility and maintenance update; build command does not run regression tests automatically."
+    },
+    {
+      "path": "postcss.config.js",
+      "baseline_lines": 6,
+      "baseline_sha256": "fa650b380adfabb151a0b352f7135e107e6352345f899060f1c5c231228f94bf",
+      "review": "Read complete build/compiler/style configuration and trace its entry-point effect."
+    },
+    {
+      "path": "scripts/verify-camera-center.cjs",
+      "baseline_lines": 45,
+      "baseline_sha256": "4d80fd3745ed664a71dc6e9a3046a7e0e1feec253d5008a1eb1a32b17beda0a0",
+      "review": "Read full browser script, selectors, test storage, projections, viewport/DPR defaults, error checks and server/browser teardown; limitations recorded in report."
+    },
+    {
+      "path": "scripts/verify-clear-site.cjs",
+      "baseline_lines": 43,
+      "baseline_sha256": "a1cf370ca2a8b252625b2f4c6dd6c28bd9e684af49a6763b1846b5842f6d0e0b",
+      "review": "Read full browser script, selectors, test storage, projections, viewport/DPR defaults, error checks and server/browser teardown; limitations recorded in report."
+    },
+    {
+      "path": "scripts/verify-environment.cjs",
+      "baseline_lines": 34,
+      "baseline_sha256": "425ace1ace804e692d8499a624d158b29e6285c9e201882d9a4bb4f75576da0c",
+      "review": "Read full browser script, selectors, test storage, projections, viewport/DPR defaults, error checks and server/browser teardown; limitations recorded in report."
+    },
+    {
+      "path": "scripts/verify-lighting-ground.cjs",
+      "baseline_lines": 13,
+      "baseline_sha256": "760807d227d59b16e84379539da9692a2d8a58421407ccbeb9c324578f2bfbd0",
+      "review": "Read full browser script, selectors, test storage, projections, viewport/DPR defaults, error checks and server/browser teardown; limitations recorded in report."
+    },
+    {
+      "path": "scripts/verify-scenery.cjs",
+      "baseline_lines": 34,
+      "baseline_sha256": "10e1a5f0df88e899361a726fe5984f5dac8a383f3eccc3a149d523b9b86aafdc",
+      "review": "Read full browser script, selectors, test storage, projections, viewport/DPR defaults, error checks and server/browser teardown; limitations recorded in report."
+    },
+    {
+      "path": "scripts/verify-studio.cjs",
+      "baseline_lines": 101,
+      "baseline_sha256": "5c219b5451af8b1b31ef9417d1d7722b91eb552f58a33b711ce3cb85aebf4d89",
+      "review": "Read full browser script, selectors, test storage, projections, viewport/DPR defaults, error checks and server/browser teardown; limitations recorded in report."
+    },
+    {
+      "path": "scripts/verify-water.cjs",
+      "baseline_lines": 29,
+      "baseline_sha256": "b61666add9e9b0d2b38d24b640858dda52fd7d830dcd59658df7c73afa500557",
+      "review": "Read full browser script, selectors, test storage, projections, viewport/DPR defaults, error checks and server/browser teardown; limitations recorded in report."
+    },
+    {
+      "path": "src/app/globals.css",
+      "baseline_lines": 43,
+      "baseline_sha256": "16972a5be54aadf026d22640e6ce56a6cc9d45bb39cd1800c3354adefd44091b",
+      "review": "Read complete responsive studio CSS, overlays, touch/focus and reduced-motion rules; no canvas size constraint was present."
+    },
+    {
+      "path": "src/app/layout.tsx",
+      "baseline_lines": 18,
+      "baseline_sha256": "f00bcb61a22def3df4d21fbbe4ee8405a06e84916305e3e6668ba2077ec9c100",
+      "review": "Checked actual App Router entry, active CSS import, metadata and children rendering."
+    },
+    {
+      "path": "src/app/page.tsx",
+      "baseline_lines": 680,
+      "baseline_sha256": "be83d00774a9f6e30d897c2710cd6b3a19422d52ed51230a09ae102383d8b5a6",
+      "review": "Read all state, restoration/autosave, six templates, ownership, placement, levels, attachment menus, perimeter, site objects, Clear/Undo and export paths. Storage/contract risks remain recorded below."
+    },
+    {
+      "path": "src/components/Temple3DPreview.tsx",
+      "baseline_lines": 1068,
+      "baseline_sha256": "c6830362d7051ea0f6012fef121b746ababeaa9a07719560b3ec6923f17f7ac1",
+      "review": "Read complete scene initialization, render scheduling, all pointer handlers, resize/display/quality paths, architectural/scenery generation, caches/disposal, bounds, selection and view controls. Canvas-size and pinch-integration defects corrected."
+    },
+    {
+      "path": "src/components/TempleCameraController.ts",
+      "baseline_lines": 99,
+      "baseline_sha256": "f298ffe57d4e1838afad1630ad38e5126718eff0206006c318004481e3cc210e",
+      "review": "Read all target, orbit, damping, fitting, ground limits, owner-following and projection methods; controller is the sole main-camera transform owner."
+    },
+    {
+      "path": "src/components/TempleGlyph.tsx",
+      "baseline_lines": 6,
+      "baseline_sha256": "33e47e41b01d6077e70aab2f1e91119d20083842d9d69b3cdfe696083a27bfe7",
+      "review": "Read all SVG shape/thumbnail branches; no renderer or camera state."
+    },
+    {
+      "path": "src/components/builderGeometry.ts",
+      "baseline_lines": 45,
+      "baseline_sha256": "1b3418e0708b8bf455ce055fd8cc181499ec507182ed6d6d49cb2379e0714f61",
+      "review": "Read batching/tag preservation and rotated perimeter/gate planning; geometric invariants tested."
+    },
+    {
+      "path": "src/components/builderMaterialMaps.ts",
+      "baseline_lines": 110,
+      "baseline_sha256": "ee2df7692c3290bde84dcf0a442c3df9bb6e2985d4f0963e23de35f160b4f44b",
+      "review": "Read all map generation, colors/data spaces, cache/retain/release paths; no camera mutation."
+    },
+    {
+      "path": "src/components/environmentLandscape.ts",
+      "baseline_lines": 161,
+      "baseline_sha256": "15103b03fc6a59eae1dbbe519935a9104a922714693298320ae5656c35a7c7b9",
+      "review": "Read all scenery construction, spatial indexing, clearings, clustering, instancing, themes and disposal paths; decorative group excluded from pick/fit."
+    },
+    {
+      "path": "src/components/naturalLighting.ts",
+      "baseline_lines": 86,
+      "baseline_sha256": "545c740802ff77e3881c42dc4b32fce699247b8fbfd4514c92b04bee2e07c744",
+      "review": "Read all ground, radiance, theme constants, contact-map creation and disposal paths."
+    },
+    {
+      "path": "src/components/naturalScenery.ts",
+      "baseline_lines": 77,
+      "baseline_sha256": "82e221f5f83187e652192e8d016d2f4139a38cbe17b3d8447e533be54c43f8ac",
+      "review": "Read every placeable boulder/grass/hill/river/creek branch and legacy fallback."
+    },
+    {
+      "path": "src/components/sceneryTrees.ts",
+      "baseline_lines": 46,
+      "baseline_sha256": "4dab0e23f5b3a4687888054dec9296a886e5dba29ba5fe40d43a106299ea629c",
+      "review": "Read every species, timber, fine leaf, color and instancing branch; approved size/count budget preserved."
+    },
+    {
+      "path": "src/components/sceneryWater.ts",
+      "baseline_lines": 82,
+      "baseline_sha256": "9d817a976d76d58e70aa98aa445c3638ec47b885344ebf5276604528cf4e97fe",
+      "review": "Read every curve, bank/surface color-alpha, normals, filtering, ownership/disposal and ripple path."
+    },
+    {
+      "path": "src/lib/temple-builder/catalog.ts",
+      "baseline_lines": 76,
+      "baseline_sha256": "7142f2bc4af214f98efd996c6e08a5d8b25f8a2ffc47ad72bf4532bd2e8a45ba",
+      "review": "Read preserved catalogue and type import; not used by active page."
+    },
+    {
+      "path": "src/lib/temple-builder/types.ts",
+      "baseline_lines": 38,
+      "baseline_sha256": "08c03450217568a52f68767605513bac2a4ed27e8a1a626676e10fea5f82b98f",
+      "review": "Read preserved v2 piece schema; not the active page level model."
+    },
+    {
+      "path": "tailwind.config.js",
+      "baseline_lines": 10,
+      "baseline_sha256": "b4e9dd76fb5feb8597f02ea9cba9bec23836da62783e2acb25a56afc545e63f9",
+      "review": "Read complete build/compiler/style configuration and trace its entry-point effect."
+    },
+    {
+      "path": "tests/environment-audit.mjs",
+      "baseline_lines": 105,
+      "baseline_sha256": "16a399697a3630be554db123e799c7fdafcbe142c214937cf1ba8c5ac984aa8a",
+      "review": "Read full production-source extraction/VM setup, test fixtures and every assertion; test scope distinguished from hardware and exhaustive-path proof."
+    },
+    {
+      "path": "tests/geometry-audit.mjs",
+      "baseline_lines": 27,
+      "baseline_sha256": "cc91023c961de7f258155aee9d5eca44c8aacf8846d7e66a90f3fdc2653ca38e",
+      "review": "Read full production-source extraction/VM setup, test fixtures and every assertion; test scope distinguished from hardware and exhaustive-path proof."
+    },
+    {
+      "path": "tests/interaction-audit.cjs",
+      "baseline_lines": 150,
+      "baseline_sha256": "89386dc8779ff439a7b583b0d9248396a9e4031022841496e540fd061eb2ad37",
+      "review": "Read full production-source extraction/VM setup, test fixtures and every assertion; test scope distinguished from hardware and exhaustive-path proof."
+    },
+    {
+      "path": "tests/lighting-ground-audit.mjs",
+      "baseline_lines": 32,
+      "baseline_sha256": "5c76d99d56a767b023555fc39d414d6bfdc93cfa869855872a8f2c5795648001",
+      "review": "Read full production-source extraction/VM setup, test fixtures and every assertion; test scope distinguished from hardware and exhaustive-path proof."
+    },
+    {
+      "path": "tests/scenery-audit.mjs",
+      "baseline_lines": 24,
+      "baseline_sha256": "2fdfb7429409fe16700effd1e4c3436e72e662a7953b97aa6b8a59caa6ea6b48",
+      "review": "Read full production-source extraction/VM setup, test fixtures and every assertion; test scope distinguished from hardware and exhaustive-path proof."
+    },
+    {
+      "path": "tests/water-audit.mjs",
+      "baseline_lines": 27,
+      "baseline_sha256": "a5c8a04f4597edacdc2aa0af381bed3ee69f59e4ba4801f00664f872ce101fda",
+      "review": "Read full production-source extraction/VM setup, test fixtures and every assertion; test scope distinguished from hardware and exhaustive-path proof."
+    },
+    {
+      "path": "tsconfig.json",
+      "baseline_lines": 21,
+      "baseline_sha256": "ed981cda9d74810e9818debec3af62037fe2758ce376c1a04af2f0c16510a354",
+      "review": "Read complete build/compiler/style configuration and trace its entry-point effect."
+    },
+    {
+      "path": "types.ts",
+      "baseline_lines": 38,
+      "baseline_sha256": "08c03450217568a52f68767605513bac2a4ed27e8a1a626676e10fea5f82b98f",
+      "review": "Read legacy piece schema; not the active page level model."
+    }
+  ]
+}
