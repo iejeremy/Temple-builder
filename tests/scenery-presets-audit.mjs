@@ -70,10 +70,14 @@ test('mountain cliffs and snow-covered peaks stay outside the editable clearing'
   }
   const geometry = peaks.children[0].geometry;
   const position = geometry.getAttribute('position'), color = geometry.getAttribute('color');
+  let snowyCrests = 0, darkFaces = 0, snowyApron = 0;
   for (let i = 0; i < position.count; i++) {
-    if (position.getY(i) > .9) assert.ok(color.getX(i) > .8);
-    if (position.getY(i) < .1) assert.ok(color.getX(i) < .3);
+    const y = position.getY(i), red = color.getX(i);
+    if (y > .73 && red > .7) snowyCrests++;
+    if (y > .18 && y < .55 && red < .3) darkFaces++;
+    if (y < .03 && red > .65) snowyApron++;
   }
+  assert.ok(snowyCrests > 8 && darkFaces > 30 && snowyApron > 20);
   env.setTheme('garden');
   assert.deepEqual([cliffs.visible, peaks.visible, water.visible], [false, false, false]);
   env.dispose();
@@ -83,8 +87,18 @@ test('island water surrounds the clearing without crossing its corners', () => {
   const env = createEnvironmentLandscape();
   env.setTheme('island');
   const water = env.root.getObjectByName('environment-island-water');
+  const foam = env.root.getObjectByName('environment-island-surf');
+  const wetSand = env.root.getObjectByName('environment-island-wet-sand');
   const original = water.geometry;
+  assert.equal(foam.visible, true);
+  assert.equal(wetSand.visible, true);
+  const foamColors = foam.geometry.getAttribute('color');
+  assert.equal(foamColors.itemSize, 4);
+  assert.equal(foamColors.getW(0), 0);
+  assert.notEqual(foamColors.getW(129), foamColors.getW(145));
   env.setTheme('garden');
+  assert.equal(foam.visible, false);
+  assert.equal(wetSand.visible, false);
   env.setTheme('island');
   assert.equal(water.geometry, original);
   for (const bounds of [new THREE.Box3(), new THREE.Box3(new THREE.Vector3(30, 0, -20), new THREE.Vector3(65, 15, 12))]) {
