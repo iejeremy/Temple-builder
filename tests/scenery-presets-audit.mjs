@@ -8,8 +8,8 @@ const cache={};
 function load(name){if(cache[name])return cache[name];const module={exports:{}};vm.runInNewContext(ts.transpile(readFileSync('src/components/'+name+'.ts','utf8'),{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}),{module,exports:module.exports,require:path=>path==='three'?THREE:load(path.slice(2))});cache[name]=module.exports;return module.exports;}
 const {sceneryPresets,sceneryThemes,isSceneryTheme}=load('sceneryPresets');
 const {createEnvironmentLandscape}=load('environmentLandscape');
-test('six stable scenery choices include the existing themes and reject unknown saved values',()=>{
- assert.deepEqual(Array.from(sceneryThemes),['garden','desert','twilight','autumn','alpine','coast']);
+test('nine stable scenery choices include the existing themes and reject unknown saved values',()=>{
+ assert.deepEqual(Array.from(sceneryThemes),['garden','desert','twilight','autumn','alpine','coast','mountain-cut','island','snowy-summit']);
  for(const id of sceneryThemes){assert.ok(isSceneryTheme(id));assert.ok(sceneryPresets[id].name);assert.ok(sceneryPresets[id].description);}
  for(const bad of ['constructor','toString','unknown',null,{},6])assert.equal(isSceneryTheme(bad),false);
 });
@@ -48,4 +48,71 @@ test('coastal sea stays outside moved/wide building clearings and dry scenery ca
   }
  }
  env.dispose();
+});
+
+test('mountain cliffs and snow-covered peaks stay outside the editable clearing', () => {
+  const env = createEnvironmentLandscape();
+  const cliffs = env.root.getObjectByName('environment-mountain-cut');
+  const peaks = env.root.getObjectByName('environment-snowy-summit');
+  const water = env.root.getObjectByName('environment-island-water');
+  for (const [theme, group] of [['mountain-cut', cliffs], ['snowy-summit', peaks]]) {
+    env.setTheme(theme);
+    assert.deepEqual([cliffs.visible, peaks.visible, water.visible], [group === cliffs, group === peaks, false]);
+    for (const bounds of [new THREE.Box3(), new THREE.Box3(new THREE.Vector3(30, 0, -20), new THREE.Vector3(65, 15, 12))]) {
+      env.setBounds(bounds);
+      const { hx, hz } = env.root.userData.clearing;
+      env.root.updateMatrixWorld(true);
+      const clearing = new THREE.Box3(new THREE.Vector3(-hx, 0, -hz), new THREE.Vector3(hx, 100, hz)).translate(env.root.position);
+      for (const ridge of group.children) {
+        assert.equal(new THREE.Box3().setFromObject(ridge, true).intersectsBox(clearing), false);
+      }
+    }
+  }
+  const geometry = peaks.children[0].geometry;
+  const position = geometry.getAttribute('position'), color = geometry.getAttribute('color');
+  let snowyCrests = 0, darkFaces = 0, snowyApron = 0;
+  for (let i = 0; i < position.count; i++) {
+    const y = position.getY(i), red = color.getX(i);
+    if (y > .73 && red > .7) snowyCrests++;
+    if (y > .18 && y < .55 && red < .3) darkFaces++;
+    if (y < .03 && red > .65) snowyApron++;
+  }
+  assert.ok(snowyCrests > 8 && darkFaces > 30 && snowyApron > 20);
+  env.setTheme('garden');
+  assert.deepEqual([cliffs.visible, peaks.visible, water.visible], [false, false, false]);
+  env.dispose();
+});
+
+test('island water surrounds the clearing without crossing its corners', () => {
+  const env = createEnvironmentLandscape();
+  env.setTheme('island');
+  const water = env.root.getObjectByName('environment-island-water');
+  const foam = env.root.getObjectByName('environment-island-surf');
+  const wetSand = env.root.getObjectByName('environment-island-wet-sand');
+  const original = water.geometry;
+  assert.equal(foam.visible, true);
+  assert.equal(wetSand.visible, true);
+  const foamColors = foam.geometry.getAttribute('color');
+  assert.equal(foamColors.itemSize, 4);
+  assert.equal(foamColors.getW(0), 0);
+  assert.notEqual(foamColors.getW(129), foamColors.getW(145));
+  env.setTheme('garden');
+  assert.equal(foam.visible, false);
+  assert.equal(wetSand.visible, false);
+  env.setTheme('island');
+  assert.equal(water.geometry, original);
+  for (const bounds of [new THREE.Box3(), new THREE.Box3(new THREE.Vector3(30, 0, -20), new THREE.Vector3(65, 15, 12))]) {
+    env.setBounds(bounds);
+    const { hx, hz } = env.root.userData.clearing;
+    env.root.updateMatrixWorld(true);
+    const hitsWater = (x, z) => {
+      const origin = new THREE.Vector3(x, 5, z).add(env.root.position);
+      return new THREE.Raycaster(origin, new THREE.Vector3(0, -1, 0)).intersectObject(water).length > 0;
+    };
+    assert.equal(water.visible, true);
+    for (const [x, z] of [[0, 0], [hx, hz], [-hx, hz], [hx, -hz], [-hx, -hz]]) assert.equal(hitsWater(x, z), false);
+    for (const [x, z] of [[hx * 1.25 + 5, 0], [-hx * 1.25 - 5, 0], [0, hz * 1.25 + 5], [0, -hz * 1.25 - 5]]) assert.equal(hitsWater(x, z), true);
+  }
+  assert.notEqual(water.geometry, original);
+  env.dispose();
 });
