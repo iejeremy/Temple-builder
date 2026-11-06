@@ -5,6 +5,7 @@ import { addNaturalScenery } from "./naturalScenery";
 import { contactShadowTexture } from "./naturalLighting";
 import { waterGeometry, bankGeometry, createWaterMaterials, rippleGeometry } from "./sceneryWater";
 import { shadeBoulderSurface, shadeGrassSurface } from "./scenerySurfaces";
+import { createSceneryBackdrops } from "./sceneryBackdrops";
 
 const random=(n:number)=>{const x=Math.sin(n*127.1+41.7)*43758.5453;return x-Math.floor(x);};
 type Course={curve:THREE.CatmullRomCurve3;width:number;bank:THREE.Mesh;water:THREE.Mesh};
@@ -30,6 +31,7 @@ export function createEnvironmentLandscape(){
   const hillMesh=hillSource.children[0] as THREE.Mesh;
   const hills=new THREE.InstancedMesh(hillMesh.geometry,hillMesh.material,8);hills.name="environment-near-hills";hills.receiveShadow=true;root.add(hills);
   const waterMaterials=createWaterMaterials(),bankMaterial=waterMaterials.bank,waterMaterial=waterMaterials.water;
+  const backdrops=createSceneryBackdrops(waterMaterial);root.add(backdrops.root);
   const courses:Course[]=[];
   for(const width of [2.6,1.05]){
     const bank=new THREE.Mesh(new THREE.BufferGeometry(),bankMaterial),water=new THREE.Mesh(new THREE.BufferGeometry(),waterMaterial);
@@ -174,8 +176,14 @@ export function createEnvironmentLandscape(){
   };
   applyTheme=()=>{
     const theme=currentTheme,preset=sceneryPresets[theme],coastal=theme==="coast",shore=(root.userData.clearing?.hz||7)+7;
+    const island=theme==="island",snowy=theme==="snowy-summit",mountain=theme==="mountain-cut";
+    const {hx,hz}=root.userData.clearing;
+    backdrops.setTheme(theme,hx,hz);
     root.userData.theme=theme;
-    woodland.visible=preset.forest!=="none";treeContacts.visible=woodland.visible;grass.visible=theme!=="desert";
+    woodland.visible=preset.forest!=="none";treeContacts.visible=woodland.visible;
+    grass.visible=theme!=="desert"&&!island&&!snowy&&!mountain;
+    rocks.visible=rockContacts.visible=!island;
+    hills.visible=!island&&!snowy&&!mountain;
     // Change background species only. Every tree retains its established position,
     // scale and hundreds of small leaves, with the same two meshes per tree.
     woodland.children.slice().forEach((old,i)=>{
@@ -207,7 +215,8 @@ export function createEnvironmentLandscape(){
       }
       mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();
     }
-    for(const c of courses){c.bank.visible=theme!=="desert"&&!coastal;c.water.visible=c.bank.visible;}ripples.visible=theme!=="desert"&&!coastal;
+    const showCourses=theme!=="desert"&&!coastal&&!island&&!snowy&&!mountain;
+    for(const c of courses){c.bank.visible=showCourses;c.water.visible=showCourses;}ripples.visible=showCourses;
     ocean.visible=beach.visible=coastal;ocean.position.set(0,.062,shore+1024);beach.position.set(0,.025,shore);
     waterMaterial.color.setHex(theme==="twilight"?0xc5d0de:theme==="alpine"?0xb9dce4:0xffffff);
     const target=sceneryPresets[theme].ground.grass,base=sceneryPresets.garden.ground.grass;

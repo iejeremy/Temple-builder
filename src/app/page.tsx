@@ -640,10 +640,11 @@ export default function TempleBuilderPage() {
           <p className="mb-2 text-xs text-white/65">Choose a setting for your world. Your buildings and placed pieces stay where they are.</p>
           <div className="flex snap-x gap-2 overflow-x-auto pb-1">{sceneryThemes.map(id=>{const preset=sceneryPresets[id];return <button key={id} aria-pressed={scenery===id} onClick={()=>setScenery(id)} className={`w-40 shrink-0 snap-start overflow-hidden rounded-xl border text-left ${scenery===id?"border-amber-200 bg-amber-200/15":"border-white/15 bg-white/5"}`}>
             <span aria-hidden="true" className="relative block h-14 overflow-hidden" style={{background:`linear-gradient(${preset.skyTop},${preset.skyBottom})`}}>
-              <span className="absolute inset-x-0 bottom-0 h-10" style={{background:preset.swatch,clipPath:id==="alpine"?"polygon(0 100%,0 80%,25% 15%,40% 65%,65% 0,100% 80%,100% 100%)":"polygon(0 100%,0 70%,25% 30%,55% 60%,80% 40%,100% 70%,100% 100%)"}}/>
+              <span className="absolute inset-x-0 bottom-0 h-10" style={{background:preset.swatch,clipPath:id==="alpine"||id==="snowy-summit"?"polygon(0 100%,0 80%,25% 15%,40% 65%,65% 0,100% 80%,100% 100%)":id==="mountain-cut"?"polygon(0 100%,0 40%,23% 5%,42% 78%,57% 78%,77% 10%,100% 45%,100% 100%)":"polygon(0 100%,0 70%,25% 30%,55% 60%,80% 40%,100% 70%,100% 100%)"}}/>
               {id==="coast"&&<span className="absolute inset-x-0 bottom-0 h-4" style={{background:preset.water}}/>}
+              {id==="island"&&<span className="absolute inset-x-0 bottom-0 h-7" style={{background:preset.water}}><span className="absolute inset-x-8 top-1 h-4 rounded-[50%]" style={{background:preset.swatch}}/></span>}
               {id==="autumn"&&<span className="absolute bottom-1 left-5 h-7 w-8 rounded-full bg-orange-500/80 shadow-[30px_5px_0_#b48e35]"/>}
-              {id==="alpine"&&<span className="absolute left-[57%] top-3 h-3 w-6 bg-slate-100" style={{clipPath:"polygon(0 100%,50% 0,100% 100%,65% 70%,45% 95%,30% 65%)"}}/>}
+              {(id==="alpine"||id==="snowy-summit")&&<span className="absolute left-[57%] top-3 h-3 w-6 bg-slate-100" style={{clipPath:"polygon(0 100%,50% 0,100% 100%,65% 70%,45% 95%,30% 65%)"}}/>}
             </span><span className="block px-3 pb-2 pt-1"><span className="block text-xs font-semibold">{preset.name}</span><span className="block text-[10px] text-white/60">{preset.description}</span></span>
           </button>;})}</div>
         </section>}

@@ -1,4 +1,4 @@
-// Real browser evidence for the six scenery choices and preservation boundaries.
+// Real browser evidence for the nine scenery choices and preservation boundaries.
 const {spawn}=require('node:child_process');
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES+'/playwright');
@@ -23,7 +23,7 @@ const inspect=()=>{
   await page.getByRole('button',{name:'+ Add',exact:true}).click();await page.getByRole('button',{name:/Scenery/}).click();await page.getByRole('button',{name:'+ tree',exact:true}).click();await page.getByRole('button',{name:'Done',exact:true}).first().click();
   await page.getByRole('button',{name:'View landscape',exact:true}).click();await page.waitForTimeout(600);
   const baseline=await page.evaluate(inspect),savedBefore=await page.evaluate(()=>JSON.parse(localStorage.getItem('echoes-temple-builder-v1')));
-  for(const [id,label] of [['garden','Garden'],['desert','Desert'],['twilight','Twilight'],['autumn','Autumn Forest'],['alpine','Alpine Meadow'],['coast','Coast']]){
+  for(const [id,label] of [['garden','Garden'],['desert','Desert'],['twilight','Twilight'],['autumn','Autumn Forest'],['alpine','Alpine Meadow'],['coast','Coast'],['mountain-cut','Mountain Cut'],['island','Island Sanctuary'],['snowy-summit','Snowy Summit']]){
    await page.getByRole('button',{name:'+ Add',exact:true}).click();await page.getByRole('button',{name:/Scenery/}).click();
    await page.waitForTimeout(200);const choiceCamera=(await page.evaluate(inspect)).camera;
    const choice=page.getByRole('region',{name:'World scenery'}).getByRole('button',{name:new RegExp('^'+label)});await choice.click();assert.equal(await choice.getAttribute('aria-pressed'),'true');
@@ -38,8 +38,8 @@ const inspect=()=>{
    results.push({id,trees:state.trees,sea:state.sea,textures:state.textures,geometries:state.geometries});console.log('PASS: '+label+' — exact saved pieces/geometry/camera and reload');
   }
   await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'+ Add',exact:true}).click();await page.getByRole('button',{name:/Scenery/}).click();await page.screenshot({path:path.join(output,'picker-portrait.png'),timeout:90000});
-  const coast=page.getByRole('region',{name:'World scenery'}).getByRole('button',{name:/^Coast/});await coast.scrollIntoViewIfNeeded();await coast.click();await page.getByRole('button',{name:'Done',exact:true}).first().click();await page.screenshot({path:path.join(output,'coast-portrait.png'),timeout:90000});
-  const dl=page.waitForEvent('download');await page.getByRole('button',{name:/Save copy/}).click();const raw=JSON.parse(fs.readFileSync(await(await dl).path(),'utf8'));assert.equal(raw.scenery,'coast');
-  assert.deepEqual(errors,[]);fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({results,errors,physicalPhoneTested:false},null,2));console.log('PASS: mobile carousel, Coast export and no JavaScript/WebGL errors');
+  const summit=page.getByRole('region',{name:'World scenery'}).getByRole('button',{name:/^Snowy Summit/});await summit.scrollIntoViewIfNeeded();await summit.click();await page.getByRole('button',{name:'Done',exact:true}).first().click();await page.screenshot({path:path.join(output,'snowy-summit-portrait.png'),timeout:90000});
+  const dl=page.waitForEvent('download');await page.getByRole('button',{name:/Save copy/}).click();const raw=JSON.parse(fs.readFileSync(await(await dl).path(),'utf8'));assert.equal(raw.scenery,'snowy-summit');
+  assert.deepEqual(errors,[]);fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({results,errors,physicalPhoneTested:false},null,2));console.log('PASS: mobile carousel, Snowy Summit export and no JavaScript/WebGL errors');
  }finally{if(browser)await browser.close();server.kill();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
